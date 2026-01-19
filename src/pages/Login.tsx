@@ -1,4 +1,6 @@
+import { useNavigate } from 'react-router-dom';
 const Login = () => {
+    const navigate = useNavigate()
     return (
         <div className="min-h-screen w-full bg-[#030e17] flex items-center justify-center p-4 relative overflow-hidden font-sans">
             {/* Background decoration (optional subtle gradient) */}
@@ -69,8 +71,9 @@ const Login = () => {
                     <button
                         type="button"
                         className="w-full bg-black hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition duration-200 flex items-center justify-center gap-3"
+                        onClick={() => navigate('/register')}
                     >
-                        {/* Simple Google/Default Icon placeholder since we don't have icons installed yet */}
+
                         <span>ลงทะเบียน</span>
                     </button>
                 </div>
