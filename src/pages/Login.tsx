@@ -1,14 +1,50 @@
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import axios from 'axios';
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema, type LoginFormValues } from '../schemas/auth';
+
+
 const Login = () => {
-    const navigate = useNavigate()
+
+    const navigate = useNavigate();
+    const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
+        resolver: zodResolver(loginSchema)
+    });
+    const { login } = useAuth();
+
+    const onSubmit = async (values: LoginFormValues) => {
+        try {
+
+            const formData = new URLSearchParams();
+            formData.append('username', values.email); // OAuth2
+            formData.append('password', values.password);
+            const res = await axios.post(
+                "http://localhost:8080/api/v1/auth/login",
+                formData,
+                {
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    }
+                }
+            );
+
+            // keep Token to Context
+            login(res.data.access_token, { email: values.email });
+            alert("Login สำเร็จ!");
+            navigate('/dashboard');
+        } catch (err: any) {
+            alert(err.response?.data?.detail || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+        }
+    };
+
     return (
         <div className="min-h-screen w-full bg-[#030e17] flex items-center justify-center p-4 relative overflow-hidden font-sans">
-            {/* Background decoration (optional subtle gradient) */}
             <div className="absolute inset-0 bg-gradient-to-br from-[#051626] to-[#000000] z-0" />
 
             <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
-
-                {/* Left Side - Text Content */}
+                {/* Left Side */}
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left">
                     <h1 className="text-5xl md:text-5xl font-bold leading-tight tracking-tight">
                         สรุปโพสต์จาก X <br />
@@ -20,44 +56,42 @@ const Login = () => {
                 </div>
 
                 {/* Right Side - Login Form */}
-                <div className="w-full md:w-[480px] bg-white rounded-2xl shadow-2xl p-8 md:p-10">
+                <form onSubmit={handleSubmit(onSubmit)} className="w-full md:w-[480px] bg-white rounded-2xl shadow-2xl p-8 md:p-10 space-y-6">
                     <div className="text-center mb-8">
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">เข้าสู่ระบบ</h2>
                         <p className="text-gray-500 text-sm">เข้าสู่ระบบเพื่อเริ่มใช้งาน Foro-x-social</p>
                     </div>
 
-                    <form className="space-y-6">
-                        <div className="space-y-2">
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                                อีเมล
-                            </label>
-                            <input
-                                type="email"
-                                id="email"
-                                placeholder="your@email.com"
-                                className="w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none"
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">อีเมล</label>
+                        <input
+                            {...register("email")}
+                            type="email"
+                            id="email"
+                            placeholder="your@email.com"
+                            className={`w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none ${errors.email ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                        />
+                        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+                    </div>
 
-                        <div className="space-y-2">
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                                รหัสผ่าน
-                            </label>
-                            <input
-                                type="password"
-                                id="password"
-                                placeholder="••••••••"
-                                className="w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none"
-                            />
-                        </div>
+                    <div className="space-y-2">
+                        <label htmlFor="password" className="block text-sm font-medium text-gray-700">รหัสผ่าน</label>
+                        <input
+                            {...register("password")}
+                            type="password"
+                            id="password"
+                            placeholder="••••••••"
+                            className={`w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none ${errors.password ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                        />
+                        {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+                    </div>
 
-                        <button
-                            type="submit"
-                            className="w-full bg-[#001f3f] hover:bg-[#003366] text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
-                        >
-                            เข้าสู่ระบบ
-                        </button>
-                    </form>
+                    <button
+                        type="submit"
+                        className="w-full bg-[#001f3f] hover:bg-[#003366] text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
+                    >
+                        เข้าสู่ระบบ
+                    </button>
 
                     <div className="relative my-8">
                         <div className="absolute inset-0 flex items-center">
@@ -73,10 +107,9 @@ const Login = () => {
                         className="w-full bg-black hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition duration-200 flex items-center justify-center gap-3"
                         onClick={() => navigate('/register')}
                     >
-
                         <span>ลงทะเบียน</span>
                     </button>
-                </div>
+                </form>
             </div>
         </div>
     );
