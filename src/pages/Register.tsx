@@ -21,7 +21,7 @@ const Register = () => {
             });
             alert("สมัครสมาชิกสำเร็จ!");
             console.log(response.data);
-            navigate("/login")
+            navigate("/")
         } catch (error: any) {
             alert(error.response?.data?.detail || "เกิดข้อผิดพลาด");
         }
