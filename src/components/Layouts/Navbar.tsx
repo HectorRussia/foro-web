@@ -2,24 +2,33 @@ import { FaHome } from 'react-icons/fa';
 import { HiMiniUsers } from 'react-icons/hi2';
 import { LuLogOut } from "react-icons/lu";
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../contexts/AuthContext';
 const iconsNav = [
-    { icon: <FaHome />, label: "หน้าแรก", active: true, path: "/dashboard" },
-    { icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", active: false, path: "/dashboard" },
-    { icon: <LuLogOut />, label: "ออกจากระบบ", active: false, path: "/" },
+    { id: 1, icon: <FaHome />, label: "หน้าแรก", active: true, path: "/dashboard" },
+    { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", active: false, path: "/dashboard" },
+    { id: 3, icon: <LuLogOut />, label: "ออกจากระบบ", active: false, path: "/" },
 ]
 
 interface NavbarProp {
+    id: number,
     icon: React.ReactNode,
     label: string,
     active?: boolean,
     path: string
 }
 
-const NavbarStruct = ({ icon, label, active = false, path }: NavbarProp) => {
+const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => {
     const navigate = useNavigate()
+    const { logout } = useAuth();
+    const pathNave = (path: string) => {
+        if (id === 3) {
+            logout();
+        }
+        navigate(path)
+    }
     return (
         <div
-            onClick={() => navigate(path)}
+            onClick={() => pathNave(path)}
             className=
             {`flex items-center gap-4 px-4 py-4 rounded-xl cursor-pointer transition-all duration-200 group 
                 ${active
@@ -40,7 +49,7 @@ const Navbar = () => {
     return (
         <nav className="flex-1 space-y-2 w-full">
             {iconsNav.map((item, index) => (
-                <NavbarStruct key={index} icon={item.icon} label={item.label} active={item.active} path={item.path} />
+                <NavbarStruct id={item.id} key={index} icon={item.icon} label={item.label} active={item.active} path={item.path} />
             ))}
         </nav>
     )
