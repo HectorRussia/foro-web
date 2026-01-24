@@ -4,8 +4,8 @@ import { LuLayoutDashboard } from 'react-icons/lu';
 import DashboardCard from '../DashboardCard';
 import api from '../../api/axiosInstance';
 
-const CATEGORIES = ['หมวดรวม', 'เทคโนโลยี', 'การตลาด'];
-const TIME_FILTERS = ['วันนี้', '7 วัน', '30 วัน'];
+const CATEGORIES = ["หมวดรวม", "เทคโนโลยี", "การตลาด"];
+const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
 
 const iconMain = [{
     icon: <LuLayoutDashboard />,
@@ -33,29 +33,46 @@ export interface PaginatedNewsResponse {
     has_next: boolean;
     has_prev: boolean;
 }
+
 const Main = () => {
 
     const [activeCategory, setActiveCategory] = useState('หมวดรวม');
     const [activeTime, setActiveTime] = useState('วันนี้');
     const [news, setNews] = useState<PaginatedNewsResponse | null>(null);
-    const fetchNews = async (page = 1, range = null) => {
+    const [isLoading, setIsLoading] = useState(false);
+    const fetchNews = async (page = 1, range: number | null = null) => {
         try {
+
+            if (isLoading) return;
+            setIsLoading(true);
+
             const response = await api.get<PaginatedNewsResponse>('/news', {
                 params: {
                     page: page,
                     limit: 10,
-                    days_range: range // ส่ง 1, 7, 30 หรือ null = ทั้งหมด
+                    days_range: range
                 }
             });
             setNews(response.data);
         } catch (error) {
             console.error('Error fetching news:', error);
         }
+        finally {
+            setIsLoading(false);
+        }
+    };
+
+    const timeRangeMap: Record<string, number | null> = {
+        'ทั้งหมด': null,
+        'วันนี้': 1,
+        '7 วัน': 7,
+        '30 วัน': 30,
+        'เก่ากว่า 30 วัน': -30,
     };
 
     useEffect(() => {
-        fetchNews();
-    }, []);
+        fetchNews(1, timeRangeMap[activeTime]);
+    }, [activeTime]);
 
     return (
         <main className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
@@ -104,11 +121,12 @@ const Main = () => {
                         {TIME_FILTERS.map(time => (
                             <button
                                 key={time}
+                                disabled={isLoading}
                                 onClick={() => setActiveTime(time)}
-                                className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all ${activeTime === time
-                                    ? 'bg-[#1e293b] text-white shadow-sm'
-                                    : 'text-gray-400 hover:text-gray-200'
-                                    }`}
+                                className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all 
+                                            ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} 
+                                            ${activeTime === time ? 'bg-[#1e293b] text-white' : 'text-gray-400'}
+                                        `}
                             >
                                 {time}
                             </button>

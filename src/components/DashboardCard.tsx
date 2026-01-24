@@ -55,14 +55,14 @@ const DashboardCard = ({ post }: { post: NewsItem }) => {
 
             <div className="flex items-center gap-2 pt-4 border-t border-[#1e293b]">
                 <a href={post.url} target="_blank" rel="noopener noreferrer" className="flex-1">
-                    <button className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-blue-400 transition-all text-sm font-medium border border-transparent hover:border-blue-900/30">
+                    <button className="w-full flex items-center justify-center gap-2 cursor-pointer py-2.5 rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-blue-400 transition-all text-sm font-medium border border-transparent hover:border-blue-900/30">
                         {iconsDash[1].icon}
                         ดูโพสต์ต้นทาง
                     </button>
                 </a>
                 <button
                     onClick={handleCopy}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-green-400 transition-all text-sm font-medium border border-transparent hover:border-green-900/30"
+                    className="flex-1 flex items-center justify-center gap-2 cursor-pointer py-2.5 rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-green-400 transition-all text-sm font-medium border border-transparent hover:border-green-900/30"
                 >
                     {copied ? <FaCheck className="text-green-500" /> : iconsDash[2].icon}
                     {copied ? <span className="text-green-500">คัดลอกแล้ว</span> : "คัดลอกลิงก์"}
