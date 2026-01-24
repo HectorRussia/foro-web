@@ -11,7 +11,7 @@ const api = axios.create({
 // Request Interceptor: แนบ Access Token ไปใน Header ทุกครั้ง
 api.interceptors.request.use(
     (config) => {
-        const token = localStorage.getItem('accessToken'); // หรือดึงจาก Context
+        const token = localStorage.getItem('accessToken');
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }

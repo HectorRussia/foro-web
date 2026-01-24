@@ -30,6 +30,8 @@ const Login = () => {
                     }
                 }
             );
+
+            localStorage.setItem('accessToken', res.data.access_token);
             // keep Token to Context
             login(res.data.access_token, {
                 email: values.email,
