@@ -9,7 +9,7 @@ const iconsDash = [
     { icon: <FaCopy />, label: "Copy" },
 ]
 
-const DashboardCard = ({ post }: { post: NewsItem }) => {
+const DashboardCard = ({ post, variant = 'list' }: { post: NewsItem, variant?: 'list' | 'grid' | 'compact' }) => {
     const [copied, setCopied] = useState(false);
 
     const handleCopy = () => {
@@ -18,54 +18,75 @@ const DashboardCard = ({ post }: { post: NewsItem }) => {
         setTimeout(() => setCopied(false), 2000);
     };
 
+    const isCompact = variant === 'compact';
+    const isGrid = variant === 'grid';
+
     return (
-        <div className="group bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 transition-all duration-200 hover:border-gray-600 hover:shadow-xl hover:shadow-black/20">
-            <div className="flex items-start justify-between mb-4">
+        <div className={`group bg-[#0f172a] border border-[#1e293b] rounded-2xl transition-all duration-200 hover:border-gray-600 hover:shadow-xl hover:shadow-black/20 flex flex-col
+            ${isCompact ? 'p-4' : 'p-6'}
+            ${isGrid ? 'h-full justify-between' : ''}
+        `}>
+            <div className={`flex items-start justify-between ${isCompact ? 'mb-2' : 'mb-4'}`}>
                 <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${post.user_id}`}>
+                    <div className={`
+                        rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden shrink-0
+                        ${isCompact ? 'w-8 h-8' : 'w-10 h-10'}
+                        ${post.user_id}
+                    `}>
                         {post.tweet_profile_pic
-                            ?
-                            <img src={post.tweet_profile_pic} alt="picture owner post" className="w-full h-full rounded-full" />
-                            :
-                            <div className='w-full h-full rounded-full flex items-center justify-center text-white font-bold text-sm bg-[#1e293b]'>{post.title.charAt(0)}</div>
+                            ? <img src={post.tweet_profile_pic} alt="owner" className="w-full h-full object-cover" />
+                            : <div className='w-full h-full bg-[#1e293b] flex items-center justify-center'>{post.title.charAt(0)}</div>
                         }
                     </div>
-                    <div>
-                        <h3 className="font-semibold text-white text-[20px] leading-tight">{post.title}</h3>
-                        <p className="text-gray-500 text-sm mt-1">{post.title} post on {new Date(post.created_at).toLocaleDateString('th-TH')}</p>
+                    <div className="min-w-0">
+                        <h3 className={`font-semibold text-white leading-tight truncate pr-2 ${isCompact ? 'text-base' : 'text-lg'}`}>
+                            {post.title}
+                        </h3>
+                        {!isCompact && (
+                            <p className="text-gray-500 text-xs mt-1 truncate">
+                                {new Date(post.created_at).toLocaleDateString('th-TH')}
+                            </p>
+                        )}
                     </div>
                 </div>
+
                 {/* Options Icon */}
-                <button className="text-gray-500 hover:text-white p-1 rounded-full hover:bg-white/5 transition-colors">
+                <button className={`text-gray-500 hover:text-white rounded-full hover:bg-white/5 transition-colors ${isCompact ? 'p-1' : 'p-2'}`}>
                     {iconsDash[0].icon}
                 </button>
             </div>
 
-            <p className="flex items-center gap-2 text-gray-300 text-base leading-relaxed mb-4 font-light">
+            <div className={`text-gray-300 font-light overflow-hidden
+                ${isCompact ? 'text-sm mb-3 line-clamp-2' : 'text-base mb-4'}
+                ${isGrid ? 'grow line-clamp-4' : ''}
+            `}>
                 {post.content}
-            </p>
-
-            <div className="flex flex-wrap gap-2 mb-6">
-                {/*  {post.tags.map((tag: string) => (
-                <span key={tag} className="px-3 py-1 rounded-full bg-[#1e293b] border border-[#334155] text-xs text-blue-300 group-hover:border-blue-500/30 transition-colors">
-                    #{tag}
-                </span>
-            ))} */}
             </div>
 
-            <div className="flex items-center gap-2 pt-4 border-t border-[#1e293b]">
+            <div className="flex flex-wrap gap-2 mb-auto">
+                {/* Tags placeholder if needed */}
+            </div>
+
+            <div className={`flex items-center gap-2 border-t border-[#1e293b] ${isCompact ? 'pt-2 mt-auto' : 'pt-4 mt-auto'}`}>
                 <a href={post.url} target="_blank" rel="noopener noreferrer" className="flex-1">
-                    <button className="w-full flex items-center justify-center gap-2 cursor-pointer py-2.5 rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-blue-400 transition-all text-sm font-medium border border-transparent hover:border-blue-900/30">
+                    <button className={`w-full flex items-center justify-center gap-2 cursor-pointer rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-blue-400 transition-all font-medium border border-transparent hover:border-blue-900/30
+                        ${isCompact ? 'py-1.5 text-xs' : 'py-2.5 text-sm'}
+                    `}>
                         {iconsDash[1].icon}
-                        ดูโพสต์ต้นทาง
+                        <span className={isGrid ? 'hidden xl:inline' : ''}>ดูโพสต์</span>
                     </button>
                 </a>
                 <button
                     onClick={handleCopy}
-                    className="flex-1 flex items-center justify-center gap-2 cursor-pointer py-2.5 rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-green-400 transition-all text-sm font-medium border border-transparent hover:border-green-900/30"
+                    className={`flex-1 flex items-center justify-center gap-2 cursor-pointer rounded-lg bg-black/40 hover:bg-black/60 text-gray-400 hover:text-green-400 transition-all font-medium border border-transparent hover:border-green-900/30
+                        ${isCompact ? 'py-1.5 text-xs' : 'py-2.5 text-sm'}
+                    `}
                 >
                     {copied ? <FaCheck className="text-green-500" /> : iconsDash[2].icon}
-                    {copied ? <span className="text-green-500">คัดลอกแล้ว</span> : "คัดลอกลิงก์"}
+                    {copied ?
+                        <span className="text-green-500">คัดลอก</span>
+                        : <span className={isGrid ? 'hidden xl:inline' : ''}>คัดลอก</span>
+                    }
                 </button>
             </div>
         </div>

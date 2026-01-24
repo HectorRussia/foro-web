@@ -34,12 +34,27 @@ export interface PaginatedNewsResponse {
     has_prev: boolean;
 }
 
+const LAYOUT_OPTIONS = [
+    { id: 'list', label: 'Standard', icon: <LuLayoutDashboard /> },
+    { id: 'grid', label: 'Grid', icon: <LuLayoutDashboard className="rotate-90" /> },
+    { id: 'compact', label: 'Compact', icon: <LuLayoutDashboard className="scale-y-75" /> }
+] as const;
+
+const timeRangeMap: Record<string, number | null> = {
+    'ทั้งหมด': null,
+    'วันนี้': 1,
+    '7 วัน': 7,
+    '30 วัน': 30,
+    'เก่ากว่า 30 วัน': -30,
+};
 const Main = () => {
 
     const [activeCategory, setActiveCategory] = useState('หมวดรวม');
     const [activeTime, setActiveTime] = useState('วันนี้');
     const [news, setNews] = useState<PaginatedNewsResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
+    const [layoutMode, setLayoutMode] = useState<'list' | 'grid' | 'compact'>('list');
+
     const fetchNews = async (page = 1, range: number | null = null) => {
         try {
 
@@ -62,34 +77,58 @@ const Main = () => {
         }
     };
 
-    const timeRangeMap: Record<string, number | null> = {
-        'ทั้งหมด': null,
-        'วันนี้': 1,
-        '7 วัน': 7,
-        '30 วัน': 30,
-        'เก่ากว่า 30 วัน': -30,
-    };
+
 
     useEffect(() => {
         fetchNews(1, timeRangeMap[activeTime]);
     }, [activeTime]);
+
 
     return (
         <main className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
             {/* Header */}
             <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-400">
+                    <h1 className="text-2xl md:text-3xl font-bold bg-clip-text text-transparent bg-linear-to-r from-white to-gray-400">
                         แดชบอร์ดข่าวสารของคุณ
                     </h1>
-                    <p className="text-gray-400 text-sm mt-1">ติดตามกระแสและสรุปเนื้อหาที่คุณสนใจล่าสุด</p>
+                    <p className="text-gray-400 text-sm mt-1">ติดตามกระแสและอ่านสรุปเนื้อหาโดย LLM จากสิ่งที่คุณสนใจที่สุด</p>
                 </div>
 
-                <div className="flex items-center gap-3 z-100">
-                    <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] border border-gray-700 transition-all text-sm font-medium">
-                        {iconMain[0].icon}
-                        <span className="hidden sm:inline">เลือกเลย์เอาต์</span>
-                    </button>
+                <div className="flex items-center gap-3 z-50">
+                    <div className="relative group">
+                        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] border border-gray-700 transition-all text-sm font-medium z-10 relative">
+                            {layoutMode === 'list' && <LuLayoutDashboard />}
+                            {layoutMode === 'grid' && <LuLayoutDashboard className="rotate-90" />}
+                            {layoutMode === 'compact' && <LuLayoutDashboard className="scale-y-75" />}
+                            <span className="hidden sm:inline">
+                                {layoutMode === 'list' ? 'Standard' : layoutMode === 'grid' ? 'Grid View' : 'Compact'}
+                            </span>
+                        </button>
+
+                        {/* Dropdown Menu */}
+                        <div className="absolute left-0 md:left-auto md:right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-left md:origin-top-right z-50">
+                            <div className="p-1">
+                                {LAYOUT_OPTIONS.map((option) => (
+                                    <button
+                                        key={option.id}
+                                        onClick={() => setLayoutMode(option.id)}
+                                        className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
+                                            ${layoutMode === option.id
+                                                ? 'bg-blue-600 text-white'
+                                                : 'text-gray-300 hover:bg-gray-700 hover:text-white'
+                                            }`}
+                                    >
+                                        <span className={option.id === 'grid' ? 'rotate-90' : option.id === 'compact' ? 'scale-y-75' : ''}>
+                                            <LuLayoutDashboard />
+                                        </span>
+                                        {option.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
                     <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all text-sm font-medium">
                         {iconMain[1].icon}
                         <span>เพิ่มหมวดใหม่</span>
@@ -117,7 +156,7 @@ const Main = () => {
 
                 {/* Time Filters & Secondary Actions */}
                 <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1e293b] pb-4">
-                    <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-lg border border-[#1e293b]">
+                    <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-lg border border-[#1e293b] overflow-x-auto max-w-full">
                         {TIME_FILTERS.map(time => (
                             <button
                                 key={time}
@@ -139,9 +178,16 @@ const Main = () => {
             </div>
 
             {/* Cards Grid */}
-            <div className="space-y-4">
+            <div className={`
+                ${layoutMode === 'grid'
+                    ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'
+                    : layoutMode === 'compact'
+                        ? 'flex flex-col space-y-2'
+                        : 'flex flex-col space-y-4'
+                }
+            `}>
                 {news?.items?.map(post => (
-                    <DashboardCard key={post.id} post={post} />
+                    <DashboardCard key={post.id} post={post} variant={layoutMode} />
                 ))}
             </div>
         </main>
