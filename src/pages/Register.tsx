@@ -3,6 +3,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { RegisterSchema, type RegisterInput } from "../schemas/auth";
 import { useNavigate } from "react-router-dom";
+
+const BASE_URL = import.meta.env.VITE_API_URL;
 const Register = () => {
 
     const navigate = useNavigate();
@@ -12,15 +14,16 @@ const Register = () => {
 
     const onSubmit = async (data: RegisterInput) => {
         try {
-            const response = await axios.post("http://localhost:8080/api/v1/auth/register", {
+
+            await axios.post(`${BASE_URL}/auth/register`, {
                 name: data.name,
                 last_name: data.lastname,
                 phone: data.phone,
                 email: data.email,
                 password: data.password,
             });
+
             alert("สมัครสมาชิกสำเร็จ!");
-            console.log(response.data);
             navigate("/")
         } catch (error: any) {
             alert(error.response?.data?.detail || "เกิดข้อผิดพลาด");
@@ -37,10 +40,14 @@ const Register = () => {
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left order-2 md:order-1">
                     <h1 className="text-4xl md:text-6xl font-bold leading-tight tracking-tight">
                         สร้างบัญชีใหม่ <br />
-                        <span className="text-blue-500">Foro-x-social</span>
+                        <img
+                            src="/images/logo-foro.png"
+                            alt="Foro Logo"
+                            className="block h-16 md:h-40 w-auto object-contain mt-4 drop-shadow-2xl "
+                        />
                     </h1>
                     <p className="text-gray-400 text-lg md:text-xl font-light">
-                        เข้าร่วมชุมชนแลกเปลี่ยนข้อมูลและติดตามสรุปเนื้อหาที่คุณสนใจ
+                        เข้าร่วมเพื่อติดตามสรุปเนื้อหาที่คุณสนใจ
                     </p>
                 </div>
 
@@ -129,7 +136,10 @@ const Register = () => {
                             <button
                                 type="submit"
                                 disabled={isSubmitting}
-                                className="w-full bg-[#001f3f] hover:bg-[#003366] disabled:opacity-50 text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
+                                className={`w-full bg-[#001f3f]  
+                                hover:bg-[#003366] disabled:opacity-50 text-white 
+                                font-medium py-3 rounded-lg transition duration-200 shadow-md
+                                ${isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer "}`}
                             >
                                 {isSubmitting ? "กำลังสมัคร..." : "ยืนยันการสมัคร"}
                             </button>

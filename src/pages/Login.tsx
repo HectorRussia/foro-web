@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginFormValues } from '../schemas/auth';
 
+const BASE_URL = import.meta.env.VITE_API_URL;
 
 const Login = () => {
 
@@ -21,7 +22,7 @@ const Login = () => {
             formData.append('username', values.email); // OAuth2
             formData.append('password', values.password);
             const res = await axios.post(
-                "http://localhost:8080/api/v1/auth/login",
+                `${BASE_URL}/auth/login`,
                 formData,
                 {
                     headers: {
@@ -32,7 +33,6 @@ const Login = () => {
 
             // keep Token to Context
             login(res.data.access_token, { email: values.email });
-            alert("Login สำเร็จ!");
             navigate('/dashboard');
         } catch (err: any) {
             alert(err.response?.data?.detail || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
@@ -88,7 +88,7 @@ const Login = () => {
 
                     <button
                         type="submit"
-                        className="w-full bg-[#001f3f] hover:bg-[#003366] text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
+                        className="w-full bg-[#001f3f] cursor-pointer hover:bg-[#003366] text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
                     >
                         เข้าสู่ระบบ
                     </button>
@@ -104,7 +104,7 @@ const Login = () => {
 
                     <button
                         type="button"
-                        className="w-full bg-black hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition duration-200 flex items-center justify-center gap-3"
+                        className="w-full bg-black cursor-pointer hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition duration-200 flex items-center justify-center gap-3"
                         onClick={() => navigate('/register')}
                     >
                         <span>ลงทะเบียน</span>
