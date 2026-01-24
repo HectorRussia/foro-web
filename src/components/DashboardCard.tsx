@@ -23,7 +23,12 @@ const DashboardCard = ({ post }: { post: NewsItem }) => {
             <div className="flex items-start justify-between mb-4">
                 <div className="flex items-center gap-3">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm ${post.user_id}`}>
-                        <img src={post.tweet_profile_pic} alt="picture owner post" className="w-full h-full rounded-full" />
+                        {post.tweet_profile_pic
+                            ?
+                            <img src={post.tweet_profile_pic} alt="picture owner post" className="w-full h-full rounded-full" />
+                            :
+                            <div className='w-full h-full rounded-full flex items-center justify-center text-white font-bold text-sm bg-[#1e293b]'>{post.title.charAt(0)}</div>
+                        }
                     </div>
                     <div>
                         <h3 className="font-semibold text-white text-[20px] leading-tight">{post.title}</h3>
