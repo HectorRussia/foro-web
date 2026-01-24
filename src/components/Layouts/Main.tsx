@@ -1,37 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { FaPlus } from 'react-icons/fa6';
 import { LuLayoutDashboard } from 'react-icons/lu';
 import DashboardCard from '../DashboardCard';
-// Mock Data for the dashboard
-const POSTS = [
-    {
-        id: 1,
-        author: 'Tech News Thailand',
-        handle: '@technewsth',
-        avatarColor: 'bg-blue-600',
-        content: 'เทคโนโลยี AI กำลังเปลี่ยนแปลงวงการธุรกิจไทย ด้วยการนำมาใช้ในการวิเคราะห์ข้อมูลและปรับปรุงประสบการณ์ลูกค้า',
-        tags: ['AI', 'TechThailand', 'Innovation'],
-        date: '2 ชั่วโมงที่แล้ว'
-    },
-    {
-        id: 2,
-        author: 'Digital Today',
-        handle: '@digitaltoday',
-        avatarColor: 'bg-purple-600',
-        content: '5 เทรนด์ Digital Marketing ปี 2024 ที่นักการตลาดต้องรู้ เน้นการใช้ AI และ Personalization',
-        tags: ['DigitalMarketing', 'Trends2024'],
-        date: '5 ชั่วโมงที่แล้ว'
-    },
-    {
-        id: 3,
-        author: 'Startup Thailand',
-        handle: '@startupth',
-        avatarColor: 'bg-green-600',
-        content: 'รวบรวมแหล่งทุนสำหรับ Startup ไทยในไตรมาสที่ 1 พร้อมเทคนิคการ Pitching ให้ผ่านฉลุย',
-        tags: ['Startup', 'Investment', 'Funding'],
-        date: '1 วันที่แล้ว'
-    }
-];
+import api from '../../api/axiosInstance';
+
 const CATEGORIES = ['หมวดรวม', 'เทคโนโลยี', 'การตลาด'];
 const TIME_FILTERS = ['วันนี้', '7 วัน', '30 วัน'];
 
@@ -43,10 +15,48 @@ const iconMain = [{
     label: "Plus"
 }]
 
-
+export interface NewsItem {
+    id: number,
+    title: string,
+    content: string,
+    url: string,
+    user_id: number,
+    tweet_profile_pic: string
+    created_at: string
+}
+export interface PaginatedNewsResponse {
+    items: NewsItem[];
+    total: number;
+    page: number;
+    limit: number;
+    pages: number;
+    has_next: boolean;
+    has_prev: boolean;
+}
 const Main = () => {
+
     const [activeCategory, setActiveCategory] = useState('หมวดรวม');
     const [activeTime, setActiveTime] = useState('วันนี้');
+    const [news, setNews] = useState<PaginatedNewsResponse | null>(null);
+    const fetchNews = async (page = 1, range = null) => {
+        try {
+            const response = await api.get<PaginatedNewsResponse>('/news', {
+                params: {
+                    page: page,
+                    limit: 10,
+                    days_range: range // ส่ง 1, 7, 30 หรือ null = ทั้งหมด
+                }
+            });
+            setNews(response.data);
+        } catch (error) {
+            console.error('Error fetching news:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchNews();
+    }, []);
+
     return (
         <main className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
             {/* Header */}
@@ -112,7 +122,7 @@ const Main = () => {
 
             {/* Cards Grid */}
             <div className="space-y-4">
-                {POSTS.map(post => (
+                {news?.items?.map(post => (
                     <DashboardCard key={post.id} post={post} />
                 ))}
             </div>
