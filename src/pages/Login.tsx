@@ -30,9 +30,14 @@ const Login = () => {
                     }
                 }
             );
-
             // keep Token to Context
-            login(res.data.access_token, { email: values.email });
+            login(res.data.access_token, {
+                email: values.email,
+                name: res.data.user.name,
+                id: res.data.user.id,
+                role: res.data.user.role,
+                phone: res.data.user.phone
+            });
             navigate('/dashboard');
         } catch (err: any) {
             alert(err.response?.data?.detail || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
