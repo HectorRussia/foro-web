@@ -48,13 +48,13 @@ const Login = () => {
 
     return (
         <div className="min-h-screen w-full bg-[#030e17] flex items-center justify-center p-4 relative overflow-hidden font-sans">
-            <div className="absolute inset-0 bg-gradient-to-br from-[#051626] to-[#000000] z-0" />
+            <div className="absolute inset-0 bg-linear-to-br from-[#051626] to-[#000000] z-0" />
 
             <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
                 {/* Left Side */}
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left">
                     <h1 className="text-5xl md:text-5xl font-bold leading-tight tracking-tight">
-                        สรุปโพสต์จาก X <br />
+                        สรุปโพสต์จาก X ด้วย LLM <br />
                         <span className="text-white">แบบอ่านง่าย</span>
                     </h1>
                     <p className="text-gray-400 text-lg md:text-xl font-light">

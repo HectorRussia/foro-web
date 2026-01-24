@@ -1,12 +1,13 @@
 import { FaHome } from 'react-icons/fa';
 import { HiMiniUsers } from 'react-icons/hi2';
 import { LuLogOut } from "react-icons/lu";
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+
 const iconsNav = [
-    { id: 1, icon: <FaHome />, label: "หน้าแรก", active: true, path: "/dashboard" },
-    { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", active: false, path: "/dashboard" },
-    { id: 3, icon: <LuLogOut />, label: "ออกจากระบบ", active: false, path: "/" },
+    { id: 1, icon: <FaHome />, label: "หน้าแรก", path: "/dashboard" },
+    { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
+    { id: 3, icon: <LuLogOut />, label: "ออกจากระบบ", path: "/" },
 ]
 
 interface NavbarProp {
@@ -46,10 +47,19 @@ const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => 
 }
 
 const Navbar = () => {
+    const location = useLocation();
+
     return (
         <nav className="flex-1 space-y-2 w-full">
             {iconsNav.map((item, index) => (
-                <NavbarStruct id={item.id} key={index} icon={item.icon} label={item.label} active={item.active} path={item.path} />
+                <NavbarStruct
+                    id={item.id}
+                    key={index}
+                    icon={item.icon}
+                    label={item.label}
+                    active={location.pathname === item.path}
+                    path={item.path}
+                />
             ))}
         </nav>
     )
