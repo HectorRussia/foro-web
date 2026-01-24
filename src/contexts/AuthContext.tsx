@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 interface User {
@@ -14,24 +14,41 @@ interface AuthContextType {
     login: (token: string, userData: any) => void;
     logout: () => void;
     isAuthenticated: boolean;
+    isLoading: boolean;
 }
-
+const BASE_URL = import.meta.env.VITE_API_URL;
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const navigate = useNavigate();
     const [accessToken, setAccessToken] = useState<string | null>(null);
     const [user, setUser] = useState<User | null>(null);
-    const navigate = useNavigate();
+    const [isLoading, setIsLoading] = useState(true);
+
+    // (Rehydration)
+    useEffect(() => {
+        const token = localStorage.getItem('accessToken');
+        const savedUser = localStorage.getItem('userData');
+
+        if (token && savedUser) {
+            setAccessToken(token);
+            setUser(JSON.parse(savedUser));
+        }
+        setIsLoading(false);
+    }, []);
+
     const login = (token: string, userData: User) => {
         setAccessToken(token);
         setUser(userData);
+        localStorage.setItem('accessToken', token);
+        localStorage.setItem('userData', JSON.stringify(userData));
     };
 
     const logout = async () => {
         try {
             // บอก Backend ให้เตะเราออก (ลบ Refresh Token ใน DB)
             // ต้องใส่ { withCredentials: true } เพื่อให้มันส่ง Cookie ไปด้วย
-            await axios.post("http://localhost:8080/api/v1/auth/logout", {}, {
+            await axios.post(`${BASE_URL}/auth/logout`, {}, {
                 withCredentials: true
             });
         } catch (err) {
@@ -51,9 +68,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user,
             login,
             logout,
-            isAuthenticated: !!accessToken
+            isAuthenticated: !!accessToken,
+            isLoading
         }}>
-            {children}
+            {!isLoading && children}
         </AuthContext.Provider>
     );
 };
