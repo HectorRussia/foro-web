@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FaPlus } from 'react-icons/fa6';
-import { LuLayoutDashboard } from 'react-icons/lu';
+import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
+import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
 import api from '../../api/axiosInstance';
 
@@ -54,6 +55,58 @@ const Main = () => {
     const [news, setNews] = useState<PaginatedNewsResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [layoutMode, setLayoutMode] = useState<'list' | 'grid' | 'compact'>('list');
+
+    // Analyze News State
+    const [analyzedContent, setAnalyzedContent] = useState<any>(null);
+    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
+
+    useEffect(() => {
+        const checkTodayAnalysis = async () => {
+            // If we are not on "Today" tab, we might not need to check, but let's check anyway to be ready
+            // OR only check when activeTime becomes 'วันนี้'
+            if (activeTime === 'วันนี้') {
+                try {
+                    const response = await api.get('/news/analyze');
+                    const data = response.data;
+
+                    // Check if data exists and is from today
+                    // Assuming the API returns an object with a 'created_at' or 'date' field
+                    // If the API returns the analysis directly, we check its timestamp
+                    if (data && data.created_at) {
+                        const isToday = dayjs(data.created_at).isSame(dayjs(), 'day');
+                        if (isToday) {
+                            setAnalyzedContent(data);
+                            setHasAnalyzedToday(true);
+                        } else {
+                            // Found old analysis, but not today's
+                            setHasAnalyzedToday(false);
+                            setAnalyzedContent(null);
+                        }
+                    }
+                } catch (error) {
+                    // If 404, implies no analysis exists
+                    console.log('No analysis found for today');
+                    setHasAnalyzedToday(false);
+                }
+            }
+        };
+        checkTodayAnalysis();
+    }, [activeTime]);
+
+    const handleAnalyzeNews = async () => {
+        if (isAnalyzing) return;
+        setIsAnalyzing(true);
+        try {
+            const response = await api.post('/news/analyze');
+            setAnalyzedContent(response.data);
+            setHasAnalyzedToday(true);
+        } catch (error) {
+            console.error('Error analyzing news:', error);
+        } finally {
+            setIsAnalyzing(false);
+        }
+    };
 
     const fetchNews = async (page = 1, range: number | null = null) => {
         try {
@@ -171,10 +224,67 @@ const Main = () => {
                             </button>
                         ))}
                     </div>
+
+                    {/* Analyze Button - Shows only when "วันนี้" is selected and hasn't been clicked today */}
+                    {activeTime === 'วันนี้' && !hasAnalyzedToday && (
+                        <button
+                            onClick={handleAnalyzeNews}
+                            disabled={isAnalyzing}
+                            className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/20 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed animate-pulse"
+                        >
+                            {isAnalyzing ? (
+                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <LuSparkles className="text-yellow-300" />
+                            )}
+                            <span className="text-sm font-medium">
+                                {isAnalyzing ? 'กำลังวิเคราะห์...' : 'ดูข่าววันนี้'}
+                            </span>
+                        </button>
+                    )}
                     <h2 className="text-lg font-semibold text-white/90">
                         {activeCategory}
                     </h2>
                 </div>
+
+                {/* Analyzed News Section */}
+                {
+                    activeTime === 'วันนี้' && analyzedContent && (
+                        <div className="mb-8 animate-[fadeIn_0.5s_ease-out]">
+                            <div className="bg-linear-to-br from-[#1e293b] to-[#0f172a] border border-blue-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
+                                    <LuSparkles className="text-6xl text-blue-400" />
+                                </div>
+
+                                <div className="relative z-10">
+                                    <h3 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-blue-200 to-blue-400 mb-4 flex items-center gap-2">
+                                        <LuSparkles className="text-yellow-400" />
+                                        สรุปข่าววันนี้
+                                    </h3>
+
+                                    <div className="prose prose-invert max-w-none text-gray-300 leading-relaxed">
+                                        {typeof analyzedContent === 'string' ? (
+                                            <p>{analyzedContent}</p>
+                                        ) : (
+                                            <div className="space-y-4">
+                                                {analyzedContent.title && <h4 className="text-lg font-semibold text-white">{analyzedContent.title}</h4>}
+                                                {analyzedContent.summary && <p>{analyzedContent.summary}</p>}
+                                                {analyzedContent.content && <div dangerouslySetInnerHTML={{ __html: analyzedContent.content }} />}
+
+                                                {/* Fallback if structure is unknown */}
+                                                {!analyzedContent.title && !analyzedContent.summary && !analyzedContent.content && (
+                                                    <pre className="whitespace-pre-wrap font-sans text-sm">
+                                                        {JSON.stringify(analyzedContent, null, 2)}
+                                                    </pre>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    )
+                }
             </div>
 
             {/* Cards Grid */}
@@ -190,7 +300,7 @@ const Main = () => {
                     <DashboardCard key={post.id} post={post} variant={layoutMode} />
                 ))}
             </div>
-        </main>
+        </main >
     )
 }
 
