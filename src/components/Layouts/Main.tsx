@@ -4,6 +4,7 @@ import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
 import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
 import api from '../../api/axiosInstance';
+import type { PaginatedNewsResponse } from '../../interface/news';
 
 const CATEGORIES = ["หมวดรวม", "เทคโนโลยี", "การตลาด"];
 const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
@@ -15,25 +16,6 @@ const iconMain = [{
     icon: <FaPlus />,
     label: "Plus"
 }]
-
-export interface NewsItem {
-    id: number,
-    title: string,
-    content: string,
-    url: string,
-    user_id: number,
-    tweet_profile_pic: string
-    created_at: string
-}
-export interface PaginatedNewsResponse {
-    items: NewsItem[];
-    total: number;
-    page: number;
-    limit: number;
-    pages: number;
-    has_next: boolean;
-    has_prev: boolean;
-}
 
 const LAYOUT_OPTIONS = [
     { id: 'list', label: 'Standard', icon: <LuLayoutDashboard /> },
@@ -56,41 +38,38 @@ const Main = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [layoutMode, setLayoutMode] = useState<'list' | 'grid' | 'compact'>('list');
 
-    // Analyze News State
-    const [analyzedContent, setAnalyzedContent] = useState<any>(null);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
 
-    useEffect(() => {
-        const checkTodayAnalysis = async () => {
-            // If we are not on "Today" tab, we might not need to check, but let's check anyway to be ready
-            // OR only check when activeTime becomes 'วันนี้'
-            if (activeTime === 'วันนี้') {
-                try {
-                    const response = await api.get('/news/analyze');
-                    const data = response.data;
+    const checkTodayAnalysis = async () => {
+        // If we are not on "Today" tab, we might not need to check, but let's check anyway to be ready
+        // OR only check when activeTime becomes 'วันนี้'
+        if (activeTime === 'วันนี้') {
+            try {
+                const response = await api.get('/news/analyze');
+                const data = response.data;
 
-                    // Check if data exists and is from today
-                    // Assuming the API returns an object with a 'created_at' or 'date' field
-                    // If the API returns the analysis directly, we check its timestamp
-                    if (data && data.created_at) {
-                        const isToday = dayjs(data.created_at).isSame(dayjs(), 'day');
-                        if (isToday) {
-                            setAnalyzedContent(data);
-                            setHasAnalyzedToday(true);
-                        } else {
-                            // Found old analysis, but not today's
-                            setHasAnalyzedToday(false);
-                            setAnalyzedContent(null);
-                        }
+                // Check if data exists and is from today
+                // Assuming the API returns an object with a 'created_at' or 'date' field
+                // If the API returns the analysis directly, we check its timestamp
+                if (data && data.created_at) {
+                    const isToday = dayjs(data.created_at).isSame(dayjs(), 'day');
+                    if (isToday) {
+                        setHasAnalyzedToday(true);
+                    } else {
+                        // Found old analysis, but not today's
+                        setHasAnalyzedToday(false);
                     }
-                } catch (error) {
-                    // If 404, implies no analysis exists
-                    console.log('No analysis found for today');
-                    setHasAnalyzedToday(false);
                 }
+            } catch (error) {
+                // If 404, implies no analysis exists
+                console.log('No analysis found for today');
+                setHasAnalyzedToday(false);
             }
-        };
+        }
+    };
+
+    useEffect(() => {
         checkTodayAnalysis();
     }, [activeTime]);
 
@@ -98,8 +77,7 @@ const Main = () => {
         if (isAnalyzing) return;
         setIsAnalyzing(true);
         try {
-            const response = await api.post('/news/analyze');
-            setAnalyzedContent(response.data);
+            await api.post('/news/analyze');
             setHasAnalyzedToday(true);
         } catch (error) {
             console.error('Error analyzing news:', error);
@@ -129,8 +107,6 @@ const Main = () => {
             setIsLoading(false);
         }
     };
-
-
 
     useEffect(() => {
         fetchNews(1, timeRangeMap[activeTime]);
@@ -247,44 +223,6 @@ const Main = () => {
                     </h2>
                 </div>
 
-                {/* Analyzed News Section */}
-                {
-                    activeTime === 'วันนี้' && analyzedContent && (
-                        <div className="mb-8 animate-[fadeIn_0.5s_ease-out]">
-                            <div className="bg-linear-to-br from-[#1e293b] to-[#0f172a] border border-blue-500/30 rounded-2xl p-6 shadow-2xl relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                    <LuSparkles className="text-6xl text-blue-400" />
-                                </div>
-
-                                <div className="relative z-10">
-                                    <h3 className="text-xl font-bold bg-clip-text text-transparent bg-linear-to-r from-blue-200 to-blue-400 mb-4 flex items-center gap-2">
-                                        <LuSparkles className="text-yellow-400" />
-                                        สรุปข่าววันนี้
-                                    </h3>
-
-                                    <div className="prose prose-invert max-w-none text-gray-300 leading-relaxed">
-                                        {typeof analyzedContent === 'string' ? (
-                                            <p>{analyzedContent}</p>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {analyzedContent.title && <h4 className="text-lg font-semibold text-white">{analyzedContent.title}</h4>}
-                                                {analyzedContent.summary && <p>{analyzedContent.summary}</p>}
-                                                {analyzedContent.content && <div dangerouslySetInnerHTML={{ __html: analyzedContent.content }} />}
-
-                                                {/* Fallback if structure is unknown */}
-                                                {!analyzedContent.title && !analyzedContent.summary && !analyzedContent.content && (
-                                                    <pre className="whitespace-pre-wrap font-sans text-sm">
-                                                        {JSON.stringify(analyzedContent, null, 2)}
-                                                    </pre>
-                                                )}
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )
-                }
             </div>
 
             {/* Cards Grid */}
