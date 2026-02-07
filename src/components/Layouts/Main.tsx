@@ -4,7 +4,7 @@ import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
 import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
 import api from '../../api/axiosInstance';
-import type { PaginatedNewsResponse } from '../../interface/news';
+import { type PaginatedNewsResponse } from '../../interface/news';
 
 const CATEGORIES = ["หมวดรวม", "เทคโนโลยี", "การตลาด"];
 const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
@@ -41,35 +41,34 @@ const Main = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
 
-    const checkTodayAnalysis = async () => {
-        // If we are not on "Today" tab, we might not need to check, but let's check anyway to be ready
-        // OR only check when activeTime becomes 'วันนี้'
-        if (activeTime === 'วันนี้') {
-            try {
-                const response = await api.get('/news/analyze');
-                const data = response.data;
-
-                // Check if data exists and is from today
-                // Assuming the API returns an object with a 'created_at' or 'date' field
-                // If the API returns the analysis directly, we check its timestamp
-                if (data && data.created_at) {
-                    const isToday = dayjs(data.created_at).isSame(dayjs(), 'day');
-                    if (isToday) {
-                        setHasAnalyzedToday(true);
-                    } else {
-                        // Found old analysis, but not today's
-                        setHasAnalyzedToday(false);
-                    }
-                }
-            } catch (error) {
-                // If 404, implies no analysis exists
-                console.log('No analysis found for today');
-                setHasAnalyzedToday(false);
-            }
-        }
-    };
-
     useEffect(() => {
+        const checkTodayAnalysis = async () => {
+            // If we are not on "Today" tab, we might not need to check, but let's check anyway to be ready
+            // OR only check when activeTime becomes 'วันนี้'
+            if (activeTime === 'วันนี้') {
+                try {
+                    const response = await api.get('/news/analyze');
+                    const data = response.data;
+
+                    // Check if data exists and is from today
+                    // Assuming the API returns an object with a 'created_at' or 'date' field
+                    // If the API returns the analysis directly, we check its timestamp
+                    if (data && data.created_at) {
+                        const isToday = dayjs(data.created_at).isSame(dayjs(), 'day');
+                        if (isToday) {
+                            setHasAnalyzedToday(true);
+                        } else {
+                            // Found old analysis, but not today's
+                            setHasAnalyzedToday(false);
+                        }
+                    }
+                } catch (error) {
+                    // If 404, implies no analysis exists
+                    console.log('No analysis found for today');
+                    setHasAnalyzedToday(false);
+                }
+            }
+        };
         checkTodayAnalysis();
     }, [activeTime]);
 
@@ -111,7 +110,6 @@ const Main = () => {
     useEffect(() => {
         fetchNews(1, timeRangeMap[activeTime]);
     }, [activeTime]);
-
 
     return (
         <main className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
