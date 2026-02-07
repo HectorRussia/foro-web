@@ -32,7 +32,7 @@ const Register = () => {
     return (
         <div className="min-h-screen w-full bg-[#030e17] flex items-center justify-center p-4 relative overflow-hidden font-sans">
             {/* Background decoration */}
-            <div className="absolute inset-0 bg-gradient-to-br from-[#051626] to-[#000000] z-0" />
+            <div className="absolute inset-0 bg-linear-to-br from-[#051626] to-[#000000] z-0" />
 
             <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
 
