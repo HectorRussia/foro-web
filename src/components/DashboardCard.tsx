@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { FaCopy, FaCheck, FaExternalLinkAlt } from 'react-icons/fa';
 import { IoIosMore, } from 'react-icons/io';
-import { type NewsItem } from './Layouts/Main';
+import type { NewsItem } from '../interface/news';
 
 const iconsDash = [
     { icon: <IoIosMore />, label: "More" },

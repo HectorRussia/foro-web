@@ -23,7 +23,7 @@ const UserTarget = () => {
 
         setIsLoading(true);
         try {
-            const response = await api.get(`${BASE_URL}/news/users/search?query=${searchQuery}`);
+            const response = await api.get(`${BASE_URL}/follow/users/search?query=${searchQuery}`);
             if (response.data?.data?.users?.users) {
                 setUsers(response.data.data.users.users);
             } else {
@@ -40,7 +40,7 @@ const UserTarget = () => {
     const handleFollow = async (user: UserTweetSearch) => {
         try {
 
-            await api.post(`${BASE_URL}/news/users/search`, {
+            await api.post(`${BASE_URL}/follow/users/search`, {
                 query: searchQuery,
                 x_account: user.screen_name,
                 name: user.name,

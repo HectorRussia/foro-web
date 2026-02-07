@@ -5,6 +5,7 @@ import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import UserTarget from './pages/UserTarget';
+import { UserFollow } from './pages/UserFollow';
 
 function App() {
   return (
@@ -17,6 +18,7 @@ function App() {
       <Route element={<ProtectedRoute />}>
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/user-target" element={<UserTarget />} />
+        <Route path="/user-following" element={<UserFollow />} />
         {/*add more route*/}
       </Route>
 

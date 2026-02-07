@@ -21,3 +21,14 @@ export interface UserTweetSearch {
     can_dm: boolean,
     isBlueVerified: boolean
 }
+
+export interface FollowedUser {
+    id: number;
+    x_account: string;
+    name: string;
+    profile_image_url_https: string;
+    status: number;
+    user_id: number;
+    created_at: string;
+    updated_at: string;
+}
