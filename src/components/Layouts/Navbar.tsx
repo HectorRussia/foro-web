@@ -4,12 +4,14 @@ import { LuLogOut } from "react-icons/lu";
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { RiUserFollowFill } from 'react-icons/ri';
+import { BiCategory } from "react-icons/bi";
 
 const iconsNav = [
     { id: 1, icon: <FaHome />, label: "หน้าแรก", path: "/dashboard" },
     { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
     { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
-    { id: 4, icon: <LuLogOut />, label: "ออกจากระบบ", path: "/" },
+    { id: 4, icon: <BiCategory />, label: "จัดการหมวดหมู่", path: "/category-management" },
+    { id: 5, icon: <LuLogOut />, label: "ออกจากระบบ", path: "/" },
 ]
 
 interface NavbarProp {
@@ -24,7 +26,7 @@ const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => 
     const navigate = useNavigate()
     const { logout } = useAuth();
     const pathNave = async (path: string) => {
-        if (id === 4) {
+        if (id === 5) {
             logout();
         }
         navigate(path)

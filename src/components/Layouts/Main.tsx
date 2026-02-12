@@ -1,21 +1,20 @@
 import { useEffect, useState } from 'react';
-import { FaPlus } from 'react-icons/fa6';
 import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
 import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
 import api from '../../api/axiosInstance';
 import { type PaginatedNewsResponse } from '../../interface/news';
 
-const CATEGORIES = ["หมวดรวม", "เทคโนโลยี", "การตลาด"];
+// const CATEGORIES = ["หมวดรวม", "เทคโนโลยี", "การตลาด"];
 const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
 
-const iconMain = [{
-    icon: <LuLayoutDashboard />,
-    label: "Layout"
-}, {
-    icon: <FaPlus />,
-    label: "Plus"
-}]
+// const iconMain = [{
+//     icon: <LuLayoutDashboard />,
+//     label: "Layout"
+// }, {
+//     icon: <FaPlus />,
+//     label: "Plus"
+// }]
 
 const LAYOUT_OPTIONS = [
     { id: 'list', label: 'Standard', icon: <LuLayoutDashboard /> },
@@ -32,7 +31,7 @@ const timeRangeMap: Record<string, number | null> = {
 };
 const Main = () => {
 
-    const [activeCategory, setActiveCategory] = useState('หมวดรวม');
+    // const [activeCategory, setActiveCategory] = useState('หมวดรวม');
     const [activeTime, setActiveTime] = useState('วันนี้');
     const [news, setNews] = useState<PaginatedNewsResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -156,10 +155,10 @@ const Main = () => {
                         </div>
                     </div>
 
-                    <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all text-sm font-medium">
+                    {/* <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all text-sm font-medium">
                         {iconMain[1].icon}
                         <span>เพิ่มหมวดใหม่</span>
-                    </button>
+                    </button> */}
                 </div>
             </header>
 
@@ -167,7 +166,7 @@ const Main = () => {
             <div className="flex flex-col gap-6 mb-8">
                 {/* Categories - Centered Pills */}
                 <div className="flex justify-center flex-wrap gap-2">
-                    {CATEGORIES.map(cat => (
+                    {/* {CATEGORIES.map(cat => (
                         <button
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
@@ -178,11 +177,11 @@ const Main = () => {
                         >
                             {cat}
                         </button>
-                    ))}
+                    ))} */}
                 </div>
 
                 {/* Time Filters & Secondary Actions */}
-                <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[#1e293b] pb-4">
+                <div className="flex flex-wrap items-center justify-start gap-4 border-b border-[#1e293b] pb-4">
                     <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-lg border border-[#1e293b] overflow-x-auto max-w-full">
                         {TIME_FILTERS.map(time => (
                             <button
@@ -216,9 +215,9 @@ const Main = () => {
                             </span>
                         </button>
                     )}
-                    <h2 className="text-lg font-semibold text-white/90">
+                    {/* <h2 className="text-lg font-semibold text-white/90">
                         {activeCategory}
-                    </h2>
+                    </h2> */}
                 </div>
 
             </div>
