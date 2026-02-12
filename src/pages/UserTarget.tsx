@@ -51,10 +51,16 @@ const UserTarget = () => {
 
         } catch (error: any) {
             if (error.response && error.response.status === 400) {
-                const serverMessage = error.response.data.data?.message;
-                toast.success(serverMessage || `You are already following ${user.name}`);
+                // Handle specific backend errors (e.g., limit reached, already followed)
+                const detail = error.response.data.detail;
+                if (detail?.data?.message) {
+                    toast.error(detail.data.message);
+                } else {
+                    toast.error(`เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ`);
+                }
             } else {
-                toast.error(`Failed to follow ${user.name}`);
+                toast.error(`ไม่สามารถติดตาม ${user.name} ได้`);
+                console.error("Follow error:", error);
             }
         }
     };
