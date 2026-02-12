@@ -173,7 +173,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     {copied ? <FaCheck className="text-green-500" /> : iconsDash[2].icon}
                     {copied ?
                         <span className="text-green-500">คัดลอก</span>
-                        : <span className={isGrid ? 'hidden xl:inline' : ''}>คัดลอก</span>
+                        : <span className={isGrid ? 'hidden xl:inline' : ''}>แชร์ลิ้งค์</span>
                     }
                 </button>
             </div>
