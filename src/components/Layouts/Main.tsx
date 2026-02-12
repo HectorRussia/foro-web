@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
+import { useInView } from 'react-intersection-observer';
 import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
 import { FaTrash } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
 import { createCategoryNews } from '../../api/categoryNews';
-import { type PaginatedNewsResponse } from '../../interface/news';
 import { getCategories } from '../../api/category';
 import { deleteNews, getNews, getNewsAnalysis, analyzeNews } from '../../api/news';
 import { type Category } from '../../interface/category';
@@ -26,10 +27,57 @@ const timeRangeMap: Record<string, number | null> = {
 };
 const Main = () => {
 
-    const [activeTime, setActiveTime] = useState('วันนี้');
-    const [news, setNews] = useState<PaginatedNewsResponse | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
+    const queryClient = useQueryClient();
+    const [activeTime, setActiveTime] = useState('ทั้งหมด');
     const [layoutMode, setLayoutMode] = useState<'list' | 'grid' | 'compact'>('list');
+
+    const { ref, inView } = useInView({
+        rootMargin: '200px', // Trigger 200px before bottom
+    });
+
+    const mainRef = useRef<HTMLElement>(null);
+
+    const handleTimeChange = (time: string) => {
+        if (time === activeTime) return;
+
+        // Force a hard reset of the query for the new key so it starts fresh
+        queryClient.removeQueries({ queryKey: ['news', time] });
+
+        setActiveTime(time);
+
+        // Scroll to top
+        if (mainRef.current) {
+            mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    };
+
+    const {
+        data,
+        fetchNextPage,
+        hasNextPage,
+        isFetchingNextPage,
+        status,
+    } = useInfiniteQuery({
+        queryKey: ['news', activeTime],
+        queryFn: ({ pageParam = 1 }) => getNews(pageParam, 10, timeRangeMap[activeTime]),
+        getNextPageParam: (lastPage) => {
+            console.log('Last Page:', lastPage); // Debug
+            const currentPage = Number(lastPage.page);
+            const totalPages = Number(lastPage.pages);
+
+            if (currentPage < totalPages) {
+                return currentPage + 1;
+            }
+            return undefined;
+        },
+        initialPageParam: 1,
+    });
+
+    useEffect(() => {
+        if (inView && hasNextPage) {
+            fetchNextPage();
+        }
+    }, [inView, hasNextPage, fetchNextPage]);
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
@@ -44,7 +92,7 @@ const Main = () => {
         try {
             const data = await getCategories();
             setCategories(data);
-            console.log('Categories loaded:', data);
+            // console.log('Categories loaded:', data);
         } catch (error) {
             console.error('Failed to fetch categories:', error);
         }
@@ -71,7 +119,8 @@ const Main = () => {
             // 2. Check API
             if (activeTime === 'วันนี้') {
                 try {
-                    const rawData = await getNewsAnalysis();
+                    const rawData = await getNewsAnalysis(); // Could be array or object
+                    console.log('Analysis Data:', rawData);
 
                     let data: any = rawData;
                     // If API returns an array, pick the latest one
@@ -113,21 +162,7 @@ const Main = () => {
         checkTodayAnalysis();
     }, [activeTime]);
 
-    const fetchNews = async (page = 1, range: number | null = null) => {
-        try {
-
-            if (isLoading) return;
-            setIsLoading(true);
-
-            const data = await getNews(page, 10, range);
-            setNews(data);
-        } catch (error) {
-            console.error('Error fetching news:', error);
-        }
-        finally {
-            setIsLoading(false);
-        }
-    };
+    // const fetchNews = async (page = 1, range: number | null = null) => { ... } // Removed manual fetch
 
     const handleAnalyzeNews = async () => {
         if (isAnalyzing) return;
@@ -142,7 +177,8 @@ const Main = () => {
             setLastAnalysisTime(dayjs().format('HH:mm'));
 
             toast.success('วิเคราะห์ข่าวเสร็จสิ้น', { id: loadingToast });
-            await fetchNews(1, timeRangeMap[activeTime]);
+            queryClient.invalidateQueries({ queryKey: ['news'] }); // Invalidate queries to refresh list
+            // await fetchNews(1, timeRangeMap[activeTime]);
         } catch (error) {
             console.error('Error analyzing news:', error);
             toast.error('เกิดข้อผิดพลาดในการวิเคราะห์ข่าว', { id: loadingToast });
@@ -174,15 +210,9 @@ const Main = () => {
 
         try {
             await deleteNews(itemToDelete);
-            toast.success('ลบข่าวสำเร็จ');
-            // Remove from state
-            setNews(prev => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    items: prev.items.filter(item => item.id !== itemToDelete)
-                };
-            });
+            queryClient.invalidateQueries({ queryKey: ['news'] }); // Refetch list
+            // setNews(prev => { ... }); // No need to manually update state with React Query
+
             setIsDeleteModalOpen(false);
             setItemToDelete(null);
         } catch (error) {
@@ -191,12 +221,12 @@ const Main = () => {
         }
     };
 
-    useEffect(() => {
-        fetchNews(1, timeRangeMap[activeTime]);
-    }, [activeTime]);
+    // useEffect(() => {
+    //     fetchNews(1, timeRangeMap[activeTime]);
+    // }, [activeTime]);
 
     return (
-        <main className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
             {/* Header */}
             <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                 <div>
@@ -243,6 +273,8 @@ const Main = () => {
                 </div>
             </header>
 
+
+
             {/* Filters Section */}
             <div className="flex flex-col gap-6 mb-8">
                 {/* Time Filters & Secondary Actions */}
@@ -251,10 +283,10 @@ const Main = () => {
                         {TIME_FILTERS.map(time => (
                             <button
                                 key={time}
-                                disabled={isLoading}
-                                onClick={() => setActiveTime(time)}
+                                disabled={status === 'pending'}
+                                onClick={() => handleTimeChange(time)}
                                 className={`px-4 py-1.5 rounded-md text-xs font-medium transition-all 
-                                            ${isLoading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} 
+                                            ${status === 'pending' ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} 
                                             ${activeTime === time ? 'bg-[#1e293b] text-white' : 'text-gray-400'}
                                         `}
                             >
@@ -305,16 +337,54 @@ const Main = () => {
                         : 'flex flex-col space-y-4'
                 }
             `}>
-                {news?.items?.map(post => (
-                    <DashboardCard
-                        key={post.id}
-                        post={post}
-                        variant={layoutMode}
-                        categories={categories}
-                        onAddToCategory={handleAddNewsToCategory}
-                        onDelete={handleDeleteNews}
-                    />
-                ))}
+                {status === 'pending' ? (
+                    <div className="col-span-full flex justify-center py-20">
+                        <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                ) : status === 'error' ? (
+                    <div className="col-span-full text-center py-20 text-red-400">Error loading news</div>
+                ) : (
+                    <>
+                        {data?.pages.map((group, i) => (
+                            <div key={i} className={`contents`}>
+                                {group.items.map(post => (
+                                    <DashboardCard
+                                        key={post.id}
+                                        post={post}
+                                        variant={layoutMode}
+                                        categories={categories}
+                                        onAddToCategory={handleAddNewsToCategory}
+                                        onDelete={handleDeleteNews}
+                                    />
+                                ))}
+                            </div>
+                        ))}
+                    </>
+                )}
+            </div>
+
+            {/* Loading Indicator for Infinite Scroll */}
+            <div ref={ref} className="py-8 flex flex-col items-center justify-center w-full min-h-20 gap-4">
+                {(isFetchingNextPage || hasNextPage) ? (
+                    <>
+                        <div className="w-8 h-8 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                        {!isFetchingNextPage && (
+                            <button
+                                onClick={() => fetchNextPage()}
+                                className="px-4 py-2 bg-blue-600/20 text-blue-400 rounded-lg hover:bg-blue-600/30 transition-colors text-sm"
+                            >
+                                โหลดเพิ่มเติม
+                            </button>
+                        )}
+                    </>
+                ) : (
+                    <div className="flex flex-col items-center gap-2 opacity-50 text-gray-400 text-sm">
+                        <span>ไม่พบข่าวเพิ่มเติม</span>
+                        <span className="text-xs">
+                            (Items: {data?.pages.reduce((acc, page) => acc + (page.items?.length || 0), 0)})
+                        </span>
+                    </div>
+                )}
             </div>
             {/* Custom Delete Modal */}
             {isDeleteModalOpen && (
