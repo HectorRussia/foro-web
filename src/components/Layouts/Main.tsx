@@ -34,6 +34,7 @@ const Main = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [lastAnalysisTime, setLastAnalysisTime] = useState<string | null>(null);
 
     // Modal state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -59,28 +60,53 @@ const Main = () => {
 
     useEffect(() => {
         const checkTodayAnalysis = async () => {
-            // If we are not on "Today" tab, we might not need to check, but let's check anyway to be ready
-            // OR only check when activeTime becomes 'วันนี้'
+            const todayStr = dayjs().format('YYYY-MM-DD');
+            const lastAnalysisDate = localStorage.getItem('last_analysis_date');
+
+            // 1. Check Local Storage first for immediate feedback
+            if (lastAnalysisDate === todayStr) {
+                setHasAnalyzedToday(true);
+            }
+
+            // 2. Check API
             if (activeTime === 'วันนี้') {
                 try {
-                    const data = await getNewsAnalysis();
+                    const rawData = await getNewsAnalysis();
 
-                    // Check if data exists and is from today
-                    // Assuming the API returns an object with a 'created_at' or 'date' field
-                    // If the API returns the analysis directly, we check its timestamp
+                    let data: any = rawData;
+                    // If API returns an array, pick the latest one
+                    if (Array.isArray(rawData)) {
+                        data = rawData.length > 0 ? rawData[0] : null;
+                    }
+
                     if (data && data.created_at) {
-                        const isToday = dayjs(data.created_at).isSame(dayjs(), 'day');
+                        const analysisDate = dayjs(data.created_at);
+                        const isToday = analysisDate.isSame(dayjs(), 'day');
                         if (isToday) {
                             setHasAnalyzedToday(true);
+                            setLastAnalysisTime(analysisDate.format('HH:mm')); // Keep time
+                            if (lastAnalysisDate !== todayStr) {
+                                localStorage.setItem('last_analysis_date', todayStr);
+                            }
                         } else {
-                            // Found old analysis, but not today's
+                            // Only reset if local storage also doesn't say today
+                            if (lastAnalysisDate !== todayStr) {
+                                setHasAnalyzedToday(false);
+                                setLastAnalysisTime(null);
+                            }
+                        }
+                    } else {
+                        if (lastAnalysisDate !== todayStr) {
                             setHasAnalyzedToday(false);
+                            setLastAnalysisTime(null);
                         }
                     }
                 } catch (error) {
-                    // If 404, implies no analysis exists
                     console.log('No analysis found for today');
-                    setHasAnalyzedToday(false);
+                    if (lastAnalysisDate !== todayStr) {
+                        setHasAnalyzedToday(false);
+                        setLastAnalysisTime(null);
+                    }
                 }
             }
         };
@@ -110,7 +136,11 @@ const Main = () => {
 
         try {
             await analyzeNews();
+            // Save to local storage
+            localStorage.setItem('last_analysis_date', dayjs().format('YYYY-MM-DD'));
             setHasAnalyzedToday(true);
+            setLastAnalysisTime(dayjs().format('HH:mm'));
+
             toast.success('วิเคราะห์ข่าวเสร็จสิ้น', { id: loadingToast });
             await fetchNews(1, timeRangeMap[activeTime]);
         } catch (error) {
@@ -233,20 +263,32 @@ const Main = () => {
                         ))}
                     </div>
 
-                    {/* Analyze Button - Shows only when "วันนี้" is selected and hasn't been clicked today */}
-                    {activeTime === 'วันนี้' && !hasAnalyzedToday && (
+                    {/* Analyze Button */}
+                    {activeTime === 'วันนี้' && (
                         <button
                             onClick={handleAnalyzeNews}
-                            disabled={isAnalyzing}
-                            className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-lg shadow-blue-500/20 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed animate-pulse"
+                            disabled={isAnalyzing || hasAnalyzedToday}
+                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-white shadow-lg transition-all transform 
+                                ${hasAnalyzedToday
+                                    ? 'bg-gray-700 cursor-not-allowed opacity-75'
+                                    : 'bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 hover:scale-105 animate-pulse shadow-blue-500/20'
+                                }
+                            `}
                         >
                             {isAnalyzing ? (
                                 <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : hasAnalyzedToday ? (
+                                <LuSparkles className="text-gray-400" />
                             ) : (
                                 <LuSparkles className="text-yellow-300" />
                             )}
                             <span className="text-sm font-medium">
-                                {isAnalyzing ? 'กำลังวิเคราะห์...' : 'ดูข่าววันนี้'}
+                                {isAnalyzing
+                                    ? 'กำลังวิเคราะห์...'
+                                    : hasAnalyzedToday
+                                        ? `วิเคราะห์แล้ว (${lastAnalysisTime || 'วันนี้'})`
+                                        : 'ดูข่าววันนี้'
+                                }
                             </span>
                         </button>
                     )}
