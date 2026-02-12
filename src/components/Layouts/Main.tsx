@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
+import { FaTrash } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
@@ -33,6 +34,10 @@ const Main = () => {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
+
+    // Modal state
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [itemToDelete, setItemToDelete] = useState<number | null>(null);
 
     const fetchCats = async () => {
         try {
@@ -130,17 +135,26 @@ const Main = () => {
     };
 
     const handleDeleteNews = async (newsId: number) => {
+        setItemToDelete(newsId);
+        setIsDeleteModalOpen(true);
+    };
+
+    const confirmDelete = async () => {
+        if (!itemToDelete) return;
+
         try {
-            await deleteNews(newsId);
+            await deleteNews(itemToDelete);
             toast.success('ลบข่าวสำเร็จ');
-            // Remove from state or refetch
+            // Remove from state
             setNews(prev => {
                 if (!prev) return null;
                 return {
                     ...prev,
-                    items: prev.items.filter(item => item.id !== newsId)
+                    items: prev.items.filter(item => item.id !== itemToDelete)
                 };
             });
+            setIsDeleteModalOpen(false);
+            setItemToDelete(null);
         } catch (error) {
             console.error('Error deleting news:', error);
             toast.error('เกิดข้อผิดพลาดในการลบข่าว');
@@ -260,6 +274,42 @@ const Main = () => {
                     />
                 ))}
             </div>
+            {/* Custom Delete Modal */}
+            {isDeleteModalOpen && (
+                <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+                    <div className="bg-[#1e293b] w-full max-w-sm rounded-3xl shadow-2xl border border-slate-700 p-8 text-center transform transition-all scale-100 animate-scale-in">
+                        <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                            <FaTrash className="text-3xl text-red-500" />
+                            <div className="absolute ml-6 mt-6 bg-[#1e293b] rounded-full p-1">
+                                <span className="bg-red-500 w-4 h-4 rounded-full flex items-center justify-center">
+                                    <div className="w-2 h-0.5 bg-white"></div>
+                                </span>
+                            </div>
+                        </div>
+
+                        <h3 className="text-2xl font-bold text-white mb-3">ลบข่าว?</h3>
+                        <p className="text-slate-400 mb-8 font-light text-sm leading-relaxed">
+                            คุณแน่ใจหรือไม่ที่จะลบข่าวนี้?
+                            <br />การกระทำนี้ไม่สามารถย้อนกลับได้ ข่าวจะถูกลบออกจากระบบทันที
+                        </p>
+
+                        <div className="flex gap-4 justify-center">
+                            <button
+                                onClick={() => setIsDeleteModalOpen(false)}
+                                className="flex-1 py-3 px-6 rounded-xl text-slate-300 hover:bg-slate-700/50 hover:text-white transition-all font-medium border border-slate-700/50"
+                            >
+                                ยกเลิก
+                            </button>
+                            <button
+                                onClick={confirmDelete}
+                                className="flex-1 py-3 px-6 bg-red-600 hover:bg-red-500 text-white rounded-xl shadow-lg shadow-red-500/20 hover:shadow-red-500/40 transition-all font-medium"
+                            >
+                                ลบข่าว
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </main >
     )
 }

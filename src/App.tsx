@@ -7,6 +7,7 @@ import ProtectedRoute from './components/auth/ProtectedRoute';
 import UserTarget from './pages/UserTarget';
 import { UserFollow } from './pages/UserFollow';
 import Category from './pages/Category';
+import CategoryNews from './pages/CategoryNews';
 
 function App() {
   return (
@@ -21,6 +22,7 @@ function App() {
         <Route path="/user-target" element={<UserTarget />} />
         <Route path="/user-following" element={<UserFollow />} />
         <Route path="/category-management" element={<Category />} />
+        <Route path="/category-news/:id" element={<CategoryNews />} />
         {/*add more route*/}
       </Route>
 

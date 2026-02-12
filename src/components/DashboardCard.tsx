@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { FaCopy, FaCheck, FaExternalLinkAlt, FaPlus, FaTrash } from 'react-icons/fa';
+import { FaCopy, FaCheck, FaExternalLinkAlt, FaPlus, FaTrash, FaMinusCircle } from 'react-icons/fa';
 import { IoIosMore, } from 'react-icons/io';
 import type { NewsItem } from '../interface/news';
 import type { Category } from '../interface/category';
@@ -15,10 +15,11 @@ interface DashboardCardProps {
     variant?: 'list' | 'grid' | 'compact';
     categories?: Category[];
     onAddToCategory?: (categoryId: number, newsId: number) => Promise<void>;
+    onRemoveFromCategory?: (newsId: number) => Promise<void>;
     onDelete?: (newsId: number) => Promise<void>;
 }
 
-const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategory, onDelete }: DashboardCardProps) => {
+const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategory, onRemoveFromCategory, onDelete }: DashboardCardProps) => {
     const [copied, setCopied] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -87,37 +88,48 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
 
                     {showMenu && (
                         <div className="absolute right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20">
-                            <div className="p-2 border-b border-gray-700">
-                                <span className="text-xs text-gray-400 px-2">เพิ่มลงในหมวดหมู่</span>
-                            </div>
-                            <div className="max-h-48 overflow-y-auto">
-                                {categories.length > 0 ? (
-                                    categories.map((category) => (
-                                        <button
-                                            key={category.id}
-                                            onClick={() => {
-                                                onAddToCategory?.(category.id, post.id);
-                                                setShowMenu(false);
-                                            }}
-                                            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2"
-                                        >
-                                            <FaPlus className="text-xs" />
-                                            <span className="truncate">{category.name}</span>
-                                        </button>
-                                    ))
-                                ) : (
-                                    <div className="px-3 py-2 text-sm text-gray-500">ไม่มีหมวดหมู่</div>
-                                )}
-                            </div>
+                            {onAddToCategory && categories.length > 0 && (
+                                <>
+                                    <div className="p-2 border-b border-gray-700">
+                                        <span className="text-xs text-gray-400 px-2">เพิ่มลงในหมวดหมู่</span>
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                        {categories.map((category) => (
+                                            <button
+                                                key={category.id}
+                                                onClick={() => {
+                                                    onAddToCategory?.(category.id, post.id);
+                                                    setShowMenu(false);
+                                                }}
+                                                className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2"
+                                            >
+                                                <FaPlus className="text-xs" />
+                                                <span className="truncate">{category.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+
+                            {onRemoveFromCategory && (
+                                <button
+                                    onClick={() => {
+                                        onRemoveFromCategory(post.id);
+                                        setShowMenu(false);
+                                    }}
+                                    className="w-full text-left px-3 py-2 text-sm text-red-300 hover:bg-gray-700 hover:text-red-200 transition-colors flex items-center gap-2"
+                                >
+                                    <FaMinusCircle className="text-xs" />
+                                    <span>ลบออกจากหมวดหมู่</span>
+                                </button>
+                            )}
 
                             {onDelete && (
                                 <>
                                     <div className="border-t border-gray-700 my-1"></div>
                                     <button
                                         onClick={() => {
-                                            if (window.confirm('คุณต้องการลบข่าวนี้ใช่หรือไม่?')) {
-                                                onDelete(post.id);
-                                            }
+                                            onDelete(post.id);
                                             setShowMenu(false);
                                         }}
                                         className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-2"

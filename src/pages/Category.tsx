@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,6 +17,7 @@ const categorySchema = z.object({
 type CategoryFormInput = z.infer<typeof categorySchema>;
 
 const Category = () => {
+    const navigate = useNavigate();
     const [categories, setCategories] = useState<CategoryType[]>([]);
     const [filteredCategories, setFilteredCategories] = useState<CategoryType[]>([]);
     const [loading, setLoading] = useState(true);
@@ -173,17 +175,24 @@ const Category = () => {
                             {filteredCategories.map((category) => (
                                 <div
                                     key={category.id}
-                                    className="group bg-[#1e293b] hover:bg-[#253248] border border-slate-700/50 hover:border-blue-500/30 rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 relative overflow-hidden"
+                                    onClick={() => navigate(`/category-news/${category.id}`)}
+                                    className="group bg-[#1e293b] hover:bg-[#253248] border border-slate-700/50 hover:border-blue-500/30 rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 relative overflow-hidden cursor-pointer"
                                 >
                                     <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                                         <button
-                                            onClick={() => handleOpenEditModal(category)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenEditModal(category);
+                                            }}
                                             className="p-2 bg-slate-700/50 hover:bg-blue-500/20 text-slate-400 hover:text-blue-400 rounded-lg transition-colors"
                                         >
                                             <FaEdit />
                                         </button>
                                         <button
-                                            onClick={() => handleOpenDeleteModal(category.id)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleOpenDeleteModal(category.id);
+                                            }}
                                             className="p-2 bg-slate-700/50 hover:bg-red-500/20 text-slate-400 hover:text-red-400 rounded-lg transition-colors"
                                         >
                                             <FaTrash />
