@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
+import { toast } from 'react-hot-toast';
 import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
 import api from '../../api/axiosInstance';
@@ -74,11 +75,16 @@ const Main = () => {
     const handleAnalyzeNews = async () => {
         if (isAnalyzing) return;
         setIsAnalyzing(true);
+        const loadingToast = toast.loading('กำลังวิเคราะห์ข่าว...');
+
         try {
             await api.post('/news/analyze');
             setHasAnalyzedToday(true);
+            toast.success('วิเคราะห์ข่าวเสร็จสิ้น', { id: loadingToast });
+            await fetchNews(1, timeRangeMap[activeTime]);
         } catch (error) {
             console.error('Error analyzing news:', error);
+            toast.error('เกิดข้อผิดพลาดในการวิเคราะห์ข่าว', { id: loadingToast });
         } finally {
             setIsAnalyzing(false);
         }
