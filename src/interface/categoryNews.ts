@@ -1,0 +1,12 @@
+export interface CategoryNewsCreate {
+    category_id: number;
+    news_id: number;
+}
+
+export interface CategoryNewsResponse {
+    id: number;
+    category_id: number;
+    news_id: number;
+    created_at: string;
+    updated_at: string;
+}

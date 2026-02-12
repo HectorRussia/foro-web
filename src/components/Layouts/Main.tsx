@@ -3,20 +3,13 @@ import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
 import { toast } from 'react-hot-toast';
 import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
-import api from '../../api/axiosInstance';
+import { createCategoryNews } from '../../api/categoryNews';
 import { type PaginatedNewsResponse } from '../../interface/news';
+import { getCategories } from '../../api/category';
+import { deleteNews, getNews, getNewsAnalysis, analyzeNews } from '../../api/news';
+import { type Category } from '../../interface/category';
 
-// const CATEGORIES = ["หมวดรวม", "เทคโนโลยี", "การตลาด"];
 const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
-
-// const iconMain = [{
-//     icon: <LuLayoutDashboard />,
-//     label: "Layout"
-// }, {
-//     icon: <FaPlus />,
-//     label: "Plus"
-// }]
-
 const LAYOUT_OPTIONS = [
     { id: 'list', label: 'Standard', icon: <LuLayoutDashboard /> },
     { id: 'grid', label: 'Grid', icon: <LuLayoutDashboard className="rotate-90" /> },
@@ -32,7 +25,6 @@ const timeRangeMap: Record<string, number | null> = {
 };
 const Main = () => {
 
-    // const [activeCategory, setActiveCategory] = useState('หมวดรวม');
     const [activeTime, setActiveTime] = useState('วันนี้');
     const [news, setNews] = useState<PaginatedNewsResponse | null>(null);
     const [isLoading, setIsLoading] = useState(false);
@@ -40,6 +32,25 @@ const Main = () => {
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
+    const [categories, setCategories] = useState<Category[]>([]);
+
+    const fetchCats = async () => {
+        try {
+            const data = await getCategories();
+            setCategories(data);
+            console.log('Categories loaded:', data);
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+        }
+    };
+
+    useEffect(() => {
+        fetchCats();
+    }, []);
+
+    useEffect(() => {
+        // console.log('Categories updated:', categories);
+    }, [categories]);
 
     useEffect(() => {
         const checkTodayAnalysis = async () => {
@@ -47,8 +58,7 @@ const Main = () => {
             // OR only check when activeTime becomes 'วันนี้'
             if (activeTime === 'วันนี้') {
                 try {
-                    const response = await api.get('/news/analyze');
-                    const data = response.data;
+                    const data = await getNewsAnalysis();
 
                     // Check if data exists and is from today
                     // Assuming the API returns an object with a 'created_at' or 'date' field
@@ -72,13 +82,29 @@ const Main = () => {
         checkTodayAnalysis();
     }, [activeTime]);
 
+    const fetchNews = async (page = 1, range: number | null = null) => {
+        try {
+
+            if (isLoading) return;
+            setIsLoading(true);
+
+            const data = await getNews(page, 10, range);
+            setNews(data);
+        } catch (error) {
+            console.error('Error fetching news:', error);
+        }
+        finally {
+            setIsLoading(false);
+        }
+    };
+
     const handleAnalyzeNews = async () => {
         if (isAnalyzing) return;
         setIsAnalyzing(true);
         const loadingToast = toast.loading('กำลังวิเคราะห์ข่าว...');
 
         try {
-            await api.post('/news/analyze');
+            await analyzeNews();
             setHasAnalyzedToday(true);
             toast.success('วิเคราะห์ข่าวเสร็จสิ้น', { id: loadingToast });
             await fetchNews(1, timeRangeMap[activeTime]);
@@ -90,25 +116,34 @@ const Main = () => {
         }
     };
 
-    const fetchNews = async (page = 1, range: number | null = null) => {
+    const handleAddNewsToCategory = async (categoryId: number, newsId: number) => {
         try {
-
-            if (isLoading) return;
-            setIsLoading(true);
-
-            const response = await api.get<PaginatedNewsResponse>('/news', {
-                params: {
-                    page: page,
-                    limit: 10,
-                    days_range: range
-                }
+            await createCategoryNews({
+                category_id: categoryId,
+                news_id: newsId
             });
-            setNews(response.data);
+            toast.success('เพิ่มข่าวเข้าหมวดหมู่เรียบร้อยแล้ว');
         } catch (error) {
-            console.error('Error fetching news:', error);
+            console.error('Error adding news to category:', error);
+            toast.error('เกิดข้อผิดพลาดในการเพิ่มข่าวเข้าหมวดหมู่');
         }
-        finally {
-            setIsLoading(false);
+    };
+
+    const handleDeleteNews = async (newsId: number) => {
+        try {
+            await deleteNews(newsId);
+            toast.success('ลบข่าวสำเร็จ');
+            // Remove from state or refetch
+            setNews(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    items: prev.items.filter(item => item.id !== newsId)
+                };
+            });
+        } catch (error) {
+            console.error('Error deleting news:', error);
+            toast.error('เกิดข้อผิดพลาดในการลบข่าว');
         }
     };
 
@@ -161,31 +196,11 @@ const Main = () => {
                         </div>
                     </div>
 
-                    {/* <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white shadow-lg shadow-blue-900/20 transition-all text-sm font-medium">
-                        {iconMain[1].icon}
-                        <span>เพิ่มหมวดใหม่</span>
-                    </button> */}
                 </div>
             </header>
 
             {/* Filters Section */}
             <div className="flex flex-col gap-6 mb-8">
-                {/* Categories - Centered Pills */}
-                <div className="flex justify-center flex-wrap gap-2">
-                    {/* {CATEGORIES.map(cat => (
-                        <button
-                            key={cat}
-                            onClick={() => setActiveCategory(cat)}
-                            className={`px-6 py-1.5 rounded-full text-sm font-medium transition-all duration-200 border ${activeCategory === cat
-                                ? 'bg-blue-600/20 border-blue-500 text-blue-400 shadow-[0_0_15px_rgba(59,130,246,0.15)]'
-                                : 'bg-[#0f172a] border-[#1e293b] text-gray-400 hover:border-gray-600 hover:text-gray-200'
-                                }`}
-                        >
-                            {cat}
-                        </button>
-                    ))} */}
-                </div>
-
                 {/* Time Filters & Secondary Actions */}
                 <div className="flex flex-wrap items-center justify-start gap-4 border-b border-[#1e293b] pb-4">
                     <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-lg border border-[#1e293b] overflow-x-auto max-w-full">
@@ -221,9 +236,6 @@ const Main = () => {
                             </span>
                         </button>
                     )}
-                    {/* <h2 className="text-lg font-semibold text-white/90">
-                        {activeCategory}
-                    </h2> */}
                 </div>
 
             </div>
@@ -238,7 +250,14 @@ const Main = () => {
                 }
             `}>
                 {news?.items?.map(post => (
-                    <DashboardCard key={post.id} post={post} variant={layoutMode} />
+                    <DashboardCard
+                        key={post.id}
+                        post={post}
+                        variant={layoutMode}
+                        categories={categories}
+                        onAddToCategory={handleAddNewsToCategory}
+                        onDelete={handleDeleteNews}
+                    />
                 ))}
             </div>
         </main >

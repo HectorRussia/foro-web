@@ -1,7 +1,8 @@
-import { useState } from 'react';
-import { FaCopy, FaCheck, FaExternalLinkAlt } from 'react-icons/fa';
+import { useState, useRef, useEffect } from 'react';
+import { FaCopy, FaCheck, FaExternalLinkAlt, FaPlus, FaTrash } from 'react-icons/fa';
 import { IoIosMore, } from 'react-icons/io';
 import type { NewsItem } from '../interface/news';
+import type { Category } from '../interface/category';
 
 const iconsDash = [
     { icon: <IoIosMore />, label: "More" },
@@ -9,8 +10,33 @@ const iconsDash = [
     { icon: <FaCopy />, label: "Copy" },
 ]
 
-const DashboardCard = ({ post, variant = 'list' }: { post: NewsItem, variant?: 'list' | 'grid' | 'compact' }) => {
+interface DashboardCardProps {
+    post: NewsItem;
+    variant?: 'list' | 'grid' | 'compact';
+    categories?: Category[];
+    onAddToCategory?: (categoryId: number, newsId: number) => Promise<void>;
+    onDelete?: (newsId: number) => Promise<void>;
+}
+
+const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategory, onDelete }: DashboardCardProps) => {
     const [copied, setCopied] = useState(false);
+    const [showMenu, setShowMenu] = useState(false);
+    const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+                setShowMenu(false);
+            }
+        };
+
+        if (showMenu) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [showMenu]);
 
     const handleCopy = () => {
         navigator.clipboard.writeText(post.url);
@@ -22,7 +48,7 @@ const DashboardCard = ({ post, variant = 'list' }: { post: NewsItem, variant?: '
     const isGrid = variant === 'grid';
 
     return (
-        <div className={`group bg-[#0f172a] border border-[#1e293b] rounded-2xl transition-all duration-200 hover:border-gray-600 hover:shadow-xl hover:shadow-black/20 flex flex-col
+        <div className={`group bg-[#0f172a] border border-[#1e293b] rounded-2xl transition-all duration-200 hover:border-gray-600 hover:shadow-xl hover:shadow-black/20 flex flex-col relative
             ${isCompact ? 'p-4' : 'p-6'}
             ${isGrid ? 'h-full justify-between' : ''}
         `}>
@@ -50,10 +76,60 @@ const DashboardCard = ({ post, variant = 'list' }: { post: NewsItem, variant?: '
                     </div>
                 </div>
 
-                {/* Options Icon */}
-                <button className={`text-gray-500 hover:text-white rounded-full hover:bg-white/5 transition-colors ${isCompact ? 'p-1' : 'p-2'}`}>
-                    {iconsDash[0].icon}
-                </button>
+                {/* Options Icon with Dropdown */}
+                <div className="relative" ref={menuRef}>
+                    <button
+                        onClick={() => setShowMenu(!showMenu)}
+                        className={`text-gray-500 hover:text-white rounded-full hover:bg-white/5 transition-colors ${isCompact ? 'p-1' : 'p-2'}`}
+                    >
+                        {iconsDash[0].icon}
+                    </button>
+
+                    {showMenu && (
+                        <div className="absolute right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-xl overflow-hidden z-20">
+                            <div className="p-2 border-b border-gray-700">
+                                <span className="text-xs text-gray-400 px-2">เพิ่มลงในหมวดหมู่</span>
+                            </div>
+                            <div className="max-h-48 overflow-y-auto">
+                                {categories.length > 0 ? (
+                                    categories.map((category) => (
+                                        <button
+                                            key={category.id}
+                                            onClick={() => {
+                                                onAddToCategory?.(category.id, post.id);
+                                                setShowMenu(false);
+                                            }}
+                                            className="w-full text-left px-3 py-2 text-sm text-gray-300 hover:bg-gray-700 hover:text-white transition-colors flex items-center gap-2"
+                                        >
+                                            <FaPlus className="text-xs" />
+                                            <span className="truncate">{category.name}</span>
+                                        </button>
+                                    ))
+                                ) : (
+                                    <div className="px-3 py-2 text-sm text-gray-500">ไม่มีหมวดหมู่</div>
+                                )}
+                            </div>
+
+                            {onDelete && (
+                                <>
+                                    <div className="border-t border-gray-700 my-1"></div>
+                                    <button
+                                        onClick={() => {
+                                            if (window.confirm('คุณต้องการลบข่าวนี้ใช่หรือไม่?')) {
+                                                onDelete(post.id);
+                                            }
+                                            setShowMenu(false);
+                                        }}
+                                        className="w-full text-left px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors flex items-center gap-2"
+                                    >
+                                        <FaTrash className="text-xs" />
+                                        <span>ลบข่าว</span>
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className={`text-gray-300 font-light overflow-hidden
