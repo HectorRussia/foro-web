@@ -30,6 +30,7 @@ const Main = () => {
     const queryClient = useQueryClient();
     const [activeTime, setActiveTime] = useState('ทั้งหมด');
     const [layoutMode, setLayoutMode] = useState<'list' | 'grid' | 'compact'>('list');
+    const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
 
     const { ref, inView } = useInView({
         rootMargin: '200px', // Trigger 200px before bottom
@@ -162,6 +163,24 @@ const Main = () => {
         checkTodayAnalysis();
     }, [activeTime]);
 
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.layout-dropdown-container')) {
+                setIsLayoutDropdownOpen(false);
+            }
+        };
+
+        if (isLayoutDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isLayoutDropdownOpen]);
+
     // const fetchNews = async (page = 1, range: number | null = null) => { ... } // Removed manual fetch
 
     const handleAnalyzeNews = async () => {
@@ -237,8 +256,11 @@ const Main = () => {
                 </div>
 
                 <div className="flex items-center gap-3 z-50">
-                    <div className="relative group">
-                        <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] border border-gray-700 transition-all text-sm font-medium z-10 relative">
+                    <div className="relative layout-dropdown-container">
+                        <button
+                            onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] border border-gray-700 transition-all text-sm font-medium z-10 relative"
+                        >
                             {layoutMode === 'list' && <LuLayoutDashboard />}
                             {layoutMode === 'grid' && <LuLayoutDashboard className="rotate-90" />}
                             {layoutMode === 'compact' && <LuLayoutDashboard className="scale-y-75" />}
@@ -248,12 +270,16 @@ const Main = () => {
                         </button>
 
                         {/* Dropdown Menu */}
-                        <div className="absolute left-0 md:left-auto md:right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-left md:origin-top-right z-50">
+                        <div className={`absolute left-0 md:left-auto md:right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-xl overflow-hidden transition-all duration-200 transform origin-top-left md:origin-top-right z-50 ${isLayoutDropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
+                            }`}>
                             <div className="p-1">
                                 {LAYOUT_OPTIONS.map((option) => (
                                     <button
                                         key={option.id}
-                                        onClick={() => setLayoutMode(option.id)}
+                                        onClick={() => {
+                                            setLayoutMode(option.id);
+                                            setIsLayoutDropdownOpen(false);
+                                        }}
                                         className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
                                             ${layoutMode === option.id
                                                 ? 'bg-blue-600 text-white'

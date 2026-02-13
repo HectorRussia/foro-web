@@ -22,6 +22,7 @@ const CategoryNews = () => {
     const [loading, setLoading] = useState(true);
     const [categoryName, setCategoryName] = useState('');
     const [layoutMode, setLayoutMode] = useState<'list' | 'grid' | 'compact'>('list');
+    const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
 
     // Modal state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -47,6 +48,24 @@ const CategoryNews = () => {
 
         fetchNews();
     }, [id]);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            const target = event.target as HTMLElement;
+            if (!target.closest('.layout-dropdown-container')) {
+                setIsLayoutDropdownOpen(false);
+            }
+        };
+
+        if (isLayoutDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isLayoutDropdownOpen]);
 
     // Map CategoryNewsItem to NewsItem for DashboardCard
     const mapToNewsItem = (item: CategoryNewsItem): NewsItem => ({
@@ -102,8 +121,11 @@ const CategoryNews = () => {
                     </div>
 
                     <div className="flex items-center gap-3 z-50">
-                        <div className="relative group">
-                            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] border border-gray-700 transition-all text-sm font-medium z-10 relative text-gray-200">
+                        <div className="relative layout-dropdown-container">
+                            <button
+                                onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
+                                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] border border-gray-700 transition-all text-sm font-medium z-10 relative text-gray-200"
+                            >
                                 {layoutMode === 'list' && <LuLayoutDashboard />}
                                 {layoutMode === 'grid' && <LuLayoutDashboard className="rotate-90" />}
                                 {layoutMode === 'compact' && <LuLayoutDashboard className="scale-y-75" />}
@@ -113,12 +135,16 @@ const CategoryNews = () => {
                             </button>
 
                             {/* Dropdown Menu */}
-                            <div className="absolute right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-xl overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right z-50">
+                            <div className={`absolute right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-xl overflow-hidden transition-all duration-200 transform origin-top-right z-50 ${isLayoutDropdownOpen ? 'opacity-100 visible' : 'opacity-0 invisible'
+                                }`}>
                                 <div className="p-1">
                                     {LAYOUT_OPTIONS.map((option) => (
                                         <button
                                             key={option.id}
-                                            onClick={() => setLayoutMode(option.id)}
+                                            onClick={() => {
+                                                setLayoutMode(option.id);
+                                                setIsLayoutDropdownOpen(false);
+                                            }}
                                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors
                                             ${layoutMode === option.id
                                                     ? 'bg-blue-600 text-white'
