@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import axios from "axios";
 import { RegisterSchema, type RegisterInput } from "../schemas/auth";
 import { useNavigate } from "react-router-dom";
+import { toast } from 'react-hot-toast';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 const Register = () => {
@@ -23,10 +24,10 @@ const Register = () => {
                 password: data.password,
             });
 
-            alert("สมัครสมาชิกสำเร็จ!");
+            toast.success("สมัครสมาชิกสำเร็จ! 🎉");
             navigate("/")
         } catch (error: any) {
-            alert(error.response?.data?.detail || "เกิดข้อผิดพลาด");
+            toast.error(error.response?.data?.detail || "เกิดข้อผิดพลาด");
         }
     };
     return (
@@ -34,7 +35,7 @@ const Register = () => {
             {/* Background decoration */}
             <div className="absolute inset-0 bg-linear-to-br from-[#051626] to-[#000000] z-0" />
 
-            <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
+            <div className="container max-w-6xl mx-auto flex flex-col-reverse md:flex-row items-center justify-between gap-12 relative z-10">
 
                 {/* Left Side - Text Content */}
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left order-2 md:order-1">
@@ -43,7 +44,7 @@ const Register = () => {
                         <img
                             src="/images/logo-foro.png"
                             alt="Foro Logo"
-                            className="block h-16 md:h-40 w-auto object-contain mt-4 drop-shadow-2xl "
+                            className="h-26 md:h-40 w-auto object-contain mt-4 drop-shadow-2xl mx-auto md:mx-0"
                         />
                     </h1>
                     <p className="text-gray-400 text-lg md:text-xl font-light">

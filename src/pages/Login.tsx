@@ -4,6 +4,7 @@ import axios from 'axios';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginFormValues } from '../schemas/auth';
+import { toast } from 'react-hot-toast';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -42,7 +43,7 @@ const Login = () => {
             });
             navigate('/dashboard');
         } catch (err: any) {
-            alert(err.response?.data?.detail || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+            toast.error(err.response?.data?.detail || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
         }
     };
 
