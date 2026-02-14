@@ -4,11 +4,10 @@ import { useInView } from 'react-intersection-observer';
 import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
 import { FaTrash } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
-import dayjs from 'dayjs';
 import DashboardCard from '../DashboardCard';
 import { createCategoryNews } from '../../api/categoryNews';
 import { getCategories } from '../../api/category';
-import { deleteNews, getNews, getNewsAnalysis, analyzeNews } from '../../api/news';
+import { deleteNews, getNews, analyzeNews } from '../../api/news';
 import { type Category } from '../../interface/category';
 
 const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
@@ -81,9 +80,7 @@ const Main = () => {
     }, [inView, hasNextPage, fetchNextPage]);
 
     const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [hasAnalyzedToday, setHasAnalyzedToday] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [lastAnalysisTime, setLastAnalysisTime] = useState<string | null>(null);
 
     // Modal state
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -107,61 +104,7 @@ const Main = () => {
         // console.log('Categories updated:', categories);
     }, [categories]);
 
-    useEffect(() => {
-        const checkTodayAnalysis = async () => {
-            const todayStr = dayjs().format('YYYY-MM-DD');
-            const lastAnalysisDate = localStorage.getItem('last_analysis_date');
-
-            // 1. Check Local Storage first for immediate feedback
-            if (lastAnalysisDate === todayStr) {
-                setHasAnalyzedToday(true);
-            }
-
-            // 2. Check API
-            if (activeTime === 'วันนี้') {
-                try {
-                    const rawData = await getNewsAnalysis(); // Could be array or object
-                    console.log('Analysis Data:', rawData);
-
-                    let data: any = rawData;
-                    // If API returns an array, pick the latest one
-                    if (Array.isArray(rawData)) {
-                        data = rawData.length > 0 ? rawData[0] : null;
-                    }
-
-                    if (data && data.created_at) {
-                        const analysisDate = dayjs(data.created_at);
-                        const isToday = analysisDate.isSame(dayjs(), 'day');
-                        if (isToday) {
-                            setHasAnalyzedToday(true);
-                            setLastAnalysisTime(analysisDate.format('HH:mm')); // Keep time
-                            if (lastAnalysisDate !== todayStr) {
-                                localStorage.setItem('last_analysis_date', todayStr);
-                            }
-                        } else {
-                            // Only reset if local storage also doesn't say today
-                            if (lastAnalysisDate !== todayStr) {
-                                setHasAnalyzedToday(false);
-                                setLastAnalysisTime(null);
-                            }
-                        }
-                    } else {
-                        if (lastAnalysisDate !== todayStr) {
-                            setHasAnalyzedToday(false);
-                            setLastAnalysisTime(null);
-                        }
-                    }
-                } catch (error) {
-                    console.log('No analysis found for today');
-                    if (lastAnalysisDate !== todayStr) {
-                        setHasAnalyzedToday(false);
-                        setLastAnalysisTime(null);
-                    }
-                }
-            }
-        };
-        checkTodayAnalysis();
-    }, [activeTime]);
+    // Removed daily analysis check - users can now analyze news freely
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -190,14 +133,8 @@ const Main = () => {
 
         try {
             await analyzeNews();
-            // Save to local storage
-            localStorage.setItem('last_analysis_date', dayjs().format('YYYY-MM-DD'));
-            setHasAnalyzedToday(true);
-            setLastAnalysisTime(dayjs().format('HH:mm'));
-
             toast.success('วิเคราะห์ข่าวเสร็จสิ้น', { id: loadingToast });
             queryClient.invalidateQueries({ queryKey: ['news'] }); // Invalidate queries to refresh list
-            // await fetchNews(1, timeRangeMap[activeTime]);
         } catch (error) {
             console.error('Error analyzing news:', error);
             toast.error('เกิดข้อผิดพลาดในการวิเคราะห์ข่าว', { id: loadingToast });
@@ -321,35 +258,21 @@ const Main = () => {
                         ))}
                     </div>
 
-                    {/* Analyze Button */}
-                    {activeTime === 'วันนี้' && (
-                        <button
-                            onClick={handleAnalyzeNews}
-                            disabled={isAnalyzing || hasAnalyzedToday}
-                            className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-white shadow-lg transition-all transform 
-                                ${hasAnalyzedToday
-                                    ? 'bg-gray-700 cursor-not-allowed opacity-75'
-                                    : 'bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 hover:scale-105 animate-pulse shadow-blue-500/20'
-                                }
-                            `}
-                        >
-                            {isAnalyzing ? (
-                                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            ) : hasAnalyzedToday ? (
-                                <LuSparkles className="text-gray-400" />
-                            ) : (
-                                <LuSparkles className="text-yellow-300" />
-                            )}
-                            <span className="text-sm font-medium">
-                                {isAnalyzing
-                                    ? 'กำลังวิเคราะห์...'
-                                    : hasAnalyzedToday
-                                        ? `วิเคราะห์แล้ว (${lastAnalysisTime || 'วันนี้'})`
-                                        : 'ดูข่าววันนี้'
-                                }
-                            </span>
-                        </button>
-                    )}
+                    {/* Analyze Button - Now available anytime */}
+                    <button
+                        onClick={handleAnalyzeNews}
+                        disabled={isAnalyzing}
+                        className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-white shadow-lg transition-all transform bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+                    >
+                        {isAnalyzing ? (
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                            <LuSparkles className="text-yellow-300" />
+                        )}
+                        <span className="text-sm font-medium">
+                            {isAnalyzing ? 'กำลังวิเคราะห์...' : 'วิเคราะห์ข่าว'}
+                        </span>
+                    </button>
                 </div>
 
             </div>
