@@ -10,7 +10,6 @@ import type { NewsItem } from '../interface/news';
 import type { CategoryNewsItem } from '../interface/categoryNews';
 
 const LAYOUT_OPTIONS = [
-    { id: 'list', label: 'Standard', icon: <LuLayoutDashboard /> },
     { id: 'grid', label: 'Grid', icon: <LuLayoutDashboard className="rotate-90" /> },
     { id: 'compact', label: 'Compact', icon: <LuLayoutDashboard className="scale-y-75" /> }
 ] as const;
@@ -21,7 +20,7 @@ const CategoryNews = () => {
     const [news, setNews] = useState<CategoryNewsItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [categoryName, setCategoryName] = useState('');
-    const [layoutMode, setLayoutMode] = useState<'list' | 'grid' | 'compact'>('list');
+    const [layoutMode, setLayoutMode] = useState<'grid' | 'compact'>('grid');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
 
     // Modal state
@@ -126,11 +125,10 @@ const CategoryNews = () => {
                                 onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
                                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1e293b] hover:bg-[#2d3b4e] border border-gray-700 transition-all text-sm font-medium z-10 relative text-gray-200"
                             >
-                                {layoutMode === 'list' && <LuLayoutDashboard />}
                                 {layoutMode === 'grid' && <LuLayoutDashboard className="rotate-90" />}
                                 {layoutMode === 'compact' && <LuLayoutDashboard className="scale-y-75" />}
                                 <span className="hidden sm:inline">
-                                    {layoutMode === 'list' ? 'Standard' : layoutMode === 'grid' ? 'Grid View' : 'Compact'}
+                                    {layoutMode === 'grid' ? 'Grid View' : 'Compact'}
                                 </span>
                             </button>
 
