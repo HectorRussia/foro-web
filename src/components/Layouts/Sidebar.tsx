@@ -11,9 +11,9 @@ const Sidebar = () => {
                 {/* <div className="h-12 w-12 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-900/20"> */}
                 {/*  <span className="font-bold text-2xl text-white">F</span> */}
                 <img
-                    src="/images/logo-foro.png"
+                    src="/images/LOGO-FORO/FORO_TP_W.png"
                     alt="Foro Logo"
-                    className="w-auto rounded-xl"
+                    className="w-1/2 rounded-xl"
                 />
                 {/*   </div> */}
             </div>

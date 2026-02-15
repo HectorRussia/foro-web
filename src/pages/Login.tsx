@@ -5,19 +5,35 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { loginSchema, type LoginFormValues } from '../schemas/auth';
 import { toast } from 'react-hot-toast';
+import { useState, useEffect } from 'react';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 const Login = () => {
-
+    const [rememberMe, setRememberMe] = useState(false);
     const navigate = useNavigate();
-    const { register, handleSubmit, formState: { errors } } = useForm<LoginFormValues>({
+    const { register, handleSubmit, formState: { errors }, setValue } = useForm<LoginFormValues>({
         resolver: zodResolver(loginSchema)
     });
     const { login } = useAuth();
 
+    // Load saved email on component mount
+    useEffect(() => {
+        const savedEmail = localStorage.getItem('rememberedEmail');
+        if (savedEmail) {
+            setValue('email', savedEmail);
+            setRememberMe(true);
+        }
+    }, [setValue]);
+
     const onSubmit = async (values: LoginFormValues) => {
         try {
+            // Handle remember me
+            if (rememberMe) {
+                localStorage.setItem('rememberedEmail', values.email);
+            } else {
+                localStorage.removeItem('rememberedEmail');
+            }
 
             const formData = new URLSearchParams();
             formData.append('username', values.email); // OAuth2
@@ -54,6 +70,9 @@ const Login = () => {
             <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
                 {/* Left Side */}
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left">
+                    <h1 className="text-[64px] md:text-[5rem] font-bold leading-tight tracking-tight text-[#4688d2]">
+                        Foro
+                    </h1>
                     <h1 className="text-5xl md:text-5xl font-bold leading-tight tracking-tight">
                         สรุปโพสต์จาก X ด้วย LLM <br />
                         <span className="text-white">แบบอ่านง่าย</span>
@@ -67,7 +86,7 @@ const Login = () => {
                 <form onSubmit={handleSubmit(onSubmit)} className="w-full md:w-[480px] bg-white rounded-2xl shadow-2xl p-8 md:p-10 space-y-6">
                     <div className="text-center mb-8">
                         <h2 className="text-3xl font-bold text-gray-900 mb-2">เข้าสู่ระบบ</h2>
-                        <p className="text-gray-500 text-sm">เข้าสู่ระบบเพื่อเริ่มใช้งาน Foro-x-social</p>
+                        <p className="text-gray-500 text-sm">เข้าสู่ระบบเพื่อเริ่มใช้งาน Foro</p>
                     </div>
 
                     <div className="space-y-2">
@@ -92,6 +111,20 @@ const Login = () => {
                             className={`w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none ${errors.password ? "border-red-500 ring-1 ring-red-500" : ""}`}
                         />
                         {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+                    </div>
+
+                    {/* Remember Me Checkbox */}
+                    <div className="flex items-center">
+                        <input
+                            type="checkbox"
+                            id="rememberMe"
+                            checked={rememberMe}
+                            onChange={(e) => setRememberMe(e.target.checked)}
+                            className="w-4 h-4 text-[#001f3f] bg-gray-100 border-gray-300 rounded focus:ring-[#001f3f] focus:ring-2 cursor-pointer"
+                        />
+                        <label htmlFor="rememberMe" className="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
+                            จดจำอีเมลของฉัน
+                        </label>
                     </div>
 
                     <button
