@@ -3,19 +3,83 @@ import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginFormValues } from '../schemas/auth';
+import { getLoginSchema, type LoginFormValues, getForgotPasswordSchema, type ForgotPasswordInput } from '../schemas/auth';
 import { toast } from 'react-hot-toast';
 import { useState, useEffect } from 'react';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 const Login = () => {
+    const [lang, setLang] = useState<'th' | 'en'>('th');
     const [rememberMe, setRememberMe] = useState(false);
+    const [showForgot, setShowForgot] = useState(false);
     const navigate = useNavigate();
     const { register, handleSubmit, formState: { errors }, setValue } = useForm<LoginFormValues>({
-        resolver: zodResolver(loginSchema)
+        resolver: zodResolver(getLoginSchema(lang))
     });
+
+    const {
+        register: registerForgot,
+        handleSubmit: handleSubmitForgot,
+        formState: { errors: errorsForgot, isSubmitting: isSubmittingForgot },
+        reset: resetForgot
+    } = useForm<ForgotPasswordInput>({
+        resolver: zodResolver(getForgotPasswordSchema(lang))
+    });
+
     const { login } = useAuth();
+
+    // Translations
+    const t = {
+        th: {
+            title: "Foro",
+            subtitle: "สรุปโพสต์จาก X ด้วย LLM",
+            subtitle2: "แบบอ่านง่าย",
+            desc: "ติดตามและรับสรุปเนื้อหาจากบัญชี X ที่คุณสนใจ",
+            loginHeader: "เข้าสู่ระบบ",
+            loginSub: "เข้าสู่ระบบเพื่อเริ่มใช้งาน Foro",
+            email: "อีเมล",
+            password: "รหัสผ่าน",
+            rememberMe: "จดจำอีเมลของฉัน",
+            loginBtn: "เข้าสู่ระบบ",
+            or: "หรือ",
+            forgotPwd: "ลืมรหัสผ่าน?",
+            registerBtn: "ลงทะเบียน",
+            resetPwd: "รีเซ็ตรหัสผ่าน",
+            phone: "เบอร์โทรศัพท์",
+            newPwd: "รหัสผ่านใหม่",
+            confirmPwd: "ยืนยันรหัสผ่านใหม่",
+            confirmBtn: "ยืนยันการตั้งรหัสผ่านใหม่",
+            loading: "กำลังดำเนินการ...",
+            resetSuccess: "รีเซ็ตรหัสผ่านสำเร็จ!",
+            loginError: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
+            resetError: "เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน"
+        },
+        en: {
+            title: "Foro",
+            subtitle: "Summarize X posts with LLM",
+            subtitle2: "Easy to read",
+            desc: "Follow and get content summaries from X accounts you're interested in.",
+            loginHeader: "Login",
+            loginSub: "Sign in to start using Foro",
+            email: "Email",
+            password: "Password",
+            rememberMe: "Remember me",
+            loginBtn: "Login",
+            or: "OR",
+            forgotPwd: "Forgot password?",
+            registerBtn: "Register",
+            resetPwd: "Reset Password",
+            phone: "Phone Number",
+            newPwd: "New Password",
+            confirmPwd: "Confirm New Password",
+            confirmBtn: "Confirm Reset Password",
+            loading: "Processing...",
+            resetSuccess: "Password reset successful!",
+            loginError: "Invalid email or password",
+            resetError: "An error occurred during password reset"
+        }
+    };
 
     // Load saved email on component mount
     useEffect(() => {
@@ -59,7 +123,22 @@ const Login = () => {
             });
             navigate('/dashboard');
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || "อีเมลหรือรหัสผ่านไม่ถูกต้อง");
+            toast.error(err.response?.data?.detail || t[lang].loginError);
+        }
+    };
+
+    const onForgotSubmit = async (data: ForgotPasswordInput) => {
+        try {
+            await axios.post(`${BASE_URL}/auth/forgot-password`, {
+                email: data.email,
+                phone: data.phone,
+                new_password: data.new_password
+            });
+            toast.success(t[lang].resetSuccess);
+            setShowForgot(false);
+            resetForgot();
+        } catch (error: any) {
+            toast.error(error.response?.data?.detail || t[lang].resetError);
         }
     };
 
@@ -67,93 +146,197 @@ const Login = () => {
         <div className="min-h-screen w-full bg-[#030e17] flex items-center justify-center p-4 relative overflow-hidden font-sans">
             <div className="absolute inset-0 bg-linear-to-br from-[#051626] to-[#000000] z-0" />
 
+            {/* Language Switcher */}
+            <div className="absolute top-6 right-6 z-50 flex bg-white/10 backdrop-blur-md rounded-xl p-1 border border-white/20 shadow-xl">
+                <button
+                    onClick={() => setLang('th')}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${lang === 'th' ? 'bg-white text-[#001f3f] shadow-lg scale-105' : 'text-gray-400 hover:text-white'}`}
+                >
+                    TH
+                </button>
+                <button
+                    onClick={() => setLang('en')}
+                    className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all duration-300 ${lang === 'en' ? 'bg-white text-[#001f3f] shadow-lg scale-105' : 'text-gray-400 hover:text-white'}`}
+                >
+                    EN
+                </button>
+            </div>
+
             <div className="container max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-12 relative z-10">
                 {/* Left Side */}
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left">
                     <h1 className="text-[64px] md:text-[5rem] font-bold leading-tight tracking-tight text-[#4688d2]">
-                        Foro
+                        {t[lang].title}
                     </h1>
                     <h1 className="text-5xl md:text-5xl font-bold leading-tight tracking-tight">
-                        สรุปโพสต์จาก X ด้วย LLM <br />
-                        <span className="text-white">แบบอ่านง่าย</span>
+                        {t[lang].subtitle} <br />
+                        <span className="text-white">{t[lang].subtitle2}</span>
                     </h1>
                     <p className="text-gray-400 text-lg md:text-xl font-light">
-                        ติดตามและรับสรุปเนื้อหาจากบัญชี X ที่คุณสนใจ
+                        {t[lang].desc}
                     </p>
                 </div>
 
                 {/* Right Side - Login Form */}
-                <form onSubmit={handleSubmit(onSubmit)} className="w-full md:w-[480px] bg-white rounded-2xl shadow-2xl p-8 md:p-10 space-y-6">
-                    <div className="text-center mb-8">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-2">เข้าสู่ระบบ</h2>
-                        <p className="text-gray-500 text-sm">เข้าสู่ระบบเพื่อเริ่มใช้งาน Foro</p>
-                    </div>
+                <div className="w-full md:w-[480px] bg-white rounded-2xl shadow-2xl p-8 md:p-10">
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+                        <div className="text-center mb-8">
+                            <h2 className="text-3xl font-bold text-gray-900 mb-2">{t[lang].loginHeader}</h2>
+                            <p className="text-gray-500 text-sm">{t[lang].loginSub}</p>
+                        </div>
 
-                    <div className="space-y-2">
-                        <label htmlFor="email" className="block text-sm font-medium text-gray-700">อีเมล</label>
-                        <input
-                            {...register("email")}
-                            type="email"
-                            id="email"
-                            placeholder="your@email.com"
-                            className={`w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none ${errors.email ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                        />
-                        {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
-                    </div>
+                        <div className="space-y-2">
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t[lang].email}</label>
+                            <input
+                                {...register("email")}
+                                type="email"
+                                id="email"
+                                placeholder="your@email.com"
+                                className={`w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none ${errors.email ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                            />
+                            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email.message}</p>}
+                        </div>
 
-                    <div className="space-y-2">
-                        <label htmlFor="password" className="block text-sm font-medium text-gray-700">รหัสผ่าน</label>
-                        <input
-                            {...register("password")}
-                            type="password"
-                            id="password"
-                            placeholder="••••••••"
-                            className={`w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none ${errors.password ? "border-red-500 ring-1 ring-red-500" : ""}`}
-                        />
-                        {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
-                    </div>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <label htmlFor="password" className="block text-sm font-medium text-gray-700">{t[lang].password}</label>
+                            </div>
+                            <input
+                                {...register("password")}
+                                type="password"
+                                id="password"
+                                placeholder="••••••••"
+                                className={`w-full px-4 py-3 rounded-lg bg-[#333333] border-transparent focus:border-gray-500 focus:bg-[#333333] focus:ring-0 text-white placeholder-gray-400 transition duration-200 outline-none ${errors.password ? "border-red-500 ring-1 ring-red-500" : ""}`}
+                            />
+                            {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password.message}</p>}
+                        </div>
 
-                    {/* Remember Me Checkbox */}
-                    <div className="flex items-center">
-                        <input
-                            type="checkbox"
-                            id="rememberMe"
-                            checked={rememberMe}
-                            onChange={(e) => setRememberMe(e.target.checked)}
-                            className="w-4 h-4 text-[#001f3f] bg-gray-100 border-gray-300 rounded focus:ring-[#001f3f] focus:ring-2 cursor-pointer"
-                        />
-                        <label htmlFor="rememberMe" className="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
-                            จดจำอีเมลของฉัน
-                        </label>
-                    </div>
+                        {/* Remember Me Checkbox */}
+                        <div className="flex items-center">
+                            <input
+                                type="checkbox"
+                                id="rememberMe"
+                                checked={rememberMe}
+                                onChange={(e) => setRememberMe(e.target.checked)}
+                                className="w-4 h-4 text-[#001f3f] bg-gray-100 border-gray-300 rounded focus:ring-[#001f3f] focus:ring-2 cursor-pointer"
+                            />
+                            <label htmlFor="rememberMe" className="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
+                                {t[lang].rememberMe}
+                            </label>
+                        </div>
 
-                    <button
-                        type="submit"
-                        className="w-full bg-[#001f3f] cursor-pointer hover:bg-[#003366] text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
-                    >
-                        เข้าสู่ระบบ
-                    </button>
+                        <button
+                            type="submit"
+                            className="w-full bg-[#001f3f] cursor-pointer hover:bg-[#003366] text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
+                        >
+                            {t[lang].loginBtn}
+                        </button>
+                    </form>
 
                     <div className="relative my-8">
                         <div className="absolute inset-0 flex items-center">
                             <div className="w-full border-t border-gray-300"></div>
                         </div>
                         <div className="relative flex justify-center text-sm">
-                            <span className="px-4 bg-white text-gray-400">หรือ</span>
+                            <span className="px-4 bg-white text-gray-400 font-medium">{t[lang].or}</span>
                         </div>
                     </div>
-
+                    <div className="flex justify-center items-center mb-5">
+                        <button
+                            type="button"
+                            onClick={() => setShowForgot(true)}
+                            className="text-sm font-medium text-[#001f3f] hover:underline cursor-pointer"
+                        >
+                            {t[lang].forgotPwd}
+                        </button>
+                    </div>
                     <button
                         type="button"
                         className="w-full bg-black cursor-pointer hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition duration-200 flex items-center justify-center gap-3"
                         onClick={() => navigate('/register')}
                     >
-                        <span>ลงทะเบียน</span>
+                        <span>{t[lang].registerBtn}</span>
                     </button>
-                </form>
+                </div>
             </div>
+
+            {/* Forgot Password Modal */}
+            {showForgot && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                    <div className="bg-white rounded-2xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                        <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <h3 className="text-2xl font-bold text-gray-900">{t[lang].resetPwd}</h3>
+                            <button
+                                onClick={() => { setShowForgot(false); resetForgot(); }}
+                                className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600 cursor-pointer"
+                            >
+                                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmitForgot(onForgotSubmit)} className="p-6 space-y-4">
+                            <div className="space-y-1">
+                                <label className="block text-sm font-medium text-gray-700">{t[lang].email}</label>
+                                <input
+                                    {...registerForgot("email")}
+                                    type="email"
+                                    placeholder="your@email.com"
+                                    className={`w-full px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-200 focus:border-[#001f3f] focus:ring-1 focus:ring-[#001f3f] transition duration-200 outline-none ${errorsForgot.email ? "border-red-500" : ""}`}
+                                />
+                                {errorsForgot.email && <p className="text-red-500 text-xs">{errorsForgot.email.message}</p>}
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-sm font-medium text-gray-700">{t[lang].phone}</label>
+                                <input
+                                    {...registerForgot("phone")}
+                                    type="tel"
+                                    placeholder="08xxxxxxxx"
+                                    className={`w-full px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-200 focus:border-[#001f3f] focus:ring-1 focus:ring-[#001f3f] transition duration-200 outline-none ${errorsForgot.phone ? "border-red-500" : ""}`}
+                                />
+                                {errorsForgot.phone && <p className="text-red-500 text-xs">{errorsForgot.phone.message}</p>}
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-sm font-medium text-gray-700">{t[lang].newPwd}</label>
+                                <input
+                                    {...registerForgot("new_password")}
+                                    type="password"
+                                    placeholder="••••••••"
+                                    className={`w-full px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-200 focus:border-[#001f3f] focus:ring-1 focus:ring-[#001f3f] transition duration-200 outline-none ${errorsForgot.new_password ? "border-red-500" : ""}`}
+                                />
+                                {errorsForgot.new_password && <p className="text-red-500 text-xs">{errorsForgot.new_password.message}</p>}
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block text-sm font-medium text-gray-700">{t[lang].confirmPwd}</label>
+                                <input
+                                    {...registerForgot("confirm_new_password")}
+                                    type="password"
+                                    placeholder="••••••••"
+                                    className={`w-full px-4 py-2.5 rounded-lg bg-gray-50 border border-gray-200 focus:border-[#001f3f] focus:ring-1 focus:ring-[#001f3f] transition duration-200 outline-none ${errorsForgot.confirm_new_password ? "border-red-500" : ""}`}
+                                />
+                                {errorsForgot.confirm_new_password && <p className="text-red-500 text-xs">{errorsForgot.confirm_new_password.message}</p>}
+                            </div>
+
+                            <div className="pt-4">
+                                <button
+                                    type="submit"
+                                    disabled={isSubmittingForgot}
+                                    className="w-full bg-[#001f3f] hover:bg-[#003366] text-white font-semibold py-3 rounded-xl transition duration-200 shadow-lg disabled:opacity-50 cursor-pointer"
+                                >
+                                    {isSubmittingForgot ? t[lang].loading : t[lang].confirmBtn}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
+
 
 export default Login;
