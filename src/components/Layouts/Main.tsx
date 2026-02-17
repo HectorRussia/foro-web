@@ -9,6 +9,7 @@ import { createCategoryNews } from '../../api/categoryNews';
 import { getCategories } from '../../api/category';
 import { deleteNews, getNews, analyzeNews } from '../../api/news';
 import { type Category } from '../../interface/category';
+import SkeletonCard from '../SkeletonCard';
 
 const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
 const LAYOUT_OPTIONS = [
@@ -292,6 +293,16 @@ const Main = () => {
                     <div className="col-span-full text-center py-20 text-red-400">Error loading news</div>
                 ) : (
                     <>
+                        {isAnalyzing && (
+                            <>
+                                <SkeletonCard variant={layoutMode} />
+                                <SkeletonCard variant={layoutMode} />
+                                <SkeletonCard variant={layoutMode} />
+                                <SkeletonCard variant={layoutMode} />
+                                <SkeletonCard variant={layoutMode} />
+                                <SkeletonCard variant={layoutMode} />
+                            </>
+                        )}
                         {data?.pages.map((group, i) => (
                             <div key={i} className={`contents`}>
                                 {group.items.map(post => (
