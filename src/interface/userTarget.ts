@@ -32,3 +32,19 @@ export interface FollowedUser {
     created_at: string;
     updated_at: string;
 }
+
+export interface Recommendation {
+    x_account: string;
+    name: string;
+    reason: string;
+}
+
+export interface RecommendationResponse {
+    status: string;
+    data: {
+        recommendations: Recommendation[];
+        total_found: string;
+        message: string;
+        query: string;
+    };
+}
