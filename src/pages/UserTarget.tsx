@@ -262,14 +262,14 @@ const UserTarget = () => {
                                     </div>
                                 </div>
 
-                                <h3 className="text-sm md:text-base font-black text-white group-hover:text-indigo-400 transition-colors truncate tracking-tight uppercase mb-0.5">
+                                <h3 className="text-md md:text-base font-black text-white group-hover:text-indigo-400 transition-colors truncate tracking-tight uppercase mb-0.5">
                                     {rec.name}
                                 </h3>
-                                <span className="text-indigo-400/80 font-bold text-xs tracking-tight italic mb-3">@{rec.x_account}</span>
+                                <span className="text-indigo-400/80 font-bold text-md tracking-tight italic mb-3">@{rec.x_account}</span>
 
                                 <div className="mt-auto border-t border-indigo-500/10 pt-3 relative">
                                     <div className="absolute top-0 left-0 w-8 h-0.5 bg-indigo-500 rounded-full" />
-                                    <p className="text-gray-400 text-xs leading-relaxed italic line-clamp-5 group-hover:text-gray-300 transition-colors">
+                                    <p className="text-gray-400 text-md leading-relaxed italic line-clamp-5 group-hover:text-gray-300 transition-colors">
                                         "{rec.reason}"
                                     </p>
                                 </div>
