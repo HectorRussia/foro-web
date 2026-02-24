@@ -7,6 +7,7 @@ interface User {
     id: string,
     role: string,
     phone: string
+    permissions?: string[];
 }
 interface AuthContextType {
     accessToken: string | null;
@@ -15,6 +16,10 @@ interface AuthContextType {
     logout: () => void;
     isAuthenticated: boolean;
     isLoading: boolean;
+    // Authorization functions
+    hasRole: (requiredRole: string | string[]) => boolean;
+    hasPermission: (permission: string | string[]) => boolean;
+    isKing: () => boolean;
 }
 const BASE_URL = import.meta.env.VITE_API_URL;
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -62,6 +67,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
+    // Authorization Functions
+
+    const hasRole = (requiredRole: string | string[]): boolean => {
+        if (!user || !user.role) return false;
+
+        if (Array.isArray(requiredRole)) {
+            return requiredRole.includes(user.role);
+        }
+
+        return user.role === requiredRole;
+    };
+
+    const hasPermission = (permission: string | string[]): boolean => {
+
+        if (!user || !user.permissions) return false;
+
+        const userPermission = user.permissions || [];
+
+        if (Array.isArray(permission)) {
+            return permission.every((perm) => userPermission.includes(perm));
+        }
+
+        return userPermission.includes(permission);
+    }
+
+    const isKing = (): boolean => hasRole('king');
+
     return (
         <AuthContext.Provider value={{
             accessToken,
@@ -69,7 +101,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             login,
             logout,
             isAuthenticated: !!accessToken,
-            isLoading
+            isLoading,
+            hasRole,
+            hasPermission,
+            isKing,
         }}>
             {!isLoading && children}
         </AuthContext.Provider>
