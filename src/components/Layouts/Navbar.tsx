@@ -2,18 +2,18 @@ import { HiMiniUsers, HiOutlineCalendarDays } from 'react-icons/hi2';
 import { LuLogOut } from "react-icons/lu";
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { RiUserFollowFill, RiBaseStationLine } from 'react-icons/ri';
+import { RiUserFollowFill, /* RiBaseStationLine  */ } from 'react-icons/ri';
 import { BiCategory } from "react-icons/bi";
-import { TbAlpha } from "react-icons/tb";
+// import { TbAlpha } from "react-icons/tb";
 import { FaReadme } from "react-icons/fa";
 const iconsNav = [
-    { id: 7, icon: <RiBaseStationLine />, label: "หน้าแรก", path: "/realtime-search", requiredRole: "king" },
+    // { id: 7, icon: <RiBaseStationLine />, label: "หน้าแรก", path: "/realtime-search", requiredRole: "king" },
     { id: 9, icon: <HiOutlineCalendarDays />, label: "ข่าววันนี้", path: "/today-news", requiredRole: ["king", "queen"] },
     { id: 1, icon: <FaReadme />, label: "อ่านข่าว", path: "/dashboard" },
     { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
     { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
     { id: 4, icon: <BiCategory />, label: "จัดการหมวดหมู่", path: "/category-management" },
-    { id: 6, icon: <TbAlpha />, label: "AdvanceSearch", path: "/advance-search", requiredRole: "king" },
+    // { id: 6, icon: <TbAlpha />, label: "AdvanceSearch", path: "/advance-search", requiredRole: "king" },
     { id: 5, icon: <LuLogOut />, label: "ออกจากระบบ", path: "/" },
 ]
 

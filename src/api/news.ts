@@ -38,3 +38,12 @@ export const analyzeNewsProTier = async (): Promise<Response> => {
     });
     return response;
 };
+
+export const getTriggerStatus = async (): Promise<{ trigger: number }> => {
+    const response = await api.get('/news/trigger');
+    return response.data;
+};
+
+export const updateTriggerStatus = async (trigger: number, news_ids?: number[]): Promise<void> => {
+    await api.patch('/news/trigger', { trigger, news_ids });
+};

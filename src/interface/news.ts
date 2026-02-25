@@ -12,6 +12,7 @@ export interface NewsItem {
     like_count?: number
     quote_count?: number
     view_count?: number
+    source?: string
 }
 export interface PaginatedNewsResponse {
     items: NewsItem[];

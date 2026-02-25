@@ -7,11 +7,14 @@ import {
     HiOutlineSparkles,
     HiOutlineStop,
     HiOutlineClock,
-    HiOutlineCalendarDays
+    HiOutlineCalendarDays,
+    HiOutlineTrash,
+    HiOutlineArrowPath
 } from "react-icons/hi2";
 import { RiLoader4Line } from "react-icons/ri";
 import { LuLayoutDashboard } from "react-icons/lu";
 import { type NewsItem, type NewsResult, type SSEEvent } from '../interface/news';
+import { getNews, getTriggerStatus, updateTriggerStatus } from '../api/news';
 
 
 const LAYOUT_OPTIONS = [
@@ -25,8 +28,11 @@ const TodayNews = () => {
     const [layoutMode, setLayoutMode] = useState<'grid' | 'compact'>('grid');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
     const [statusMessage, setStatusMessage] = useState('ระบบพร้อมทำงาน');
-    const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [nextCursor, setNextCursor] = useState<string | null>(() => localStorage.getItem('today_news_twitter_cursor'));
     const [hasStarted, setHasStarted] = useState(false);
+    const [backupResults, setBackupResults] = useState<NewsResult[]>([]);
+    const [backupCursor, setBackupCursor] = useState<string | null>(null);
+    const [isRestorable, setIsRestorable] = useState(false);
 
     // Search Parameters
     const [searchParams] = useState({
@@ -44,17 +50,48 @@ const TodayNews = () => {
     // Refs
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    // Context restoration and Cleanup on unmount
+    // Context restoration and Initial Data Fetch
     useEffect(() => {
-        // Clear cursor on mount to ensure fresh start on refresh
-        localStorage.removeItem('today_news_twitter_cursor');
-        setNextCursor(null);
-        setHasStarted(false);
+        const init = async () => {
+            try {
+                // Sync Trigger Status
+                const triggerData = await getTriggerStatus();
+                if (triggerData.trigger === 1) {
+                    setHasStarted(true);
+                    setStatusMessage('ระบบกำลังทำงานอยู่ (ตรวจพบค้างคา)');
+                }
+
+                // Fetch Existing Today's News from DB
+                const newsResponse = await getNews(1, 40, 1);
+                if (newsResponse.items && newsResponse.items.length > 0) {
+                    // Convert NewsItem (from DB) back to NewsResult structure for UI consistency
+                    const dbResults: NewsResult[] = newsResponse.items.map(item => ({
+                        id: item.id,
+                        title: item.title,
+                        content: item.content,
+                        source: item.source || 'Database',
+                        url: item.url,
+                        tweet_id: item.tweet_id,
+                        created_at: item.created_at,
+                        retweet_count: item.retweet_count || 0,
+                        reply_count: item.reply_count || 0,
+                        like_count: item.like_count || 0,
+                        quote_count: item.quote_count || 0,
+                        view_count: item.view_count || 0,
+                        tweet_profile_pic: item.tweet_profile_pic
+                    }));
+                    setNewsResults(dbResults);
+                    if (triggerData.trigger === 1) setHasStarted(true);
+                }
+            } catch (error) {
+                console.error('Failed to sync today news:', error);
+            }
+        };
+
+        init();
 
         return () => {
             if (abortControllerRef.current) abortControllerRef.current.abort();
-            // Clear cursor on unmount to handle page navigation
-            localStorage.removeItem('today_news_twitter_cursor');
         };
     }, []);
 
@@ -67,8 +104,10 @@ const TodayNews = () => {
 
         // Initial capture of next_cursor if provided in any event (fallback)
         const rawData = { ...data, ...(eventData || {}) } as any;
-        if (rawData.next_cursor && !nextCursor) {
-            setNextCursor(rawData.next_cursor);
+        const potentialCursor = rawData.next_cursor || rawData.twitter_cursor;
+        if (potentialCursor && potentialCursor !== nextCursor) {
+            setNextCursor(potentialCursor);
+            localStorage.setItem('today_news_twitter_cursor', potentialCursor);
         }
 
 
@@ -244,6 +283,38 @@ const TodayNews = () => {
         setStatusMessage('หยุดการประมวลผลแล้ว');
     };
 
+    const handleClear = async () => {
+        try {
+            const newsIds = newsResults.map(item => item.id);
+            await updateTriggerStatus(0, newsIds);
+            if (newsResults.length > 0) {
+                setBackupResults(newsResults);
+                setBackupCursor(nextCursor);
+                setIsRestorable(true);
+            }
+            setNewsResults([]);
+            setHasStarted(false);
+            localStorage.removeItem('today_news_twitter_cursor');
+            setNextCursor(null);
+            setStatusMessage('ล้างข้อมูลเรียบร้อยแล้ว');
+        } catch (error) {
+            console.error('Failed to clear news:', error);
+        }
+    };
+
+    const handleRestore = () => {
+        if (backupResults.length > 0) {
+            setNewsResults(backupResults);
+            if (backupCursor) {
+                setNextCursor(backupCursor);
+                localStorage.setItem('today_news_twitter_cursor', backupCursor);
+            }
+            setIsRestorable(false);
+            setHasStarted(true);
+            setStatusMessage('กู้คืนข้อมูลสำเร็จ');
+        }
+    };
+
     const mapToNewsItem = (res: NewsResult): NewsItem => ({
         id: res.id,
         title: res.title,
@@ -310,6 +381,27 @@ const TodayNews = () => {
                                 </div>
                             )}
                         </div>
+
+                        {/* Clear & Restore Controls */}
+                        <div className="flex items-center gap-1.5 p-1.5 bg-white/5 rounded-2xl border border-white/10">
+                            <button
+                                onClick={handleClear}
+                                className="p-2 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
+                                title="ล้างข้อมูลทั้งหน้าจอและหยุดระบบ"
+                            >
+                                <HiOutlineTrash className="text-xl" />
+                            </button>
+                            {isRestorable && (
+                                <button
+                                    onClick={handleRestore}
+                                    className="p-2 text-gray-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-xl transition-all animate-pulse"
+                                    title="กู้คืนข้อมูลที่เพิ่งล้างไป"
+                                >
+                                    <HiOutlineArrowPath className="text-xl" />
+                                </button>
+                            )}
+                        </div>
+
 
                         {!isStreaming && nextCursor && (
                             <button
