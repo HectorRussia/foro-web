@@ -24,3 +24,17 @@ export const getNewsAnalysis = async (): Promise<NewsAnalysisResponse> => {
 export const analyzeNews = async (): Promise<void> => {
     await api.post('/news/analyze');
 };
+
+// Axios ใน Browser ไม่รองรับการอ่าน ReadableStream แบบ Real-time (จะรอจนกว่าข้อมูลจะมาครบทั้งหมดถึงจะเริ่มทำงาน) 
+// ซึ่งจะทำให้ UI ของไม่ "ไหล" ตามเหตุการณ์จริง
+export const analyzeNewsProTier = async (): Promise<Response> => {
+    const token = localStorage.getItem('accessToken');
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/news-sse/analyze-individual`, {
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+        },
+    });
+    return response;
+};

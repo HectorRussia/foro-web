@@ -8,6 +8,9 @@ import UserTarget from './pages/UserTarget';
 import { UserFollow } from './pages/UserFollow';
 import Category from './pages/Category';
 import CategoryNews from './pages/CategoryNews';
+import AdvanceSearch from './pages/AdvanceSearch';
+import RealtimeSearch from './pages/RealtimeSearch';
+import TodayNews from './pages/TodayNews';
 
 function App() {
   return (
@@ -24,6 +27,19 @@ function App() {
         <Route path="/category-management" element={<Category />} />
         <Route path="/category-news/:id" element={<CategoryNews />} />
         {/*add more route*/}
+
+        {/*For King*/}
+        <Route element={<ProtectedRoute requiredRole={"king"} />}>
+          <Route path="/advance-search" element={<AdvanceSearch />} />
+          <Route path="/realtime-search" element={<RealtimeSearch />} />
+          <Route path="/today-news" element={<TodayNews />} />
+        </Route>
+        {/*For Queen*/}
+        <Route element={<ProtectedRoute requiredRole={"queen"} />}>
+          <Route path="/realtime-search" element={<RealtimeSearch />} />
+          <Route path="/today-news" element={<TodayNews />} />
+        </Route>
+
       </Route>
 
     </Routes>

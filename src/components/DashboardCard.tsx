@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { FaCopy, FaCheck, FaExternalLinkAlt, FaPlus, FaTrash, FaMinusCircle } from 'react-icons/fa';
+import { FaCopy, FaCheck, FaExternalLinkAlt, FaPlus, FaTrash, FaMinusCircle, FaRegComment, FaRetweet, FaRegHeart, FaQuoteLeft, FaRegChartBar } from 'react-icons/fa';
 import { IoIosMore, } from 'react-icons/io';
+import { HiOutlineClock } from 'react-icons/hi2';
 import type { NewsItem } from '../interface/news';
 import type { Category } from '../interface/category';
 
@@ -69,10 +70,51 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                         <h3 className={`font-semibold text-white leading-tight truncate pr-2 ${isCompact ? 'text-base' : 'text-lg'}`}>
                             {post.title}
                         </h3>
-                        {!isCompact && (
-                            <p className="text-gray-500 text-xs mt-1 truncate">
-                                {new Date(post.created_at).toLocaleDateString('th-TH')}
-                            </p>
+                        {!isCompact && post.created_at && (
+                            <div className="flex items-center gap-1.5 text-gray-500 text-xs mt-1 font-medium opacity-80">
+                                <HiOutlineClock className="text-[14px]" />
+                                <span>
+                                    {(() => {
+                                        const d = new Date(post.created_at);
+                                        if (isNaN(d.getTime())) return post.created_at;
+
+                                        // Thai Date (BE)
+                                        const thaiDate = d.toLocaleDateString('th-TH', {
+                                            day: '2-digit',
+                                            month: '2-digit',
+                                            year: 'numeric'
+                                        });
+
+                                        // Relative Time
+                                        const now = new Date();
+                                        const seconds = Math.floor((now.getTime() - d.getTime()) / 1000);
+                                        let relativeTime = "";
+
+                                        let interval = seconds / 31536000;
+                                        if (interval > 1) relativeTime = Math.floor(interval) + "y ago";
+                                        else {
+                                            interval = seconds / 2592000;
+                                            if (interval > 1) relativeTime = Math.floor(interval) + "mo ago";
+                                            else {
+                                                interval = seconds / 86400;
+                                                if (interval > 1) relativeTime = Math.floor(interval) + "d ago";
+                                                else {
+                                                    interval = seconds / 3600;
+                                                    if (interval > 1) relativeTime = Math.floor(interval) + "h ago";
+                                                    else {
+                                                        interval = seconds / 60;
+                                                        if (interval > 1) relativeTime = Math.floor(interval) + "m ago";
+                                                        else if (seconds < 30) relativeTime = "just now";
+                                                        else relativeTime = Math.floor(seconds) + "s ago";
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        return `${thaiDate} • ${relativeTime}`;
+                                    })()}
+                                </span>
+                            </div>
                         )}
                     </div>
                 </div>
@@ -151,6 +193,32 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                 {post.content}
             </div>
 
+            {/* Interaction Stats */}
+            <div className={`flex items-center gap-4 mb-4 text-xs font-medium text-gray-500/80 ${isCompact ? 'px-1' : ''}`}>
+                <div className="flex items-center gap-1.5 hover:text-blue-400 transition-colors cursor-default group/stat">
+                    <FaRegComment className="text-[14px]" />
+                    <span>{post.reply_count?.toLocaleString() || 0}</span>
+                </div>
+                <div className="flex items-center gap-1.5 hover:text-green-400 transition-colors cursor-default group/stat">
+                    <FaRetweet className="text-[14px]" />
+                    <span>{post.retweet_count?.toLocaleString() || 0}</span>
+                </div>
+                <div className="flex items-center gap-1.5 hover:text-rose-400 transition-colors cursor-default group/stat">
+                    <FaRegHeart className="text-[14px]" />
+                    <span>{post.like_count?.toLocaleString() || 0}</span>
+                </div>
+                {post.quote_count !== undefined && post.quote_count > 0 && (
+                    <div className="flex items-center gap-1.5 hover:text-purple-400 transition-colors cursor-default group/stat">
+                        <FaQuoteLeft className="text-[12px]" />
+                        <span>{post.quote_count?.toLocaleString()}</span>
+                    </div>
+                )}
+                <div className="flex items-center gap-1.5 hover:text-cyan-400 transition-colors cursor-default group/stat ml-auto">
+                    <FaRegChartBar className="text-[14px]" />
+                    <span>{post.view_count?.toLocaleString() || 0}</span>
+                </div>
+            </div>
+
             <div className="flex flex-wrap gap-2 mb-auto">
                 {/* Tags placeholder if needed */}
             </div>
@@ -177,7 +245,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     }
                 </button>
             </div>
-        </div>
+        </div >
     )
 }
 

@@ -74,7 +74,12 @@ const CategoryNews = () => {
         url: item.news_url,
         tweet_profile_pic: item.news_tweet_profile_pic,
         created_at: item.created_at,
-        user_id: 0 // Default or mapped if available
+        user_id: 0,
+        retweet_count: item.retweet_count,
+        reply_count: item.reply_count,
+        like_count: item.like_count,
+        quote_count: item.quote_count,
+        view_count: item.view_count
     });
 
     const handleRemoveFromCategory = async (newsId: number) => {

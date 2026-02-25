@@ -44,6 +44,14 @@ const SkeletonCard = ({ variant = 'grid' }: SkeletonCardProps) => {
                 )}
             </div>
 
+            {/* Interaction Stats Placeholder */}
+            <div className={`flex items-center gap-4 mb-4 ${isCompact ? 'px-1' : ''}`}>
+                <div className="flex items-center gap-1.5 w-12 h-3 bg-slate-800 rounded-md" />
+                <div className="flex items-center gap-1.5 w-12 h-3 bg-slate-800 rounded-md" />
+                <div className="flex items-center gap-1.5 w-12 h-3 bg-slate-800 rounded-md" />
+                <div className="flex items-center gap-1.5 w-12 h-3 bg-slate-800 rounded-md ml-auto" />
+            </div>
+
             {/* Tags Placeholder */}
             <div className="flex flex-wrap gap-2 mb-4">
                 <div className="h-6 bg-slate-800 rounded-full w-16" />

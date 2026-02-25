@@ -37,19 +37,18 @@ const Main = () => {
 
     const mainRef = useRef<HTMLElement>(null);
 
-    const handleTimeChange = (time: string) => {
+    /* const handleTimeChange = (time: string) => {
         if (time === activeTime) return;
 
-        // Force a hard reset of the query for the new key so it starts fresh
-        queryClient.removeQueries({ queryKey: ['news', time] });
-
+        // Force clear all news queries to ensure the new range is fetched fresh
+        queryClient.removeQueries({ queryKey: ['news'] });
         setActiveTime(time);
 
         // Scroll to top
         if (mainRef.current) {
             mainRef.current.scrollTo({ top: 0, behavior: 'smooth' });
         }
-    };
+    }; */
 
     const {
         data,
@@ -58,10 +57,13 @@ const Main = () => {
         isFetchingNextPage,
         status,
     } = useInfiniteQuery({
-        queryKey: ['news', activeTime],
-        queryFn: ({ pageParam = 1 }) => getNews(pageParam, 10, timeRangeMap[activeTime]),
+        queryKey: ['news', { filter: activeTime }],
+        queryFn: ({ pageParam = 1 }) => {
+            const range = timeRangeMap[activeTime];
+            // backend expects number or undefined
+            return getNews(pageParam, 10, range === null ? undefined : range);
+        },
         getNextPageParam: (lastPage) => {
-            console.log('Last Page:', lastPage); // Debug
             const currentPage = Number(lastPage.page);
             const totalPages = Number(lastPage.pages);
 
@@ -79,7 +81,8 @@ const Main = () => {
         }
     }, [inView, hasNextPage, fetchNextPage]);
 
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
+    // const [isAnalyzing, setIsAnalyzing] = useState(false);
+    // const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
 
     // Modal state
@@ -90,7 +93,6 @@ const Main = () => {
         try {
             const data = await getCategories();
             setCategories(data);
-            // console.log('Categories loaded:', data);
         } catch (error) {
             console.error('Failed to fetch categories:', error);
         }
@@ -101,10 +103,7 @@ const Main = () => {
     }, []);
 
     useEffect(() => {
-        // console.log('Categories updated:', categories);
     }, [categories]);
-
-    // Removed daily analysis check - users can now analyze news freely
 
     // Close dropdown when clicking outside
     useEffect(() => {
@@ -126,22 +125,22 @@ const Main = () => {
 
     // const fetchNews = async (page = 1, range: number | null = null) => { ... } // Removed manual fetch
 
-    const handleAnalyzeNews = async () => {
-        if (isAnalyzing) return;
-        setIsAnalyzing(true);
-        const loadingToast = toast.loading('กำลังวิเคราะห์ข่าว...');
-
-        try {
-            await analyzeNews();
-            toast.success('วิเคราะห์ข่าวเสร็จสิ้น', { id: loadingToast });
-            queryClient.invalidateQueries({ queryKey: ['news'] }); // Invalidate queries to refresh list
-        } catch (error) {
-            console.error('Error analyzing news:', error);
-            toast.error('เกิดข้อผิดพลาดในการวิเคราะห์ข่าว', { id: loadingToast });
-        } finally {
-            setIsAnalyzing(false);
-        }
-    };
+    /*  const handleAnalyzeNews = async () => {
+         if (isAnalyzing) return;
+         setIsAnalyzing(true);
+         const loadingToast = toast.loading('กำลังวิเคราะห์ข่าว...');
+ 
+         try {
+             await analyzeNews();
+             toast.success('วิเคราะห์ข่าวเสร็จสิ้น', { id: loadingToast });
+             queryClient.invalidateQueries({ queryKey: ['news'] }); // Invalidate queries to refresh list
+         } catch (error) {
+             console.error('Error analyzing news:', error);
+             toast.error('เกิดข้อผิดพลาดในการวิเคราะห์ข่าว', { id: loadingToast });
+         } finally {
+             setIsAnalyzing(false);
+         }
+     }; */
 
     const handleAddNewsToCategory = async (categoryId: number, newsId: number) => {
         try {
@@ -177,9 +176,6 @@ const Main = () => {
         }
     };
 
-    // useEffect(() => {
-    //     fetchNews(1, timeRangeMap[activeTime]);
-    // }, [activeTime]);
 
     return (
         <main ref={mainRef} className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
@@ -241,7 +237,7 @@ const Main = () => {
             <div className="flex flex-col gap-6 mb-8">
                 {/* Time Filters & Secondary Actions */}
                 <div className="flex flex-wrap items-center justify-start gap-4 border-b border-[#1e293b] pb-4">
-                    <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-lg border border-[#1e293b] overflow-x-auto max-w-full">
+                    {/*  <div className="flex items-center gap-2 bg-[#0f172a] p-1 rounded-lg border border-[#1e293b] overflow-x-auto max-w-full">
                         {TIME_FILTERS.map(time => (
                             <button
                                 key={time}
@@ -255,10 +251,10 @@ const Main = () => {
                                 {time}
                             </button>
                         ))}
-                    </div>
+                    </div> */}
 
                     {/* Analyze Button - Now available anytime */}
-                    <button
+                    {/* <button
                         onClick={handleAnalyzeNews}
                         disabled={isAnalyzing}
                         className="flex items-center gap-2 px-4 py-1.5 rounded-lg text-white shadow-lg transition-all transform bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
@@ -271,7 +267,7 @@ const Main = () => {
                         <span className="text-sm font-medium">
                             {isAnalyzing ? 'กำลังวิเคราะห์...' : 'วิเคราะห์ข่าว'}
                         </span>
-                    </button>
+                    </button> */}
                 </div>
 
             </div>
@@ -293,7 +289,7 @@ const Main = () => {
                     <div className="col-span-full text-center py-20 text-red-400">Error loading news</div>
                 ) : (
                     <>
-                        {isAnalyzing && (
+                        {/*  {isAnalyzing && (
                             <>
                                 <SkeletonCard variant={layoutMode} />
                                 <SkeletonCard variant={layoutMode} />
@@ -302,7 +298,7 @@ const Main = () => {
                                 <SkeletonCard variant={layoutMode} />
                                 <SkeletonCard variant={layoutMode} />
                             </>
-                        )}
+                        )} */}
                         {data?.pages.map((group, i) => (
                             <div key={i} className={`contents`}>
                                 {group.items.map(post => (

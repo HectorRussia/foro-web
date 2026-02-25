@@ -1,16 +1,19 @@
-import { FaHome } from 'react-icons/fa';
-import { HiMiniUsers } from 'react-icons/hi2';
+import { HiMiniUsers, HiOutlineCalendarDays } from 'react-icons/hi2';
 import { LuLogOut } from "react-icons/lu";
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { RiUserFollowFill } from 'react-icons/ri';
+import { RiUserFollowFill, RiBaseStationLine } from 'react-icons/ri';
 import { BiCategory } from "react-icons/bi";
-
+import { TbAlpha } from "react-icons/tb";
+import { FaReadme } from "react-icons/fa";
 const iconsNav = [
-    { id: 1, icon: <FaHome />, label: "หน้าแรก", path: "/dashboard" },
+    { id: 7, icon: <RiBaseStationLine />, label: "หน้าแรก", path: "/realtime-search", requiredRole: "king" },
+    { id: 9, icon: <HiOutlineCalendarDays />, label: "ข่าววันนี้", path: "/today-news", requiredRole: ["king", "queen"] },
+    { id: 1, icon: <FaReadme />, label: "อ่านข่าว", path: "/dashboard" },
     { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
     { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
     { id: 4, icon: <BiCategory />, label: "จัดการหมวดหมู่", path: "/category-management" },
+    { id: 6, icon: <TbAlpha />, label: "AdvanceSearch", path: "/advance-search", requiredRole: "king" },
     { id: 5, icon: <LuLogOut />, label: "ออกจากระบบ", path: "/" },
 ]
 
@@ -19,7 +22,8 @@ interface NavbarProp {
     icon: React.ReactNode,
     label: string,
     active?: boolean,
-    path: string
+    path: string,
+    requiredRole?: string | string[]
 }
 
 const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => {
@@ -31,6 +35,7 @@ const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => 
         }
         navigate(path)
     }
+
     return (
         <div
             onClick={() => pathNave(path)}
@@ -52,10 +57,23 @@ const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => 
 
 const Navbar = () => {
     const location = useLocation();
+    const { hasRole } = useAuth();
+    const filteredNavItems = iconsNav.filter(item => {
+        // no role display normal
+        if (!item.requiredRole) {
+            return true;
+        }
 
+        // Check Role
+        if (item.requiredRole && !hasRole(item.requiredRole)) {
+            return false;
+        }
+
+        return true;
+    });
     return (
         <nav className="flex-1 space-y-2 w-full">
-            {iconsNav.map((item, index) => (
+            {filteredNavItems.map((item, index) => (
                 <NavbarStruct
                     id={item.id}
                     key={index}
@@ -63,6 +81,7 @@ const Navbar = () => {
                     label={item.label}
                     active={location.pathname === item.path}
                     path={item.path}
+                    requiredRole={item.requiredRole}
                 />
             ))}
         </nav>

@@ -22,4 +22,9 @@ export interface CategoryNewsItem {
     news_tweet_profile_pic: string;
     created_at: string;
     updated_at: string;
+    retweet_count?: number
+    reply_count?: number
+    like_count?: number
+    quote_count?: number
+    view_count?: number
 }
