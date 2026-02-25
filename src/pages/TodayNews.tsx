@@ -26,6 +26,7 @@ const TodayNews = () => {
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
     const [statusMessage, setStatusMessage] = useState('ระบบพร้อมทำงาน');
     const [nextCursor, setNextCursor] = useState<string | null>(null);
+    const [hasStarted, setHasStarted] = useState(false);
 
     // Search Parameters
     const [searchParams] = useState({
@@ -43,10 +44,17 @@ const TodayNews = () => {
     // Refs
     const abortControllerRef = useRef<AbortController | null>(null);
 
-    // Cleanup on unmount
+    // Context restoration and Cleanup on unmount
     useEffect(() => {
+        // Clear cursor on mount to ensure fresh start on refresh
+        localStorage.removeItem('today_news_twitter_cursor');
+        setNextCursor(null);
+        setHasStarted(false);
+
         return () => {
             if (abortControllerRef.current) abortControllerRef.current.abort();
+            // Clear cursor on unmount to handle page navigation
+            localStorage.removeItem('today_news_twitter_cursor');
         };
     }, []);
 
@@ -57,9 +65,9 @@ const TodayNews = () => {
             setStatusMessage(eventData.message);
         }
 
-        // Capture next_cursor if provided in any event
+        // Initial capture of next_cursor if provided in any event (fallback)
         const rawData = { ...data, ...(eventData || {}) } as any;
-        if (rawData.next_cursor) {
+        if (rawData.next_cursor && !nextCursor) {
             setNextCursor(rawData.next_cursor);
         }
 
@@ -140,6 +148,10 @@ const TodayNews = () => {
                 break;
 
             case 'complete':
+                if (eventData.twitter_cursor) {
+                    localStorage.setItem('today_news_twitter_cursor', eventData.twitter_cursor);
+                    setNextCursor(eventData.twitter_cursor);
+                }
                 setStatusMessage('วิเคราะห์ชุดล่าสุดเสร็จสิ้น');
                 setIsStreaming(false);
                 break;
@@ -165,10 +177,12 @@ const TodayNews = () => {
         setIsStreaming(true);
         setStatusMessage('กำลังเชื่อมต่อ...');
 
-        // If not loading more, clear previous results
+        // If not loading more, clear previous results and cache
         if (!cursorOverride || typeof cursorOverride !== 'string') {
             setNewsResults([]);
             setNextCursor(null);
+            localStorage.removeItem('today_news_twitter_cursor');
+            setHasStarted(true);
         }
 
         setProgress({ current: 0, total: 0 });
@@ -260,8 +274,13 @@ const TodayNews = () => {
                             ข่าววันนี้
                         </h1>
                         <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
-                            <span className={`h-2 w-2 rounded-full ${isStreaming ? 'bg-blue-400 animate-pulse shadow-[0_0_8px_blue]' : 'bg-gray-600'}`}></span>
+                            <span className={`h-5 w-5 rounded-full ${isStreaming ? 'bg-blue-400 animate-pulse shadow-[0_0_8px_blue]' : 'bg-gray-600'}`}></span>
                             {statusMessage}
+                            {newsResults.length > 0 && (
+                                <span className="ml-2 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-400 animate-in fade-in slide-in-from-left-2">
+                                    จำนวนข่าวในหน้านี้ {newsResults.length}
+                                </span>
+                            )}
                         </p>
                     </div>
 
@@ -292,12 +311,28 @@ const TodayNews = () => {
                             )}
                         </div>
 
+                        {!isStreaming && nextCursor && (
+                            <button
+                                onClick={() => startAnalysisStream(nextCursor)}
+                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 font-bold transition-all hover:bg-amber-500/20 active:scale-95 animate-in fade-in zoom-in-95"
+                                title={`Next Signal: ${nextCursor}`}
+                            >
+                                <HiOutlineClock className="text-xl" />
+                                <span className="hidden sm:inline">ข่าวต่อไป</span>
+                            </button>
+                        )}
+
                         {!isStreaming ? (
                             <button
                                 onClick={() => startAnalysisStream()}
-                                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-white font-bold transition-all transform bg-linear-to-r from-blue-600 to-blue-500 shadow-xl hover:shadow-blue-500/20 hover:-translate-y-0.5"
+                                disabled={hasStarted || newsResults.length > 0}
+                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-white font-bold transition-all transform 
+                                    ${hasStarted || newsResults.length > 0
+                                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                                        : 'bg-linear-to-r from-blue-600 to-blue-500 shadow-xl hover:shadow-blue-500/20 hover:-translate-y-0.5 active:scale-95'
+                                    }`}
                             >
-                                <HiOutlineSparkles className="text-xl" />
+                                <HiOutlineSparkles className={`text-xl ${hasStarted || newsResults.length > 0 ? 'text-gray-600' : 'text-white'}`} />
                                 <span>อ่านข่าววันนี้</span>
                             </button>
                         ) : (
@@ -364,27 +399,7 @@ const TodayNews = () => {
                             ))
                         )}
 
-                        {/* Load More UI Section */}
-                        {!isStreaming && nextCursor && newsResults.length > 0 && (
-                            <div className="col-span-full flex flex-col items-center py-10 animate-in fade-in zoom-in-95 duration-500">
-                                <div className="w-px h-12 bg-linear-to-b from-blue-500/50 to-transparent mb-6"></div>
-                                <button
-                                    onClick={() => startAnalysisStream(nextCursor)}
-                                    className="group relative flex items-center gap-3 px-8 py-4 rounded-2xl bg-white/5 border border-white/10 hover:bg-blue-600/10 hover:border-blue-500/50 transition-all duration-300 overflow-hidden"
-                                >
-                                    {/* Animated background glow */}
-                                    <div className="absolute inset-0 bg-linear-to-r from-blue-600/0 via-blue-600/5 to-blue-600/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
 
-                                    <HiOutlineClock className="text-xl text-blue-400 group-hover:rotate-12 transition-transform" />
-                                    <div className="text-left">
-                                        <div className="text-xs font-bold text-gray-400 uppercase tracking-widest group-hover:text-blue-400 transition-colors">Continue Extraction</div>
-                                        <div className="text-sm text-gray-500 group-hover:text-gray-300">โหลดข้อมูลชุดถัดไปจาก Cursor</div>
-                                    </div>
-                                    <HiOutlineSparkles className="text-lg text-blue-500/50 group-hover:text-blue-400 animate-pulse" />
-                                </button>
-                                <p className="text-[10px] text-gray-600 mt-4 font-mono tracking-tighter uppercase">Cursor: {nextCursor.substring(0, 12)}...</p>
-                            </div>
-                        )}
                     </div>
                 </div>
 

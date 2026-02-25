@@ -64,6 +64,8 @@ export interface SSEEventData {
     quote_count?: number;
     view_count?: number;
     tweet_created_at?: string;
+    twitter_cursor?: string;
+    twitter_has_next?: boolean;
 }
 
 export interface SSEEvent {
