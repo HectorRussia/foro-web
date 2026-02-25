@@ -1,33 +1,33 @@
 import { useEffect, useState, useRef } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useInView } from 'react-intersection-observer';
-import { LuLayoutDashboard, LuSparkles } from 'react-icons/lu';
+import { LuLayoutDashboard } from 'react-icons/lu';
 import { FaTrash } from 'react-icons/fa';
 import { toast } from 'react-hot-toast';
 import DashboardCard from '../DashboardCard';
 import { createCategoryNews } from '../../api/categoryNews';
 import { getCategories } from '../../api/category';
-import { deleteNews, getNews, analyzeNews } from '../../api/news';
+import { deleteNews, getNews } from '../../api/news';
 import { type Category } from '../../interface/category';
-import SkeletonCard from '../SkeletonCard';
+// import SkeletonCard from '../SkeletonCard';
 
-const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
+// const TIME_FILTERS = ["ทั้งหมด", "วันนี้", "7 วัน", "30 วัน", "เก่ากว่า 30 วัน"];
 const LAYOUT_OPTIONS = [
     { id: 'grid', label: 'Grid', icon: <LuLayoutDashboard className="rotate-90" /> },
     { id: 'compact', label: 'Compact', icon: <LuLayoutDashboard className="scale-y-75" /> }
 ] as const;
 
-const timeRangeMap: Record<string, number | null> = {
+/* const timeRangeMap: Record<string, number | null> = {
     'ทั้งหมด': null,
     'วันนี้': 1,
     '7 วัน': 7,
     '30 วัน': 30,
     'เก่ากว่า 30 วัน': -30,
-};
+}; */
 const Main = () => {
 
     const queryClient = useQueryClient();
-    const [activeTime, setActiveTime] = useState('ทั้งหมด');
+    // const [activeTime, setActiveTime] = useState('ทั้งหมด');
     const [layoutMode, setLayoutMode] = useState<'grid' | 'compact'>('grid');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
 
@@ -57,11 +57,11 @@ const Main = () => {
         isFetchingNextPage,
         status,
     } = useInfiniteQuery({
-        queryKey: ['news', { filter: activeTime }],
+        queryKey: ['news', /* { filter: activeTime } */],
         queryFn: ({ pageParam = 1 }) => {
-            const range = timeRangeMap[activeTime];
+            // const range = timeRangeMap[activeTime];
             // backend expects number or undefined
-            return getNews(pageParam, 10, range === null ? undefined : range);
+            return getNews(pageParam, 10, /* range === null ? undefined : range */);
         },
         getNextPageParam: (lastPage) => {
             const currentPage = Number(lastPage.page);
