@@ -299,20 +299,29 @@ const Main = () => {
                                 <SkeletonCard variant={layoutMode} />
                             </>
                         )} */}
-                        {data?.pages.map((group, i) => (
-                            <div key={i} className={`contents`}>
-                                {group.items.map(post => (
-                                    <DashboardCard
-                                        key={post.id}
-                                        post={post}
-                                        variant={layoutMode}
-                                        categories={categories}
-                                        onAddToCategory={handleAddNewsToCategory}
-                                        onDelete={handleDeleteNews}
-                                    />
-                                ))}
-                            </div>
-                        ))}
+                        {(() => {
+                            const seenTweetIds = new Set<string>();
+                            return data?.pages.map((group, i) => (
+                                <div key={i} className={`contents`}>
+                                    {group.items.map(post => {
+                                        if (post.tweet_id) {
+                                            if (seenTweetIds.has(post.tweet_id)) return null;
+                                            seenTweetIds.add(post.tweet_id);
+                                        }
+                                        return (
+                                            <DashboardCard
+                                                key={post.id}
+                                                post={post}
+                                                variant={layoutMode}
+                                                categories={categories}
+                                                onAddToCategory={handleAddNewsToCategory}
+                                                onDelete={handleDeleteNews}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            ));
+                        })()}
                     </>
                 )}
             </div>
