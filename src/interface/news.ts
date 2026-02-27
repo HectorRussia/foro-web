@@ -13,6 +13,7 @@ export interface NewsItem {
     quote_count?: number
     view_count?: number
     source?: string
+    tweet_created_at?: string
 }
 export interface PaginatedNewsResponse {
     items: NewsItem[];
@@ -45,6 +46,7 @@ export interface NewsResult {
     like_count?: number
     quote_count?: number
     view_count?: number
+    tweet_created_at?: string
 }
 
 export interface SSEEventData {
@@ -65,6 +67,7 @@ export interface SSEEventData {
     quote_count?: number;
     view_count?: number;
     tweet_created_at?: string;
+    tweet_profile_pic?: string;
     twitter_cursor?: string;
     twitter_has_next?: boolean;
 }

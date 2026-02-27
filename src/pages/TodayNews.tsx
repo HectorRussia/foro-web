@@ -27,6 +27,7 @@ const TodayNews = () => {
     const [isStreaming, setIsStreaming] = useState(false);
     const [layoutMode, setLayoutMode] = useState<'grid' | 'compact'>('grid');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
+    const layoutDropdownRef = useRef<HTMLDivElement>(null);
     const [statusMessage, setStatusMessage] = useState('ระบบพร้อมทำงาน');
     const [nextCursor, setNextCursor] = useState<string | null>(() => localStorage.getItem('today_news_twitter_cursor'));
     const [hasStarted, setHasStarted] = useState(false);
@@ -94,6 +95,25 @@ const TodayNews = () => {
             if (abortControllerRef.current) abortControllerRef.current.abort();
         };
     }, []);
+
+    // Handle click outside to close layout dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (layoutDropdownRef.current && !layoutDropdownRef.current.contains(event.target as Node)) {
+                setIsLayoutDropdownOpen(false);
+            }
+        };
+
+        if (isLayoutDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isLayoutDropdownOpen]);
 
     const handleSSEEvent = (data: SSEEvent) => {
         const { event, data: eventData } = data;
@@ -176,6 +196,7 @@ const TodayNews = () => {
                         current: eventData.current,
                         total: eventData.total,
                         created_at: findVal(['tweet_created_at', 'created_at', 'timestamp']) || new Date().toISOString(),
+                        tweet_created_at: findVal(['tweet_created_at', 'created_at', 'timestamp']),
                         retweet_count: getNum(['retweet_count', 'retweets', 'retweetCount']),
                         reply_count: getNum(['reply_count', 'replies', 'comment_count', 'replyCount']),
                         like_count: getNum(['like_count', 'likes', 'favorite_count', 'favorites', 'likeCount']),
@@ -357,7 +378,7 @@ const TodayNews = () => {
 
                     <div className="flex items-center gap-3">
                         {/* Layout Toggle */}
-                        <div className="relative">
+                        <div className="relative" ref={layoutDropdownRef}>
                             <button
                                 onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
                                 className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-sm font-medium"
@@ -367,7 +388,7 @@ const TodayNews = () => {
                             </button>
 
                             {isLayoutDropdownOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95">
+                                <div className="absolute left-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95">
                                     {LAYOUT_OPTIONS.map((option) => (
                                         <button
                                             key={option.id}

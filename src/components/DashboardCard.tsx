@@ -1,5 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
+import 'dayjs/locale/th';
 import { FaCopy, FaCheck, FaExternalLinkAlt, FaPlus, FaTrash, FaMinusCircle, FaRegComment, FaRetweet, FaRegHeart, FaQuoteLeft, FaRegChartBar } from 'react-icons/fa';
+
+dayjs.extend(relativeTime);
+dayjs.locale('th');
 import { IoIosMore, } from 'react-icons/io';
 import { HiOutlineClock } from 'react-icons/hi2';
 import type { NewsItem } from '../interface/news';
@@ -59,7 +65,6 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     <div className={`
                         rounded-full flex items-center justify-center text-white font-bold text-sm overflow-hidden shrink-0
                         ${isCompact ? 'w-8 h-8' : 'w-10 h-10'}
-                        ${post.user_id}
                     `}>
                         {post.tweet_profile_pic
                             ? <img src={post.tweet_profile_pic} alt="owner" className="w-full h-full object-cover" />
@@ -67,51 +72,32 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                         }
                     </div>
                     <div className="min-w-0">
-                        <h3 className={`font-semibold text-white leading-tight truncate pr-2 ${isCompact ? 'text-base' : 'text-lg'}`}>
+                        <h3 className={`font-semibold text-white leading-tight wrap-break-word pr-2 ${isCompact ? 'text-base' : 'text-lg'}`}>
                             {post.title}
                         </h3>
-                        {!isCompact && post.created_at && (
+                        {!isCompact && (post.tweet_created_at || post.created_at) && (
                             <div className="flex items-center gap-1.5 text-gray-500 text-xs mt-1 font-medium opacity-80">
                                 <HiOutlineClock className="text-[14px]" />
                                 <span>
                                     {(() => {
-                                        const d = new Date(post.created_at);
-                                        if (isNaN(d.getTime())) return post.created_at;
+                                        // Prioritize actual tweet date from Twitter, fallback to DB record date
+                                        const rawDate = post.tweet_created_at || post.created_at;
+                                        if (!rawDate) return '';
 
-                                        // Thai Date (BE)
-                                        const thaiDate = d.toLocaleDateString('th-TH', {
+                                        const d = dayjs(rawDate);
+                                        if (!d.isValid()) return rawDate;
+
+                                        // Thai Date (BE) - Native helper for consistent BE year conversion
+                                        const thaiDate = d.toDate().toLocaleDateString('th-TH', {
                                             day: '2-digit',
                                             month: '2-digit',
                                             year: 'numeric'
                                         });
 
-                                        // Relative Time
-                                        const now = new Date();
-                                        const seconds = Math.floor((now.getTime() - d.getTime()) / 1000);
-                                        let relativeTime = "";
+                                        // Thai relative time (e.g., "1 ชั่วโมงที่แล้ว")
+                                        const relative = d.fromNow();
 
-                                        let interval = seconds / 31536000;
-                                        if (interval > 1) relativeTime = Math.floor(interval) + "y ago";
-                                        else {
-                                            interval = seconds / 2592000;
-                                            if (interval > 1) relativeTime = Math.floor(interval) + "mo ago";
-                                            else {
-                                                interval = seconds / 86400;
-                                                if (interval > 1) relativeTime = Math.floor(interval) + "d ago";
-                                                else {
-                                                    interval = seconds / 3600;
-                                                    if (interval > 1) relativeTime = Math.floor(interval) + "h ago";
-                                                    else {
-                                                        interval = seconds / 60;
-                                                        if (interval > 1) relativeTime = Math.floor(interval) + "m ago";
-                                                        else if (seconds < 30) relativeTime = "just now";
-                                                        else relativeTime = Math.floor(seconds) + "s ago";
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        return `${thaiDate} • ${relativeTime}`;
+                                        return `${thaiDate} • ${relative}`;
                                     })()}
                                 </span>
                             </div>
@@ -186,9 +172,9 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                 </div>
             </div>
 
-            <div className={`text-gray-300 font-light overflow-hidden
-                ${isCompact ? 'text-sm mb-3 line-clamp-2' : 'text-base mb-4'}
-                ${isGrid ? 'grow line-clamp-4' : ''}
+            <div className={`text-gray-300 font-light overflow-hidden wrap-break-word
+                ${isCompact ? 'text-sm mb-3 md:line-clamp-2' : 'text-base mb-4'}
+                ${isGrid ? 'grow md:line-clamp-4' : ''}
             `}>
                 {post.content}
             </div>
@@ -229,7 +215,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                         ${isCompact ? 'py-1.5 text-xs' : 'py-2.5 text-sm'}
                     `}>
                         {iconsDash[1].icon}
-                        <span className={isGrid ? 'hidden xl:inline' : ''}>ดูโพสต์</span>
+                        <span className={isGrid ? 'md:hidden lg:inline' : ''}>ดูโพสต์</span>
                     </button>
                 </a>
                 <button
@@ -241,7 +227,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     {copied ? <FaCheck className="text-green-500" /> : iconsDash[2].icon}
                     {copied ?
                         <span className="text-green-500">คัดลอก</span>
-                        : <span className={isGrid ? 'hidden xl:inline' : ''}>แชร์ลิ้งค์</span>
+                        : <span className={isGrid ? 'md:hidden lg:inline' : ''}>แชร์ลิ้งค์</span>
                     }
                 </button>
             </div>

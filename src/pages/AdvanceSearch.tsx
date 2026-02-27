@@ -41,6 +41,9 @@ interface NewsResult {
     current?: number;
     total?: number;
     created_at: string;
+    tweet_created_at?: string;
+    tweet_profile_pic?: string;
+    retweet_count?: number;
 }
 
 interface Statistics {
@@ -62,6 +65,9 @@ interface SSEEventData {
     url?: string;
     tweet_id?: string;
     error_code?: string;
+    tweet_created_at?: string;
+    tweet_profile_pic?: string;
+    retweet_count?: number;
 }
 
 interface SSEEvent {
@@ -228,10 +234,13 @@ const AdvancedSearchStream = () => {
                     content: eventData.analysis,
                     source: eventData.source || 'Unknown',
                     url: eventData.url || '#',
-                    tweet_id: eventData.tweet_id,
+                    tweet_id: eventData.tweet_id || '',
+                    tweet_profile_pic: eventData.tweet_profile_pic || '',
+                    retweet_count: eventData.retweet_count || 0,
                     current: eventData.current,
                     total: eventData.total,
-                    created_at: new Date().toISOString()
+                    created_at: eventData.tweet_created_at || new Date().toISOString(),
+                    tweet_created_at: eventData.tweet_created_at
                 };
 
                 setNewsResults(prev => [...prev, newsItem]);
