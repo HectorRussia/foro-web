@@ -31,7 +31,7 @@ const UserTarget = () => {
         try {
             const response = await api.get(`${BASE_URL}/follow/users/search?query=${searchQuery}`);
             if (response.data?.data?.users?.users) {
-                setUsers(response.data.data.users.users);
+                setUsers(response.data.data.users.users.slice(0, 10));
             } else {
                 setUsers([]);
             }
@@ -78,7 +78,7 @@ const UserTarget = () => {
                 query: recommendQuery
             });
             if (response.data?.data?.recommendations) {
-                setRecommendations(response.data.data.recommendations);
+                setRecommendations(response.data.data.recommendations.slice(0, 10));
             } else {
                 setRecommendations([]);
             }
