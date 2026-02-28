@@ -203,7 +203,13 @@ const TodayNews = () => {
                         quote_count: getNum(['quote_count', 'quotes', 'quoteCount']),
                         view_count: getNum(['view_count', 'views', 'impression_count', 'viewCount'])
                     };
-                    setNewsResults(prev => [newsItem, ...prev]);
+                    setNewsResults(prev => {
+                        const isDuplicate = prev.some(item => (item.tweet_id && item.tweet_id === newsItem.tweet_id) || item.id === newsItem.id);
+                        if (isDuplicate) {
+                            return prev.map(item => ((item.tweet_id && item.tweet_id === newsItem.tweet_id) || item.id === newsItem.id) ? newsItem : item);
+                        }
+                        return [...prev, newsItem];
+                    });
                 }
                 break;
 
