@@ -55,34 +55,53 @@ const TodayNews = () => {
     useEffect(() => {
         const init = async () => {
             try {
-                // Sync Trigger Status
+                // 1. Sync Trigger Status first to understand current state
                 const triggerData = await getTriggerStatus();
-                if (triggerData.trigger === 1) {
-                    setHasStarted(true);
-                    setStatusMessage('ระบบกำลังทำงานอยู่ (ตรวจพบค้างคา)');
+                const isCleared = localStorage.getItem('today_news_is_cleared') === 'true';
+
+                // 2. Clear the 'cleared' flag if we detect an active run starting elsewhere
+                if (triggerData.trigger === 1 && isCleared) {
+                    localStorage.removeItem('today_news_is_cleared');
                 }
 
-                // Fetch Existing Today's News from DB
+                // 3. Fetch items from DB
                 const newsResponse = await getNews(1, 40, 1);
-                if (newsResponse.items && newsResponse.items.length > 0) {
-                    // Convert NewsItem (from DB) back to NewsResult structure for UI consistency
+                const hasNews = newsResponse.items && newsResponse.items.length > 0;
+
+                // 4. Decision: Show news IF (Run is Active) OR (User hasn't explicitly clicked Clear)
+                if (hasNews && (triggerData.trigger === 1 || !isCleared)) {
                     const dbResults: NewsResult[] = newsResponse.items.map(item => ({
                         id: item.id,
                         title: item.title,
                         content: item.content,
-                        source: item.source || 'Database',
+                        source: item.source || item.title || 'Twitter',
                         url: item.url,
                         tweet_id: item.tweet_id,
-                        created_at: item.created_at,
+                        created_at: item.tweet_created_at || item.created_at, // Prioritize tweet time for display
+                        tweet_created_at: item.tweet_created_at,
                         retweet_count: item.retweet_count || 0,
                         reply_count: item.reply_count || 0,
                         like_count: item.like_count || 0,
                         quote_count: item.quote_count || 0,
                         view_count: item.view_count || 0,
                         tweet_profile_pic: item.tweet_profile_pic
-                    }));
+                    })).reverse(); // Reverse results to match SSE arrival order
                     setNewsResults(dbResults);
-                    if (triggerData.trigger === 1) setHasStarted(true);
+                    setHasStarted(true);
+                } else {
+                    setNewsResults([]);
+                }
+
+                // 5. Update Status Message based on the merged state
+                if (triggerData.trigger === 1) {
+                    setHasStarted(true);
+                    setStatusMessage('ระบบกำลังทำงานอยู่ (ตรวจพบค้างคา)');
+                } else if (isCleared && !hasNews) {
+                    setStatusMessage('ระบบพร้อมทำงาน');
+                } else if (isCleared && hasNews) {
+                    setStatusMessage('ล้างข้อมูลเรียบร้อยแล้ว');
+                } else {
+                    setStatusMessage(hasNews ? 'ประมวลผลเสร็จสิ้น' : 'ระบบพร้อมทำงาน');
                 }
             } catch (error) {
                 console.error('Failed to sync today news:', error);
@@ -248,6 +267,7 @@ const TodayNews = () => {
             setNewsResults([]);
             setNextCursor(null);
             localStorage.removeItem('today_news_twitter_cursor');
+            localStorage.removeItem('today_news_is_cleared'); // Reset clear flag on new start
             setHasStarted(true);
         }
 
@@ -310,6 +330,16 @@ const TodayNews = () => {
         setStatusMessage('หยุดการประมวลผลแล้ว');
     };
 
+    const handleDeleteIndividual = async (id: number) => {
+        try {
+            const { deleteNews } = await import('../api/news');
+            await deleteNews(id);
+            setNewsResults(prev => prev.filter(item => item.id !== id));
+        } catch (error) {
+            console.error('Failed to delete news:', error);
+        }
+    };
+
     const handleClear = async () => {
         try {
             const newsIds = newsResults.map(item => item.id);
@@ -322,6 +352,7 @@ const TodayNews = () => {
             setNewsResults([]);
             setHasStarted(false);
             localStorage.removeItem('today_news_twitter_cursor');
+            localStorage.setItem('today_news_is_cleared', 'true'); // Flag to persist clear on refresh
             setNextCursor(null);
             setStatusMessage('ล้างข้อมูลเรียบร้อยแล้ว');
         } catch (error) {
@@ -351,6 +382,7 @@ const TodayNews = () => {
         tweet_profile_pic: res.tweet_profile_pic || '',
         created_at: res.created_at,
         tweet_id: res.tweet_id || '',
+        tweet_created_at: res.tweet_created_at, // Missing field - Fixed
         retweet_count: res.retweet_count,
         reply_count: res.reply_count,
         like_count: res.like_count,
@@ -513,6 +545,7 @@ const TodayNews = () => {
                                     <DashboardCard
                                         post={mapToNewsItem(res)}
                                         variant={layoutMode}
+                                        onDelete={handleDeleteIndividual}
                                     />
                                 </div>
                             ))
