@@ -11,12 +11,14 @@ import CategoryNews from './pages/CategoryNews';
 import AdvanceSearch from './pages/AdvanceSearch';
 import RealtimeSearch from './pages/RealtimeSearch';
 import TodayNews from './pages/TodayNews';
+import LandingPage from './pages/LandingPage';
 
 function App() {
   return (
     <Routes>
       {/* Public Routes*/}
-      <Route path="/" element={<Login />} />
+      <Route path="/" element={<LandingPage />} />
+      <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
 
       {/* Protected Routes*/}

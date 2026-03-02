@@ -257,7 +257,7 @@ const Register = () => {
 
                     <div className="mt-6 text-center text-sm text-gray-500">
                         {t[lang].alreadyHaveAccount}{' '}
-                        <a href="/" className="font-medium text-[#001f3f] hover:underline">
+                        <a href="/login" className="font-medium text-[#001f3f] hover:underline">
                             {t[lang].loginBtn}
                         </a>
                     </div>
