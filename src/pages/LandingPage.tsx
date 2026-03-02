@@ -7,6 +7,7 @@ import ComparisonSection from '../components/LandingPage/ComparisonSection';
 import SmartFilterSection from '../components/LandingPage/SmartFilterSection';
 import CTASection from '../components/LandingPage/CTASection';
 import FooterLand from '../components/LandingPage/FooterLand';
+import { organizationSchema, schemaData } from '../constants/SchemaMarkup';
 
 const LandingPage = () => {
     const [newsIndex, setNewsIndex] = useState(0);
@@ -20,6 +21,13 @@ const LandingPage = () => {
 
     return (
         <div className="min-h-screen bg-[#030e17] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative">
+            {/* ── SEO Schema Markup ── */}
+            <script type="application/ld+json">
+                {JSON.stringify(schemaData)}
+            </script>
+            <script type="application/ld+json">
+                {JSON.stringify(organizationSchema)}
+            </script>
             {/* ── Background Gradients ── */}
             <BackGround />
 
