@@ -24,7 +24,7 @@ const ComparisonSection = () => {
                         transition={{ delay: 0.1 }}
                         className="text-gray-400 text-lg md:text-xl font-medium max-w-2xl mx-auto"
                     >
-                        AI ช่วยกลั่นเนื้อหาให้เหลือเฉพาะประเด็นสำคัญ <br className="hidden md:block" />
+                        AI ช่วยกรองเนื้อหาให้เหลือเฉพาะประเด็นสำคัญ <br className="hidden md:block" />
                         ไม่ต้องอ่านยาว ไม่ต้องแปลเอง
                     </motion.p>
                 </div>
