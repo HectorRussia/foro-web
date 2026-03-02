@@ -39,7 +39,7 @@ const TodayNews = () => {
     const [searchParams] = useState({
         query_type: "Latest",
         since_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
-        until_date: dayjs().format('YYYY-MM-DD'),
+        until_date: dayjs().add(1, 'day').format('YYYY-MM-DD'),
         use_followed_users: true,
         cursor: ""
     });
