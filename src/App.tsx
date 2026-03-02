@@ -33,6 +33,7 @@ function App() {
         <Route path="/user-following" element={<UserFollow />} />
         <Route path="/category-management" element={<Category />} />
         <Route path="/category-news/:id" element={<CategoryNews />} />
+        <Route path="/today-news" element={<TodayNews />} />
         {/*add more route*/}
 
         {/*For King*/}
