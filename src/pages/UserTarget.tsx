@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { FaMagnifyingGlass, FaTwitter, FaUserPlus, FaRobot, FaWandMagicSparkles, FaArrowRight } from 'react-icons/fa6';
+import { FaMagnifyingGlass, FaTwitter, FaUserPlus, FaRobot, FaWandMagicSparkles, FaArrowRight, FaCopy } from 'react-icons/fa6';
 import { Toaster, toast } from 'react-hot-toast';
 import { HiCheckBadge } from 'react-icons/hi2';
 import Sidebar from '../components/Layouts/Sidebar';
@@ -19,6 +19,7 @@ const UserTarget = () => {
     const [recommendQuery, setRecommendQuery] = useState("ฉันอยากติดตามเรื่องเทคโนโลยีมีแนะนำไหมว่าควรติดตามใคร");
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [isRecommending, setIsRecommending] = useState(false);
+    const [isSearchingMore, setIsSearchingMore] = useState(false);
 
     const formatNumber = (num: number) => {
         return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
@@ -73,6 +74,7 @@ const UserTarget = () => {
         if (!recommendQuery.trim()) return;
 
         setIsRecommending(true);
+        setRecommendations([]); // Clear for a fresh search
         try {
             const response = await api.post(`${BASE_URL}/follow/users/llm_recommend`, {
                 query: recommendQuery
@@ -88,6 +90,38 @@ const UserTarget = () => {
             toast.error("ไม่สามารถดึงข้อมูลแนะนำได้");
         } finally {
             setIsRecommending(false);
+        }
+    };
+
+    const handleSearchMore = async () => {
+        if (!recommendQuery.trim() || isRecommending || isSearchingMore) return;
+
+        setIsSearchingMore(true);
+        try {
+            // Prepare the structure as requested: current names and the query
+            const existingData = recommendations.map(rec => ({
+                name: rec.name,
+                x_account: rec.x_account
+            }));
+
+            const response = await api.post(`${BASE_URL}/follow/users/llm_recommend`, {
+                query: recommendQuery,
+                existing_recommendations: existingData
+            });
+
+            if (response.data?.data?.recommendations && response.data.data.recommendations.length > 0) {
+                const newRecs = response.data.data.recommendations;
+                // Append the new recommendations
+                setRecommendations(prev => [...prev, ...newRecs]);
+                toast.success(`พบเพิ่มอีก ${newRecs.length} บัญชี`);
+            } else {
+                toast.error("ไม่พบข้อมูลเพิ่มเติมในขณะนี้");
+            }
+        } catch (error) {
+            console.error("Error fetching more recommendations:", error);
+            toast.error("เกิดข้อผิดพลาดในการค้นหาเพิ่มเติม");
+        } finally {
+            setIsSearchingMore(false);
         }
     };
 
@@ -162,7 +196,7 @@ const UserTarget = () => {
                         {/* Submit Button */}
                         <button
                             type="submit"
-                            disabled={isLoading || isRecommending}
+                            disabled={isLoading || isRecommending || isSearchingMore}
                             className={`shrink-0 flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-xl font-black text-xs md:text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide ${activeTab === 'search'
                                 ? 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20'
                                 : 'bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20'
@@ -255,11 +289,22 @@ const UserTarget = () => {
                             <div key={idx} className="group flex flex-col bg-[#0f172a]/80 border border-indigo-500/20 p-5 rounded-2xl hover:border-indigo-500/60 hover:shadow-[0_15px_30px_rgba(99,102,241,0.1)] transition-all duration-500 relative overflow-hidden">
                                 <div className="absolute -top-8 -right-8 w-24 h-24 bg-indigo-600/10 blur-2xl rounded-full group-hover:bg-indigo-600/20 transition-all duration-500" />
 
-                                <div className="flex items-center gap-2 mb-3">
+                                <div className="flex items-center justify-between mb-3 relative z-10">
                                     <div className="bg-indigo-600/20 border border-indigo-500/30 px-2.5 py-1 rounded-full flex items-center gap-1.5">
                                         <FaRobot className="text-indigo-400 text-[9px] animate-pulse" />
                                         <span className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">AI Pick</span>
                                     </div>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(rec.x_account);
+                                            toast.success(`คัดลอก @${rec.x_account} แล้ว`);
+                                        }}
+                                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-[#1e293b]/50 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all duration-300 border border-transparent hover:border-indigo-500/30 group/copy"
+                                        title="คัดลอกชื่อผู้ใช้"
+                                    >
+                                        <span className="text-[9px] font-bold uppercase tracking-wider hidden group-hover/copy:block transition-all">Copy</span>
+                                        <FaCopy className="text-[12px]" />
+                                    </button>
                                 </div>
 
                                 <h3 className="text-md md:text-base font-black text-white group-hover:text-indigo-400 transition-colors truncate tracking-tight uppercase mb-0.5">
@@ -275,6 +320,27 @@ const UserTarget = () => {
                                 </div>
                             </div>
                         ))}
+                    </div>
+                )}
+
+                {/* ── Search More Button ── */}
+                {activeTab === 'recommend' && recommendations.length > 0 && (
+                    <div className="flex justify-center mt-10 mb-10">
+                        <button
+                            onClick={handleSearchMore}
+                            disabled={isRecommending || isSearchingMore}
+                            className="group relative flex items-center gap-3 px-8 py-4 bg-[#0f172a] border border-indigo-500/30 rounded-2xl font-black text-xs md:text-sm text-indigo-400 hover:text-white hover:border-indigo-500 hover:bg-indigo-600/10 transition-all duration-500 shadow-xl shadow-indigo-500/5 hover:shadow-indigo-500/20 active:scale-95 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <div className="absolute inset-0 bg-linear-to-r from-indigo-600/0 via-indigo-600/5 to-indigo-600/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                            {isSearchingMore ? (
+                                <div className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                            ) : (
+                                <FaWandMagicSparkles className="text-indigo-400 group-hover:rotate-12 transition-transform" />
+                            )}
+                            <span className="tracking-widest uppercase">
+                                {isSearchingMore ? "กำลังค้นหาเพิ่ม..." : "ค้นหาเพิ่มเติม"}
+                            </span>
+                        </button>
                     </div>
                 )}
 
