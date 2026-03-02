@@ -1,15 +1,19 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { FaArrowRight, FaHeart } from 'react-icons/fa6';
 import { HiCheckBadge } from 'react-icons/hi2';
 import { newsBatches } from '../../constants/LandingPage';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface HeroLandingProps {
     newsIndex: number;
 }
 
 const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
+    const { isAuthenticated } = useAuth();
+    const navigate = useNavigate();
+
     return (
         <section className="relative px-6 pt-32 pb-20 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16 min-h-[90vh]">
 
@@ -40,10 +44,20 @@ const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
                     อ่านเร็ว เข้าใจทันที ไม่พลาดทุกประเด็นสำคัญ
                 </p>
 
-                <Link to="/login" className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
-                    <span>เริ่มต้นใช้งานฟรี</span>
-                    <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
-                </Link>
+                {isAuthenticated ? (
+                    <button
+                        onClick={() => navigate('/dashboard')}
+                        className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group"
+                    >
+                        <span>ไปที่แดชบอร์ด</span>
+                        <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
+                    </button>
+                ) : (
+                    <Link to="/login" className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
+                        <span>เริ่มต้นใช้งานฟรี</span>
+                        <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
+                    </Link>
+                )}
             </motion.div>
 
             {/* Right side: Animation */}

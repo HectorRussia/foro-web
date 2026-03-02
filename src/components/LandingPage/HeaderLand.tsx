@@ -1,6 +1,10 @@
 import { Link } from 'react-router-dom';
-import { FaSignInAlt } from 'react-icons/fa';
+import { FaSignInAlt, FaArrowRight } from 'react-icons/fa';
+import { useAuth } from '../../contexts/AuthContext';
+
 const HeaderLand = () => {
+    const { isAuthenticated } = useAuth();
+
     return (
         <>
             {/* ── Header ── */}
@@ -9,10 +13,17 @@ const HeaderLand = () => {
                     <img src="/images/LOGO-FORO/FORO_TP_W.png" alt="logo" className="w-10 h-10" />
                     <span className="text-2xl font-black tracking-tighter uppercase">Foro</span>
                 </div>
-                <Link to="/login" className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 active:scale-95">
-                    <FaSignInAlt className="text-xs" />
-                    <span>เข้าสู่ระบบ</span>
-                </Link>
+                {isAuthenticated ? (
+                    <Link to="/dashboard" className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 active:scale-95">
+                        <FaArrowRight className="text-xs" />
+                        <span>ไปที่แดชบอร์ด</span>
+                    </Link>
+                ) : (
+                    <Link to="/login" className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 active:scale-95">
+                        <FaSignInAlt className="text-xs" />
+                        <span>เข้าสู่ระบบ</span>
+                    </Link>
+                )}
             </nav>
         </>
     )

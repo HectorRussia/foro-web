@@ -12,14 +12,19 @@ import AdvanceSearch from './pages/AdvanceSearch';
 import RealtimeSearch from './pages/RealtimeSearch';
 import TodayNews from './pages/TodayNews';
 import LandingPage from './pages/LandingPage';
+import PublicRoute from './components/auth/PublicRoute';
 
 function App() {
   return (
     <Routes>
-      {/* Public Routes*/}
+      {/* Public Routes - Accessible by everyone */}
       <Route path="/" element={<LandingPage />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
+
+      {/* Guest-only Routes - Redirect to dashboard if already logged in */}
+      <Route element={<PublicRoute />}>
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+      </Route>
 
       {/* Protected Routes*/}
       <Route element={<ProtectedRoute />}>
