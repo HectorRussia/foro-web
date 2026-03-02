@@ -117,7 +117,6 @@ const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
 
                     <div className="flex items-center justify-between mb-8 relative">
                         <div className="flex items-center gap-4">
-                            <img src="/images/LOGO-FORO/FORO_TP_W.png" alt="logo" className="w-10 h-10" />
                             <div className="flex flex-col">
                                 <h3 className="text-2xl font-black leading-none mb-1">FORO Summary</h3>
                                 <span className="text-gray-500 text-xs font-bold uppercase tracking-widest">จาก 3 บัญชี X</span>

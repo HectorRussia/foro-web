@@ -32,10 +32,10 @@ const FooterLand = () => {
     return (
         <>
             <footer className="py-12 px-6 border-t border-white/5 bg-[#030e17]/80 backdrop-blur-md relative z-10">
-                <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="max-w-5xl mx-auto flex flex-col md:flex-row items-center justify-center gap-8">
                     <div className="flex items-center gap-3">
                         <img src="/images/LOGO-FORO/FORO_TP_W.png" alt="logo" className="w-10 h-10" />
-                        <span className="text-xl font-black tracking-tighter text-white">FORO</span>
+                        {/*  <span className="text-xl font-black tracking-tighter text-white">FORO</span> */}
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-6 text-[11px] font-bold text-gray-500 uppercase tracking-[0.2em]">
