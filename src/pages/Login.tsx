@@ -33,8 +33,8 @@ const Login = () => {
     const t = {
         th: {
             title: "Foro",
-            subtitle: "AI สรุปข่าวรายวัน อ่านง่าย ได้ประเด็น",
-            subtitle2: "แบบอ่านง่าย",
+            subtitle: "AI สรุปข่าวรายวัน",
+            subtitle2: "อ่านง่าย ได้ประเด็น",
             desc: "ติดตามและรับสรุปเนื้อหาจากบัญชี X ที่คุณสนใจ",
             loginHeader: "เข้าสู่ระบบ",
             loginSub: "เข้าสู่ระบบเพื่อเริ่มใช้งาน Foro",
@@ -57,8 +57,8 @@ const Login = () => {
         },
         en: {
             title: "Foro",
-            subtitle: "AI-generated daily news that is concise and easy to understand.",
-            subtitle2: "Easy to read",
+            subtitle: "Daily AI News Summaries",
+            subtitle2: "Easy to Read. Straight to the Point.",
             desc: "Follow and get content summaries from X accounts you're interested in.",
             loginHeader: "Login",
             loginSub: "Sign in to start using Foro",

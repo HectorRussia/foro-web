@@ -13,7 +13,7 @@ const Sidebar = () => {
                 <img
                     src="/images/LOGO-FORO/FORO_TP_W.png"
                     alt="Foro Logo"
-                    className="w-1/2 rounded-xl"
+                    className="h-12 w-auto object-contain rounded-xl"
                 />
                 {/*   </div> */}
             </div>

@@ -46,7 +46,7 @@ const SmartFilterSection = () => {
                     transition={{ delay: 0.1 }}
                     className="text-gray-400 text-base md:text-lg font-medium"
                 >
-                    บอก AI ว่าคุณอยากได้โพสต์แบบไหน แล้วให้ AI หามาให้
+                    บอก AI ว่าคุณอยากได้โพสต์แบบไหน
                 </motion.p>
             </div>
 

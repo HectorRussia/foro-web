@@ -34,8 +34,8 @@ const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
                     <span className="block mt-4 text-transparent bg-clip-text bg-linear-to-r from-blue-400 via-indigo-400 to-purple-400">
                         AI สรุปข่าว
                     </span>
-                    <span className="block mt-2 text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-rose-400">
-                        อ่านง่าย ได้ประเด็น
+                    <span className="block mt-2 text-4xl md:text-5xl lg:text-7xl tracking-tight text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-rose-400">
+                        อ่านง่าย  ได้ประเด็น
                     </span>
                 </motion.h1>
 
