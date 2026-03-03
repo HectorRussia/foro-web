@@ -84,7 +84,7 @@ const TodayNews = () => {
                     quote_count: item.quote_count || 0,
                     view_count: item.view_count || 0,
                     tweet_profile_pic: item.tweet_profile_pic
-                })).reverse(); // Reverse results to match SSE arrival order
+                })).sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
                 setNewsResults(dbResults);
                 setHasStarted(true);
             } else {
@@ -222,10 +222,13 @@ const TodayNews = () => {
                     };
                     setNewsResults(prev => {
                         const isDuplicate = prev.some(item => (item.tweet_id && item.tweet_id === newsItem.tweet_id) || item.id === newsItem.id);
+                        let next;
                         if (isDuplicate) {
-                            return prev.map(item => ((item.tweet_id && item.tweet_id === newsItem.tweet_id) || item.id === newsItem.id) ? newsItem : item);
+                            next = prev.map(item => ((item.tweet_id && item.tweet_id === newsItem.tweet_id) || item.id === newsItem.id) ? newsItem : item);
+                        } else {
+                            next = [...prev, newsItem];
                         }
-                        return [...prev, newsItem];
+                        return next.sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
                     });
                 }
                 break;
