@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { getLoginSchema, type LoginFormValues, getForgotPasswordSchema, type ForgotPasswordInput } from '../schemas/auth';
 import { toast } from 'react-hot-toast';
 import { useState, useEffect } from 'react';
+import { loginT } from '../constants/Translations';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -28,58 +29,6 @@ const Login = () => {
     });
 
     const { login } = useAuth();
-
-    // Translations
-    const t = {
-        th: {
-            title: "Foro",
-            subtitle: "AI สรุปข่าวรายวัน",
-            subtitle2: "อ่านง่าย ได้ประเด็น",
-            desc: "ติดตามและรับสรุปเนื้อหาจากบัญชี X ที่คุณสนใจ",
-            loginHeader: "เข้าสู่ระบบ",
-            loginSub: "เข้าสู่ระบบเพื่อเริ่มใช้งาน Foro",
-            email: "อีเมล",
-            password: "รหัสผ่าน",
-            rememberMe: "จดจำอีเมลของฉัน",
-            loginBtn: "เข้าสู่ระบบ",
-            or: "หรือ",
-            forgotPwd: "ลืมรหัสผ่าน?",
-            registerBtn: "ลงทะเบียน",
-            resetPwd: "รีเซ็ตรหัสผ่าน",
-            phone: "เบอร์โทรศัพท์",
-            newPwd: "รหัสผ่านใหม่",
-            confirmPwd: "ยืนยันรหัสผ่านใหม่",
-            confirmBtn: "ยืนยันการตั้งรหัสผ่านใหม่",
-            loading: "กำลังดำเนินการ...",
-            resetSuccess: "รีเซ็ตรหัสผ่านสำเร็จ!",
-            loginError: "อีเมลหรือรหัสผ่านไม่ถูกต้อง",
-            resetError: "เกิดข้อผิดพลาดในการรีเซ็ตรหัสผ่าน"
-        },
-        en: {
-            title: "Foro",
-            subtitle: "Daily AI News Summaries",
-            subtitle2: "Easy to Read. Straight to the Point.",
-            desc: "Follow and get content summaries from X accounts you're interested in.",
-            loginHeader: "Login",
-            loginSub: "Sign in to start using Foro",
-            email: "Email",
-            password: "Password",
-            rememberMe: "Remember me",
-            loginBtn: "Login",
-            or: "OR",
-            forgotPwd: "Forgot password?",
-            registerBtn: "Register",
-            resetPwd: "Reset Password",
-            phone: "Phone Number",
-            newPwd: "New Password",
-            confirmPwd: "Confirm New Password",
-            confirmBtn: "Confirm Reset Password",
-            loading: "Processing...",
-            resetSuccess: "Password reset successful!",
-            loginError: "Invalid email or password",
-            resetError: "An error occurred during password reset"
-        }
-    };
 
     // Load saved email on component mount
     useEffect(() => {
@@ -121,9 +70,9 @@ const Login = () => {
                 role: res.data.user.role,
                 phone: res.data.user.phone
             });
-            navigate('/dashboard');
+            navigate('/today-news');
         } catch (err: any) {
-            toast.error(err.response?.data?.detail || t[lang].loginError);
+            toast.error(err.response?.data?.detail || loginT[lang].loginError);
         }
     };
 
@@ -134,11 +83,11 @@ const Login = () => {
                 phone: data.phone,
                 new_password: data.new_password
             });
-            toast.success(t[lang].resetSuccess);
+            toast.success(loginT[lang].resetSuccess);
             setShowForgot(false);
             resetForgot();
         } catch (error: any) {
-            toast.error(error.response?.data?.detail || t[lang].resetError);
+            toast.error(error.response?.data?.detail || loginT[lang].resetError);
         }
     };
 
@@ -166,14 +115,14 @@ const Login = () => {
                 {/* Left Side */}
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left">
                     <h1 className="text-[64px] md:text-[5rem] font-bold leading-tight tracking-tight text-[#4688d2]">
-                        {t[lang].title}
+                        {loginT[lang].title}
                     </h1>
                     <h1 className="text-5xl md:text-5xl font-bold leading-tight tracking-tight">
-                        {t[lang].subtitle} <br />
-                        <span className="text-white">{t[lang].subtitle2}</span>
+                        {loginT[lang].subtitle} <br />
+                        <span className="text-white">{loginT[lang].subtitle2}</span>
                     </h1>
                     <p className="text-gray-400 text-lg md:text-xl font-light">
-                        {t[lang].desc}
+                        {loginT[lang].desc}
                     </p>
                 </div>
 
@@ -181,12 +130,12 @@ const Login = () => {
                 <div className="w-full md:w-[480px] bg-white rounded-2xl shadow-2xl p-8 md:p-10">
                     <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
                         <div className="text-center mb-8">
-                            <h2 className="text-3xl font-bold text-gray-900 mb-2">{t[lang].loginHeader}</h2>
-                            <p className="text-gray-500 text-sm">{t[lang].loginSub}</p>
+                            <h2 className="text-3xl font-bold text-gray-900 mb-2">{loginT[lang].loginHeader}</h2>
+                            <p className="text-gray-500 text-sm">{loginT[lang].loginSub}</p>
                         </div>
 
                         <div className="space-y-2">
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t[lang].email}</label>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">{loginT[lang].email}</label>
                             <input
                                 {...register("email")}
                                 type="email"
@@ -199,7 +148,7 @@ const Login = () => {
 
                         <div className="space-y-2">
                             <div className="flex items-center justify-between">
-                                <label htmlFor="password" className="block text-sm font-medium text-gray-700">{t[lang].password}</label>
+                                <label htmlFor="password" className="block text-sm font-medium text-gray-700">{loginT[lang].password}</label>
                             </div>
                             <input
                                 {...register("password")}
@@ -221,7 +170,7 @@ const Login = () => {
                                 className="w-4 h-4 text-[#001f3f] bg-gray-100 border-gray-300 rounded focus:ring-[#001f3f] focus:ring-2 cursor-pointer"
                             />
                             <label htmlFor="rememberMe" className="ml-2 text-sm font-medium text-gray-700 cursor-pointer">
-                                {t[lang].rememberMe}
+                                {loginT[lang].rememberMe}
                             </label>
                         </div>
 
@@ -229,7 +178,7 @@ const Login = () => {
                             type="submit"
                             className="w-full bg-[#001f3f] cursor-pointer hover:bg-[#003366] text-white font-medium py-3 rounded-lg transition duration-200 shadow-md"
                         >
-                            {t[lang].loginBtn}
+                            {loginT[lang].loginBtn}
                         </button>
                     </form>
 
@@ -238,7 +187,7 @@ const Login = () => {
                             <div className="w-full border-t border-gray-300"></div>
                         </div>
                         <div className="relative flex justify-center text-sm">
-                            <span className="px-4 bg-white text-gray-400 font-medium">{t[lang].or}</span>
+                            <span className="px-4 bg-white text-gray-400 font-medium">{loginT[lang].or}</span>
                         </div>
                     </div>
                     <div className="flex justify-center items-center mb-5">
@@ -247,7 +196,7 @@ const Login = () => {
                             onClick={() => setShowForgot(true)}
                             className="text-sm font-medium text-[#001f3f] hover:underline cursor-pointer"
                         >
-                            {t[lang].forgotPwd}
+                            {loginT[lang].forgotPwd}
                         </button>
                     </div>
                     <button
@@ -255,7 +204,7 @@ const Login = () => {
                         className="w-full bg-black cursor-pointer hover:bg-gray-800 text-white font-medium py-3 rounded-lg transition duration-200 flex items-center justify-center gap-3"
                         onClick={() => navigate('/register')}
                     >
-                        <span>{t[lang].registerBtn}</span>
+                        <span>{loginT[lang].registerBtn}</span>
                     </button>
                 </div>
             </div>
@@ -265,7 +214,7 @@ const Login = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                     <div className="bg-white rounded-2xl w-full max-w-md flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
                         <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <h3 className="text-2xl font-bold text-gray-900">{t[lang].resetPwd}</h3>
+                            <h3 className="text-2xl font-bold text-gray-900">{loginT[lang].resetPwd}</h3>
                             <button
                                 onClick={() => { setShowForgot(false); resetForgot(); }}
                                 className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600 cursor-pointer"
@@ -278,7 +227,7 @@ const Login = () => {
 
                         <form onSubmit={handleSubmitForgot(onForgotSubmit)} className="p-6 space-y-4">
                             <div className="space-y-1">
-                                <label className="block text-sm font-medium text-gray-700">{t[lang].email}</label>
+                                <label className="block text-sm font-medium text-gray-700">{loginT[lang].email}</label>
                                 <input
                                     {...registerForgot("email")}
                                     type="email"
@@ -289,7 +238,7 @@ const Login = () => {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="block text-sm font-medium text-gray-700">{t[lang].phone}</label>
+                                <label className="block text-sm font-medium text-gray-700">{loginT[lang].phone}</label>
                                 <input
                                     {...registerForgot("phone")}
                                     type="tel"
@@ -300,7 +249,7 @@ const Login = () => {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="block text-sm font-medium text-gray-700">{t[lang].newPwd}</label>
+                                <label className="block text-sm font-medium text-gray-700">{loginT[lang].newPwd}</label>
                                 <input
                                     {...registerForgot("new_password")}
                                     type="password"
@@ -311,7 +260,7 @@ const Login = () => {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="block text-sm font-medium text-gray-700">{t[lang].confirmPwd}</label>
+                                <label className="block text-sm font-medium text-gray-700">{loginT[lang].confirmPwd}</label>
                                 <input
                                     {...registerForgot("confirm_new_password")}
                                     type="password"
@@ -327,7 +276,7 @@ const Login = () => {
                                     disabled={isSubmittingForgot}
                                     className="w-full bg-[#001f3f] hover:bg-[#003366] text-white font-semibold py-3 rounded-xl transition duration-200 shadow-lg disabled:opacity-50 cursor-pointer"
                                 >
-                                    {isSubmittingForgot ? t[lang].loading : t[lang].confirmBtn}
+                                    {isSubmittingForgot ? loginT[lang].loading : loginT[lang].confirmBtn}
                                 </button>
                             </div>
                         </form>

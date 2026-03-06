@@ -5,9 +5,10 @@ import axios from "axios";
 import { getRegisterSchema, type RegisterInput } from "../schemas/auth";
 import { useNavigate } from "react-router-dom";
 import { toast } from 'react-hot-toast';
-
+import { RegisterT } from "../constants/Translations";
 const BASE_URL = import.meta.env.VITE_API_URL;
 const Register = () => {
+
     const [lang, setLang] = useState<'th' | 'en'>('th');
     const navigate = useNavigate();
     const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<RegisterInput>({
@@ -16,58 +17,6 @@ const Register = () => {
 
     const [showTerms, setShowTerms] = useState(false);
     const [modalMode, setModalMode] = useState<'terms' | 'privacy'>('terms');
-
-    // Translations
-    const t = {
-        th: {
-            title: "สร้างบัญชีใหม่",
-            desc: "เข้าร่วมเพื่อติดตามสรุปเนื้อหาที่คุณสนใจ",
-            registerHeader: "สมัครสมาชิก",
-            registerSub: "กรอกข้อมูลเพื่อเริ่มต้นใช้งาน",
-            name: "ชื่อ",
-            lastname: "นามสกุล",
-            email: "อีเมล",
-            phone: "เบอร์โทรศัพท์",
-            password: "รหัสผ่าน",
-            confirmPassword: "ยืนยันรหัสผ่าน",
-            agreed: "ฉันได้อ่านและยอมรับ",
-            terms: "Terms of Service",
-            and: "และ",
-            privacy: "Privacy Policy",
-            submitBtn: "ยืนยันการสมัคร",
-            submitting: "กำลังสมัคร...",
-            alreadyHaveAccount: "มีบัญชีอยู่แล้ว?",
-            loginBtn: "เข้าสู่ระบบ",
-            successMsg: "สมัครสมาชิกสำเร็จ! 🎉",
-            errorMsg: "เกิดข้อผิดพลาด",
-            lastUpdated: "อัปเดตล่าสุด: 2/15/2026",
-            understand: "รับทราบและเข้าใจ"
-        },
-        en: {
-            title: "Create Account",
-            desc: "Join to follow content summaries you're interested in.",
-            registerHeader: "Sign Up",
-            registerSub: "Fill in the information to get started",
-            name: "First Name",
-            lastname: "Last Name",
-            email: "Email",
-            phone: "Phone Number",
-            password: "Password",
-            confirmPassword: "Confirm Password",
-            agreed: "I have read and agree to the",
-            terms: "Terms of Service",
-            and: "and",
-            privacy: "Privacy Policy",
-            submitBtn: "Register Now",
-            submitting: "Signing up...",
-            alreadyHaveAccount: "Already have an account?",
-            loginBtn: "Sign In",
-            successMsg: "Registration successful! 🎉",
-            errorMsg: "An error occurred",
-            lastUpdated: "Last Updated: 2/15/2026",
-            understand: "I Understand"
-        }
-    };
 
     const onSubmit = async (data: RegisterInput) => {
         try {
@@ -80,10 +29,10 @@ const Register = () => {
                 password: data.password,
             });
 
-            toast.success(t[lang].successMsg);
+            toast.success(RegisterT[lang].successMsg);
             navigate("/")
         } catch (error: any) {
-            toast.error(error.response?.data?.detail || t[lang].errorMsg);
+            toast.error(error.response?.data?.detail || RegisterT[lang].errorMsg);
         }
     };
     return (
@@ -112,7 +61,7 @@ const Register = () => {
                 {/* Left Side - Text Content */}
                 <div className="text-white w-full md:w-1/2 space-y-6 text-center md:text-left order-2 md:order-1">
                     <h1 className="text-4xl md:text-6xl font-bold leading-tight tracking-tight">
-                        {t[lang].title} <br />
+                        {RegisterT[lang].title} <br />
                         <img
                             src="/images/LOGO-FORO/FORO_TP_W.png"
                             alt="Foro Logo"
@@ -120,21 +69,21 @@ const Register = () => {
                         />
                     </h1>
                     <p className="text-gray-400 text-lg md:text-xl font-light">
-                        {t[lang].desc}
+                        {RegisterT[lang].desc}
                     </p>
                 </div>
 
                 {/* Right Side - Register Form */}
                 <div className="w-full md:w-[520px] bg-white rounded-2xl shadow-2xl p-8 md:p-10 order-1 md:order-2">
                     <div className="text-center mb-6">
-                        <h2 className="text-3xl font-bold text-gray-900 mb-2">{t[lang].registerHeader}</h2>
-                        <p className="text-gray-500 text-sm">{t[lang].registerSub}</p>
+                        <h2 className="text-3xl font-bold text-gray-900 mb-2">{RegisterT[lang].registerHeader}</h2>
+                        <p className="text-gray-500 text-sm">{RegisterT[lang].registerSub}</p>
                     </div>
 
                     <form className="space-y-4" onSubmit={handleSubmit(onSubmit)}>
                         <div className="grid grid-cols-2 gap-4">
                             <div className="space-y-1">
-                                <label htmlFor="name" className="block text-sm font-medium text-gray-700">{t[lang].name}</label>
+                                <label htmlFor="name" className="block text-sm font-medium text-gray-700">{RegisterT[lang].name}</label>
                                 <input
                                     type="text"
                                     id="name"
@@ -145,7 +94,7 @@ const Register = () => {
                                 {errors.name && <p className="text-red-500 text-xs">{errors.name.message}</p>}
                             </div>
                             <div className="space-y-1">
-                                <label htmlFor="lastname" className="block text-sm font-medium text-gray-700">{t[lang].lastname}</label>
+                                <label htmlFor="lastname" className="block text-sm font-medium text-gray-700">{RegisterT[lang].lastname}</label>
                                 <input
                                     type="text"
                                     id="lastname"
@@ -158,7 +107,7 @@ const Register = () => {
                         </div>
 
                         <div className="space-y-1">
-                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">{t[lang].email}</label>
+                            <label htmlFor="email" className="block text-sm font-medium text-gray-700">{RegisterT[lang].email}</label>
                             <input
                                 type="email"
                                 id="email"
@@ -170,7 +119,7 @@ const Register = () => {
                         </div>
 
                         <div className="space-y-1">
-                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">{t[lang].phone}</label>
+                            <label htmlFor="phone" className="block text-sm font-medium text-gray-700">{RegisterT[lang].phone}</label>
                             <input
                                 type="tel"
                                 id="phone"
@@ -182,7 +131,7 @@ const Register = () => {
                         </div>
 
                         <div className="space-y-1">
-                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">{t[lang].password}</label>
+                            <label htmlFor="password" className="block text-sm font-medium text-gray-700">{RegisterT[lang].password}</label>
                             <input
                                 type="password"
                                 id="password"
@@ -194,7 +143,7 @@ const Register = () => {
                         </div>
 
                         <div className="space-y-1">
-                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">{t[lang].confirmPassword}</label>
+                            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">{RegisterT[lang].confirmPassword}</label>
                             <input
                                 type="password"
                                 id="confirmPassword"
@@ -218,21 +167,21 @@ const Register = () => {
                                 </div>
                                 <div className="text-sm">
                                     <label htmlFor="agreed" className="text-gray-600 cursor-pointer">
-                                        {t[lang].agreed}{" "}
+                                        {RegisterT[lang].agreed}{" "}
                                         <button
                                             type="button"
                                             onClick={() => { setModalMode('terms'); setShowTerms(true); }}
                                             className="text-[#001f3f] font-semibold hover:underline"
                                         >
-                                            {t[lang].terms}
+                                            {RegisterT[lang].terms}
                                         </button>{" "}
-                                        {t[lang].and}{" "}
+                                        {RegisterT[lang].and}{" "}
                                         <button
                                             type="button"
                                             onClick={() => { setModalMode('privacy'); setShowTerms(true); }}
                                             className="text-[#001f3f] font-semibold hover:underline"
                                         >
-                                            {t[lang].privacy}
+                                            {RegisterT[lang].privacy}
                                         </button>
                                     </label>
                                 </div>
@@ -249,16 +198,16 @@ const Register = () => {
                                 font-medium py-3 rounded-lg transition duration-200 shadow-md
                                 ${isSubmitting ? "opacity-50 cursor-not-allowed" : "cursor-pointer "}`}
                             >
-                                {isSubmitting ? t[lang].submitting : t[lang].submitBtn}
+                                {isSubmitting ? RegisterT[lang].submitting : RegisterT[lang].submitBtn}
                             </button>
                         </div>
 
                     </form>
 
                     <div className="mt-6 text-center text-sm text-gray-500">
-                        {t[lang].alreadyHaveAccount}{' '}
+                        {RegisterT[lang].alreadyHaveAccount}{' '}
                         <a href="/login" className="font-medium text-[#001f3f] hover:underline">
-                            {t[lang].loginBtn}
+                            {RegisterT[lang].loginBtn}
                         </a>
                     </div>
                 </div>
@@ -279,7 +228,7 @@ const Register = () => {
                                 </h3>
                                 <div className="flex items-center gap-2 mt-1">
                                     <p className="text-sm text-gray-500">
-                                        {t[lang].lastUpdated}
+                                        {RegisterT[lang].lastUpdated}
                                     </p>
                                     <span className="text-gray-300">|</span>
                                     <div className="flex bg-gray-200 rounded-lg p-0.5">
@@ -626,7 +575,7 @@ const Register = () => {
                                 onClick={() => setShowTerms(false)}
                                 className="px-8 py-3 bg-[#001f3f] text-white rounded-xl font-semibold hover:bg-[#003366] transition-all shadow-lg active:scale-95"
                             >
-                                {t[lang].understand}
+                                {RegisterT[lang].understand}
                             </button>
                         </div>
                     </div>

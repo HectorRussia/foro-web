@@ -21,19 +21,20 @@ function App() {
       <Route path="/" element={<LandingPage />} />
 
       {/* Guest-only Routes - Redirect to dashboard if already logged in */}
-      <Route element={<PublicRoute />}>
+      <Route element={<PublicRoute redirectPath="/today-news" />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Route>
 
       {/* Protected Routes*/}
       <Route element={<ProtectedRoute />}>
+        <Route path="/today-news" element={<TodayNews />} />
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/user-target" element={<UserTarget />} />
         <Route path="/user-following" element={<UserFollow />} />
         <Route path="/category-management" element={<Category />} />
         <Route path="/category-news/:id" element={<CategoryNews />} />
-        <Route path="/today-news" element={<TodayNews />} />
+
         {/*add more route*/}
 
         {/*For King*/}
