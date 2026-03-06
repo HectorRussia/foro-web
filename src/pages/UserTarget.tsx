@@ -16,7 +16,7 @@ const UserTarget = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     // AI Recommendation states
-    const [activeTab, setActiveTab] = useState<'search' | 'recommend'>('search');
+    const [activeTab, setActiveTab] = useState<'search' | 'recommend'>('recommend');
     const [recommendQuery, setRecommendQuery] = useState("ฉันอยากติดตามเรื่องเทคโนโลยีมีแนะนำไหมว่าควรติดตามใคร");
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [isRecommending, setIsRecommending] = useState(false);
