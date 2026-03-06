@@ -5,7 +5,7 @@ interface PublicRouteProps {
     redirectPath?: string;
 }
 
-const PublicRoute = ({ redirectPath = '/dashboard' }: PublicRouteProps) => {
+const PublicRoute = ({ redirectPath = '/today-news' }: PublicRouteProps) => {
     const { isAuthenticated, isLoading } = useAuth();
 
     if (isLoading) {

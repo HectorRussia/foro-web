@@ -21,7 +21,7 @@ function App() {
       <Route path="/" element={<LandingPage />} />
 
       {/* Guest-only Routes - Redirect to dashboard if already logged in */}
-      <Route element={<PublicRoute redirectPath="/today-news" />}>
+      <Route element={<PublicRoute />}>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
       </Route>
