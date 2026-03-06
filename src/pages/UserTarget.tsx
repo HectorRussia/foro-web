@@ -143,16 +143,6 @@ const UserTarget = () => {
                 {/* ── Tabs ── */}
                 <div className="flex items-center gap-2 mb-5">
                     <button
-                        onClick={() => setActiveTab('search')}
-                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'search'
-                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                            : 'bg-[#0f172a] text-gray-400 border border-[#1e293b] hover:border-gray-600'
-                            }`}
-                    >
-                        <FaMagnifyingGlass />
-                        <span>ค้นหาทั่วไป</span>
-                    </button>
-                    <button
                         onClick={() => setActiveTab('recommend')}
                         className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'recommend'
                             ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/30'
@@ -161,6 +151,16 @@ const UserTarget = () => {
                     >
                         <FaRobot className={activeTab === 'recommend' ? 'animate-pulse' : ''} />
                         <span>แนะนำโดย AI</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('search')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'search'
+                            ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
+                            : 'bg-[#0f172a] text-gray-400 border border-[#1e293b] hover:border-gray-600'
+                            }`}
+                    >
+                        <FaMagnifyingGlass />
+                        <span>ค้นหาทั่วไป</span>
                     </button>
                 </div>
 
@@ -346,12 +346,11 @@ const UserTarget = () => {
                 )}
 
                 {/* ── Empty State ── */}
-                {((activeTab === 'search' && !isLoading && users.length === 0) ||
-                    (activeTab === 'recommend' && !isRecommending && recommendations.length === 0)) && (
-                        <div className="mt-4">
-                            <PresetUserTarget onFollow={handleFollow} />
-                        </div>
-                    )}
+                {activeTab === 'recommend' && !isRecommending && recommendations.length === 0 && (
+                    <div className="mt-4">
+                        <PresetUserTarget onFollow={handleFollow} />
+                    </div>
+                )}
             </div>
 
             <Toaster position="bottom-right" />

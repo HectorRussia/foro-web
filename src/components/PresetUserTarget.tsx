@@ -125,7 +125,7 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
                                             <h2 className="text-xs md:text-sm font-black text-white truncate group-hover:text-blue-400 transition-colors uppercase">{user.name}</h2>
                                             <span className="text-gray-500 bg-[#1e293b] px-1.5 py-0.5 rounded text-[8px] font-bold shrink-0">@{user.x_account}</span>
                                         </div>
-                                        <p className="text-gray-500 text-[9px] md:text-[10px] line-clamp-1 mb-1.5 leading-relaxed italic">
+                                        <p className="text-gray-500 text-[10px] md:text-[15px] line-clamp-1 mb-1.5 leading-relaxed italic">
                                             "{user.reason}"
                                         </p>
                                         <div className="flex items-center gap-3">

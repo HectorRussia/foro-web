@@ -463,16 +463,6 @@ const TodayNews = () => {
                         </div>
 
 
-                        {!isStreaming && nextCursor && (
-                            <button
-                                onClick={() => startAnalysisStream(nextCursor)}
-                                className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 font-bold transition-all hover:bg-amber-500/20 active:scale-95 animate-in fade-in zoom-in-95"
-                                title={`Next Signal: ${nextCursor}`}
-                            >
-                                <HiOutlineClock className="text-xl" />
-                                <span className="hidden sm:inline">ข่าวต่อไป</span>
-                            </button>
-                        )}
 
                         {!isStreaming ? (
                             <button
@@ -554,6 +544,25 @@ const TodayNews = () => {
 
 
                     </div>
+
+                    {!isStreaming && nextCursor && (
+                        <div className="flex justify-center mt-10 mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <button
+                                onClick={() => startAnalysisStream(nextCursor)}
+                                className="group relative flex items-center justify-center gap-4 px-12 py-5 rounded-4xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 w-full md:w-[400px] overflow-hidden shadow-2xl shadow-amber-500/5 active:scale-95"
+                                title={`Next Signal: ${nextCursor}`}
+                            >
+                                <div className="absolute inset-0 bg-linear-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+                                <div className="p-3 rounded-2xl bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
+                                    <HiOutlineClock className="text-2xl text-amber-500 animate-pulse" />
+                                </div>
+                                <div className="flex flex-col items-start">
+                                    <span className="text-amber-500 font-black text-xl tracking-tight">ข่าวต่อไป</span>
+                                    <span className="text-amber-500/40 text-[10px] uppercase font-bold tracking-[0.2em]">Load More Signals</span>
+                                </div>
+                            </button>
+                        </div>
+                    )}
                 </div>
 
                 {/* Processing Progress Status */}
