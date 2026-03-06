@@ -30,7 +30,7 @@ export const categoryNews: Record<string, any[]> = {
         { id: 't3', source: "Apple", handle: "@Apple", text: "เปิดตัว Vision Pro 2 ที่บางและเบากว่าเดิม", time: "8 ชม. ที่แล้ว", color: "bg-gray-500", icon: "A" },
     ],
     marketing: [
-        { id: 'm1', source: "Neil Patel", handle: "@neilpatel", text: "SEO ในปี 2024 เน้น E-E-A-T และเนื้อหาที่มีคุณภาพ", time: "3 ชม. ที่แล้ว", color: "bg-blue-600", icon: "NP" },
+        { id: 'm1', source: "Intragram ", handle: "@Intragram ", text: "ผลักดันการช้อปปิ้งออนไลน์มากขึ้นในปี 2026", time: "3 ชม. ที่แล้ว", color: "bg-gradient-to-tr from-[#f9ce34] via-[#ee2a7b] to-[#6228d7] text-white", icon: "IG" },
         { id: 'm2', source: "Gary Vee", handle: "@garyvee", text: "การตลาดแบบ Authenticity คือกุญแจสำคัญ", time: "6 ชม. ที่แล้ว", color: "bg-purple-600", icon: "GV" },
         { id: 'm3', source: "Marketing Land", handle: "@MarketingLand", text: "TikTok Shopping เติบโต 400%", time: "1 วันที่แล้ว", color: "bg-green-600", icon: "ML" },
     ],
