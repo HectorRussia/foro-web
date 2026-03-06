@@ -5,6 +5,7 @@ import { HiCheckBadge } from 'react-icons/hi2';
 import Sidebar from '../components/Layouts/Sidebar';
 import api from '../api/axiosInstance';
 import type { UserTweetSearch, Recommendation } from '../interface/userTarget';
+import PresetUserTarget from '../components/PresetUserTarget';
 
 
 const BASE_URL = import.meta.env.VITE_API_URL;
@@ -347,19 +348,8 @@ const UserTarget = () => {
                 {/* ── Empty State ── */}
                 {((activeTab === 'search' && !isLoading && users.length === 0) ||
                     (activeTab === 'recommend' && !isRecommending && recommendations.length === 0)) && (
-                        <div className="text-center py-16 md:py-24 bg-[#0f172a]/40 rounded-3xl border-2 border-dashed border-[#1e293b] mt-6">
-                            <div className="mb-6 flex justify-center text-gray-800">
-                                {activeTab === 'search'
-                                    ? <FaMagnifyingGlass size={48} className="animate-pulse" />
-                                    : <FaRobot size={48} className="animate-bounce" />
-                                }
-                            </div>
-                            <h3 className="text-lg md:text-2xl font-black text-gray-500 uppercase tracking-tighter">No results found</h3>
-                            <p className="text-gray-600 mt-2 text-sm max-w-sm mx-auto leading-relaxed">
-                                {activeTab === 'search'
-                                    ? "ลองค้นหาด้วยคำอื่น"
-                                    : "บอก AI ว่าคุณสนใจเรื่องอะไร"}
-                            </p>
+                        <div className="mt-4">
+                            <PresetUserTarget onFollow={handleFollow} />
                         </div>
                     )}
             </div>
