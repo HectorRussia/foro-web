@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { FaRobot, FaMicrochip, FaBriefcase, FaChartLine, FaHandHoldingDollar, FaBitcoin, FaHeartPulse, FaPersonWalking, FaGlobe, FaBuildingColumns, FaWandMagicSparkles, FaUserPlus, FaTwitter, FaLightbulb, FaGavel } from 'react-icons/fa6';
 import { HiCheckBadge } from 'react-icons/hi2';
+import { motion, AnimatePresence } from 'framer-motion';
 import type { Recommendation } from '../interface/userTarget';
 import { PRESET_DATA } from '../constants/PresetData';
 
@@ -40,6 +41,7 @@ interface PresetUserTargetProps {
 const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
     const [seed, setSeed] = useState(0);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const randomUsers = useMemo(() => {
         if (!selectedCategory || !PRESET_DATA[selectedCategory]) return [];
@@ -47,29 +49,53 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
         return [...categoryData].sort(() => 0.5 - Math.random()).slice(0, 3);
     }, [selectedCategory, seed]);
 
+    const handleShuffle = async () => {
+        setIsRefreshing(true);
+        // Add a small artificial delay to show the "loading" effect as requested by user
+        await new Promise(resolve => setTimeout(resolve, 600));
+        setSeed(prev => prev + 1);
+        setIsRefreshing(false);
+    };
+
     const handleCategoryClick = (id: string) => {
         if (selectedCategory === id) {
-            setSeed(prev => prev + 1);
+            handleShuffle();
         } else {
             setSelectedCategory(id);
+            setSeed(prev => prev + 1);
         }
     };
 
+    // Auto trigger initial load if needed or handle logic
+    useEffect(() => {
+        if (selectedCategory && seed === 0) {
+            setSeed(1);
+        }
+    }, [selectedCategory]);
+
     return (
         <div className="w-full mt-10">
-            <h2 className="text-sm font-black text-gray-400 mb-6 flex items-center justify-center gap-3 uppercase tracking-widest text-center">
+            <motion.h2
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-sm font-black text-gray-400 mb-6 flex items-center justify-center gap-3 uppercase tracking-widest text-center"
+            >
                 <span className="w-1.5 h-4 bg-blue-600 rounded-full"></span>
                 ลองติดตามผู้เชี่ยวชาญจากหมวดหมู่ที่คุณสนใจ
                 <span className="w-1.5 h-4 bg-blue-600 rounded-full"></span>
-            </h2>
+            </motion.h2>
 
             {/* Category Grid */}
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 mb-8 max-w-4xl mx-auto">
-                {CATEGORIES.map((cat) => (
-                    <button
+                {CATEGORIES.map((cat, idx) => (
+                    <motion.button
                         key={cat.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.05 }}
                         onClick={() => handleCategoryClick(cat.id)}
-                        className={`group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-300 ${selectedCategory === cat.id
+                        disabled={isRefreshing}
+                        className={`group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-300 disabled:opacity-70 ${selectedCategory === cat.id
                             ? 'bg-linear-to-br ' + cat.color + ' border-transparent shadow-lg shadow-blue-500/20'
                             : 'bg-[#0f172a]/40 border-[#1e293b] hover:border-gray-500 hover:bg-[#0f172a]/60'
                             }`}
@@ -82,95 +108,141 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
                             }`}>
                             {cat.name}
                         </span>
-                    </button>
+                    </motion.button>
                 ))}
             </div>
 
             {/* Random Users View */}
             {selectedCategory && (
-                <div className="animate-in fade-in slide-in-from-bottom-2 duration-500 max-w-4xl mx-auto">
+                <div className="max-w-4xl mx-auto min-h-[400px]">
                     <div className="flex items-center justify-between mb-4 px-1">
                         <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2 underline underline-offset-4 decoration-blue-500/30">
                             <FaWandMagicSparkles className="animate-pulse" />
                             แนะนำสำหรับคุณในหมวด {CATEGORIES.find(c => c.id === selectedCategory)?.name}
                         </h3>
                         <button
-                            onClick={() => setSeed(prev => prev + 1)}
-                            className="text-[15px] font-black text-gray-500 hover:text-white transition-colors uppercase tracking-tight flex items-center gap-1.5 cursor-pointer"
+                            onClick={handleShuffle}
+                            disabled={isRefreshing}
+                            className="text-[15px] font-black text-gray-500 hover:text-white transition-all uppercase tracking-tight flex items-center gap-2 cursor-pointer disabled:cursor-not-allowed group"
                         >
-                            <span className="w-2 h-2 bg-gray-500 rounded-full" />
-                            สุ่มใหม่
+                            {isRefreshing ? (
+                                <div className="w-4 h-4 border-2 border-gray-500 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <span className="w-2 h-2 bg-gray-500 rounded-full group-hover:bg-white transition-colors" />
+                            )}
+                            <span>{isRefreshing ? 'กำลังสุ่ม...' : 'สุ่มใหม่'}</span>
                         </button>
                     </div>
 
-                    {randomUsers.length > 0 ? (
-                        <div className="grid grid-cols-1 gap-4">
-                            {randomUsers.map((user, idx) => (
-                                <div key={idx} className="group flex items-center gap-3 bg-[#0f172a]/80 border border-[#1e293b] p-3 md:p-4 rounded-2xl hover:border-blue-500/40 hover:bg-[#0f172a] transition-all duration-300">
-                                    {/* Avatar */}
-                                    <div className="shrink-0 relative">
-                                        <img
-                                            src={user.profile_image}
-                                            alt={user.name}
-                                            className="w-11 h-11 md:w-14 md:h-14 rounded-full border-2 border-[#1e293b] group-hover:border-blue-500/50 object-cover transition-all duration-300"
-                                        />
-                                        <div className="absolute -bottom-0.5 -right-0.5 bg-white text-blue-500 rounded-full p-0.5 ring-2 ring-[#0f172a]">
-                                            <HiCheckBadge className="text-[10px] md:text-[12px]" />
-                                        </div>
+                    <div className="relative">
+                        <AnimatePresence mode="wait">
+                            {isRefreshing ? (
+                                <motion.div
+                                    key="loading"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    className="flex flex-col items-center justify-center py-20 gap-4"
+                                >
+                                    <div className="relative">
+                                        <div className="w-12 h-12 border-4 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+                                        <FaWandMagicSparkles className="absolute inset-0 m-auto text-blue-400 text-xl animate-pulse" />
                                     </div>
-
-                                    {/* Info */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
-                                            <h2 className="text-xs md:text-sm font-black text-white truncate group-hover:text-blue-400 transition-colors uppercase">{user.name}</h2>
-                                            <span className="text-gray-500 bg-[#1e293b] px-1.5 py-0.5 rounded text-[8px] font-bold shrink-0">@{user.x_account}</span>
-                                        </div>
-                                        <p className="text-gray-500 text-[10px] md:text-[15px] line-clamp-1 mb-1.5 leading-relaxed italic">
-                                            "{user.reason}"
-                                        </p>
-                                        <div className="flex items-center gap-3">
-                                            <div>
-                                                <span className="font-black text-white text-[10px] md:text-xs">{user.followers}</span>
-                                                <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold ml-0.5">F</span>
-                                            </div>
-                                            <div>
-                                                <span className="font-black text-white text-[10px] md:text-xs">{user.following}</span>
-                                                <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold ml-0.5">Fw</span>
-                                            </div>
-                                            <div>
-                                                <span className="font-black text-white text-[10px] md:text-xs">{user.posts}</span>
-                                                <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold ml-0.5">P</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Buttons */}
-                                    <div className="shrink-0 flex flex-col gap-1.5">
-                                        <button
-                                            onClick={() => onFollow(user.name, user.x_account, user.profile_image)}
-                                            className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[9px] md:text-[10px] uppercase tracking-wide transition-all duration-200 active:scale-95 shadow-md shadow-blue-600/30 whitespace-nowrap"
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest animate-pulse">กำลังสุ่มบัญชีใหม่ให้คุณ...</p>
+                                </motion.div>
+                            ) : randomUsers.length > 0 ? (
+                                <motion.div
+                                    key={`${selectedCategory}-${seed}`}
+                                    initial={{ opacity: 0, y: 20 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -20 }}
+                                    transition={{ duration: 0.4, ease: "easeOut" }}
+                                    className="grid grid-cols-1 gap-4"
+                                >
+                                    {randomUsers.map((user, idx) => (
+                                        <motion.div
+                                            key={user.x_account}
+                                            initial={{ opacity: 0, x: -10 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            transition={{ delay: idx * 0.1 }}
+                                            className="group flex items-center gap-3 bg-[#0f172a]/80 border border-[#1e293b] p-3 md:p-4 rounded-2xl hover:border-blue-500/40 hover:bg-[#0f172a] transition-all duration-300 shadow-lg shadow-black/20"
                                         >
-                                            <FaUserPlus className="text-[8px]" />
-                                            <span>Follow</span>
-                                        </button>
-                                        <a
-                                            href={`https://twitter.com/${user.x_account}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="flex items-center justify-center gap-1 px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] border border-gray-700/50 rounded-lg text-gray-400 hover:text-white font-black text-[9px] md:text-[10px] uppercase tracking-wide transition-all duration-200 whitespace-nowrap"
-                                        >
-                                            <FaTwitter className="text-[8px]" />
-                                            <span>Profile</span>
-                                        </a>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <div className="py-8 bg-[#0f172a]/20 rounded-2xl border border-dashed border-[#1e293b] text-center">
-                            <p className="text-gray-700 font-black text-[10px] uppercase">ยังไม่มีข้อมูลในหมวดนี้</p>
-                        </div>
-                    )}
+                                            {/* Avatar */}
+                                            <div className="shrink-0 relative">
+                                                <div className="w-11 h-11 md:w-14 md:h-14 rounded-full border-2 border-[#1e293b] group-hover:border-blue-500/50 overflow-hidden transition-all duration-300">
+                                                    <img
+                                                        src={user.profile_image}
+                                                        alt={user.name}
+                                                        className="w-full h-full object-cover"
+                                                        onLoad={(e) => {
+                                                            (e.target as HTMLImageElement).parentElement?.classList.add('border-blue-500/30');
+                                                        }}
+                                                    />
+                                                </div>
+                                                <div className="absolute -bottom-0.5 -right-0.5 bg-white text-blue-500 rounded-full p-0.5 ring-2 ring-[#0f172a]">
+                                                    <HiCheckBadge className="text-[10px] md:text-[12px]" />
+                                                </div>
+                                            </div>
+
+                                            {/* Info */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
+                                                    <h2 className="text-xs md:text-sm font-black text-white truncate group-hover:text-blue-400 transition-colors uppercase">{user.name}</h2>
+                                                    <span className="text-gray-500 bg-[#1e293b] px-1.5 py-0.5 rounded text-[8px] font-bold shrink-0">@{user.x_account}</span>
+                                                </div>
+                                                <p className="text-gray-400 text-[10px] md:text-sm line-clamp-1 mb-1.5 leading-relaxed italic group-hover:text-gray-300 transition-colors">
+                                                    "{user.reason}"
+                                                </p>
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="font-black text-white text-[10px] md:text-xs">{user.followers}</span>
+                                                        <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold">F</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="font-black text-white text-[10px] md:text-xs">{user.following}</span>
+                                                        <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold">Fw</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-1">
+                                                        <span className="font-black text-white text-[10px] md:text-xs">{user.posts}</span>
+                                                        <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold">P</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Buttons */}
+                                            <div className="shrink-0 flex flex-col gap-1.5">
+                                                <button
+                                                    onClick={() => onFollow(user.name, user.x_account, user.profile_image)}
+                                                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[9px] md:text-[10px] uppercase tracking-wide transition-all duration-200 active:scale-95 shadow-md shadow-blue-600/30 whitespace-nowrap"
+                                                >
+                                                    <FaUserPlus className="text-[8px]" />
+                                                    <span>Follow</span>
+                                                </button>
+                                                <a
+                                                    href={`https://twitter.com/${user.x_account}`}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] border border-gray-700/50 rounded-lg text-gray-400 hover:text-white font-black text-[9px] md:text-[10px] uppercase tracking-wide transition-all duration-200 whitespace-nowrap"
+                                                >
+                                                    <FaTwitter className="text-[8px]" />
+                                                    <span>Profile</span>
+                                                </a>
+                                            </div>
+                                        </motion.div>
+                                    ))}
+                                </motion.div>
+                            ) : (
+                                <motion.div
+                                    key="empty"
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="py-12 bg-[#0f172a]/20 rounded-2xl border border-dashed border-[#1e293b] text-center"
+                                >
+                                    <p className="text-gray-700 font-black text-[10px] uppercase tracking-widest">ยังไม่มีข้อมูลในหมวดนี้</p>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
                 </div>
             )}
         </div>
