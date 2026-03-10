@@ -15,6 +15,10 @@ import { RiLoader4Line } from "react-icons/ri";
 import { LuLayoutDashboard } from "react-icons/lu";
 import { type NewsItem, type NewsResult, type SSEEvent } from '../interface/news';
 import { getNews, getTriggerStatus, updateTriggerStatus } from '../api/news';
+import { getCategories } from '../api/category';
+import { createCategoryNews } from '../api/categoryNews';
+import { toast } from 'react-hot-toast';
+import { type Category } from '../interface/category';
 
 
 const LAYOUT_OPTIONS = [
@@ -34,6 +38,7 @@ const TodayNews = () => {
     const [backupResults, setBackupResults] = useState<NewsResult[]>([]);
     const [backupCursor, setBackupCursor] = useState<string | null>(null);
     const [isRestorable, setIsRestorable] = useState(false);
+    const [categories, setCategories] = useState<Category[]>([]);
 
     // Search Parameters
     const [searchParams] = useState({
@@ -106,8 +111,18 @@ const TodayNews = () => {
             console.error('Failed to sync today news:', error);
         }
     };
+    const fetchCats = async () => {
+        try {
+            const data = await getCategories();
+            setCategories(data);
+        } catch (error) {
+            console.error('Failed to fetch categories:', error);
+        }
+    };
+
     useEffect(() => {
         init();
+        fetchCats();
         return () => {
             if (abortControllerRef.current) abortControllerRef.current.abort();
         };
@@ -341,6 +356,19 @@ const TodayNews = () => {
         }
     };
 
+    const handleAddNewsToCategory = async (categoryId: number, newsId: number) => {
+        try {
+            await createCategoryNews({
+                category_id: categoryId,
+                news_id: newsId
+            });
+            toast.success('เพิ่มข่าวเข้าหมวดหมู่เรียบร้อยแล้ว');
+        } catch (error) {
+            console.error('Error adding news to category:', error);
+            toast.error('เกิดข้อผิดพลาดในการเพิ่มข่าวเข้าหมวดหมู่');
+        }
+    };
+
     const handleClear = async () => {
         try {
             const newsIds = newsResults.map(item => item.id);
@@ -536,6 +564,8 @@ const TodayNews = () => {
                                     <DashboardCard
                                         post={mapToNewsItem(res)}
                                         variant={layoutMode}
+                                        categories={categories}
+                                        onAddToCategory={handleAddNewsToCategory}
                                         onDelete={handleDeleteIndividual}
                                     />
                                 </div>
