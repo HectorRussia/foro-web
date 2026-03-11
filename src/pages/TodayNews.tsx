@@ -9,7 +9,8 @@ import {
     HiOutlineClock,
     HiOutlineCalendarDays,
     HiOutlineTrash,
-    HiOutlineArrowPath
+    HiOutlineArrowPath,
+    HiOutlineFunnel
 } from "react-icons/hi2";
 import { RiLoader4Line } from "react-icons/ri";
 import { LuLayoutDashboard } from "react-icons/lu";
@@ -32,6 +33,12 @@ const TodayNews = () => {
     const [layoutMode, setLayoutMode] = useState<'grid' | 'compact'>('grid');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
     const layoutDropdownRef = useRef<HTMLDivElement>(null);
+    
+    // Filter State
+    const [activeFilters, setActiveFilters] = useState<string[]>([]);
+    const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
+    const filterDropdownRef = useRef<HTMLDivElement>(null);
+
     const [statusMessage, setStatusMessage] = useState('ระบบพร้อมทำงาน');
     const [nextCursor, setNextCursor] = useState<string | null>(() => localStorage.getItem('today_news_twitter_cursor'));
     const [hasStarted, setHasStarted] = useState(false);
@@ -146,6 +153,25 @@ const TodayNews = () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isLayoutDropdownOpen]);
+
+    // Handle click outside to close filter dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target as Node)) {
+                setIsFilterDropdownOpen(false);
+            }
+        };
+
+        if (isFilterDropdownOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isFilterDropdownOpen]);
 
     const handleSSEEvent = (data: SSEEvent) => {
         const { event, data: eventData } = data;
@@ -411,13 +437,52 @@ const TodayNews = () => {
         tweet_profile_pic: res.tweet_profile_pic || '',
         created_at: res.created_at,
         tweet_id: res.tweet_id || '',
-        tweet_created_at: res.tweet_created_at, // Missing field - Fixed
+        tweet_created_at: res.tweet_created_at,
         retweet_count: res.retweet_count,
         reply_count: res.reply_count,
         like_count: res.like_count,
         quote_count: res.quote_count,
         view_count: res.view_count
     });
+
+    const toggleFilter = (filter: string) => {
+        setActiveFilters(prev => 
+            prev.includes(filter) 
+                ? prev.filter(f => f !== filter) 
+                : [...prev, filter]
+        );
+    };
+
+    const getFilteredNews = () => {
+        const sorted = [...newsResults].sort((a, b) => {
+            const hasView = activeFilters.includes('mostView');
+            const hasLiked = activeFilters.includes('mostLiked');
+
+            if (hasView && hasLiked) {
+                // Combined score: Views + (Likes + Retweets) * weighted
+                // Normalizing roughly: views usually > likes+retweets
+                const scoreA = (a.view_count || 0) + ((a.like_count || 0) + (a.retweet_count || 0)) * 5;
+                const scoreB = (b.view_count || 0) + ((b.like_count || 0) + (b.retweet_count || 0)) * 5;
+                return scoreB - scoreA;
+            }
+            
+            if (hasView) {
+                return (b.view_count || 0) - (a.view_count || 0);
+            }
+            
+            if (hasLiked) {
+                const scoreA = (a.like_count || 0) + (a.retweet_count || 0);
+                const scoreB = (b.like_count || 0) + (b.retweet_count || 0);
+                return scoreB - scoreA;
+            }
+
+            // Default: Most Recent
+            return dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf();
+        });
+        return sorted;
+    };
+
+    const displayNews = getFilteredNews();
 
     return (
         <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100 overflow-hidden">
@@ -466,6 +531,60 @@ const TodayNews = () => {
                                             {option.label === 'Grid' ? 'Grid' : 'Compact'}
                                         </button>
                                     ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Filter Toggle */}
+                        <div className="relative" ref={filterDropdownRef}>
+                            <button
+                                onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 transition-all text-sm font-medium ${isFilterDropdownOpen || activeFilters.length > 0 ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
+                            >
+                                <HiOutlineFunnel className={activeFilters.length > 0 ? 'animate-pulse' : ''} />
+                                <span className="hidden sm:inline">Filter</span>
+                                {activeFilters.length > 0 && (
+                                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-[10px] text-white font-bold ml-1">
+                                        {activeFilters.length}
+                                    </span>
+                                )}
+                            </button>
+
+                            {isFilterDropdownOpen && (
+                                <div className="absolute right-0 sm:left-0 top-full mt-2 w-52 bg-[#1e293b]/90 border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-60 animate-in fade-in zoom-in-95 backdrop-blur-xl">
+                                    <div className="p-3 space-y-2">
+                                        <button
+                                            onClick={() => toggleFilter('mostView')}
+                                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeFilters.includes('mostView') ? 'bg-[#39FF14] text-black shadow-[0_0_20px_rgba(57,255,20,0.3)]' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${activeFilters.includes('mostView') ? 'bg-black animate-pulse' : 'bg-gray-500'}`} />
+                                                Most View
+                                            </div>
+                                            {activeFilters.includes('mostView') && <span className="text-[10px] opacity-70">Active</span>}
+                                        </button>
+                                        <button
+                                            onClick={() => toggleFilter('mostLiked')}
+                                            className={`w-full flex items-center justify-between px-4 py-3 rounded-xl text-sm font-bold transition-all ${activeFilters.includes('mostLiked') ? 'bg-[#39FF14] text-black shadow-[0_0_20px_rgba(57,255,20,0.3)]' : 'text-gray-300 hover:bg-white/5 hover:text-white'}`}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <div className={`w-1.5 h-1.5 rounded-full ${activeFilters.includes('mostLiked') ? 'bg-black animate-pulse' : 'bg-gray-500'}`} />
+                                                Most Liked
+                                            </div>
+                                            {activeFilters.includes('mostLiked') && <span className="text-[10px] opacity-70">Active</span>}
+                                        </button>
+                                        
+                                        {activeFilters.length > 0 && (
+                                            <div className="pt-2 border-t border-white/5">
+                                                <button
+                                                    onClick={() => setActiveFilters([])}
+                                                    className="w-full flex items-center justify-center px-4 py-2 text-[10px] text-gray-500 hover:text-rose-400 font-bold uppercase tracking-widest transition-colors"
+                                                >
+                                                    Reset All Filters
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                         </div>
@@ -559,7 +678,7 @@ const TodayNews = () => {
                                 <p className="text-sm mt-2 max-w-md">กดปุ่ม "เริ่มรับข้อมูล" เพื่อเริ่มวิเคราะห์ข่าวสารล่าสุดของวันนี้</p>
                             </div>
                         ) : (
-                            newsResults.map((res) => (
+                            displayNews.map((res) => (
                                 <div key={res.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                                     <DashboardCard
                                         post={mapToNewsItem(res)}
