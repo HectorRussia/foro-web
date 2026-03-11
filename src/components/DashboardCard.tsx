@@ -172,9 +172,9 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                 </div>
             </div>
 
-            <div className={`text-gray-300 font-light overflow-hidden wrap-break-word
-                ${isCompact ? 'text-sm mb-3 md:line-clamp-2' : 'text-base mb-4'}
-                ${isGrid ? 'grow md:line-clamp-4' : ''}
+            <div className={`text-gray-300 font-light overflow-hidden wrap-break-word leading-relaxed
+                ${isCompact ? 'text-sm mb-3 line-clamp-2' : 'text-base mb-4'}
+                ${isGrid ? 'grow line-clamp-5 md:line-clamp-4' : ''}
             `}>
                 {post.content}
             </div>

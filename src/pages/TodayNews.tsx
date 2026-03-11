@@ -487,40 +487,39 @@ const TodayNews = () => {
     return (
         <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100 overflow-hidden">
             <Sidebar />
-
-            <main className="flex-1 ml-20 lg:ml-80 p-6 flex flex-col h-screen overflow-hidden">
+            <main className="flex-1 ml-20 lg:ml-80 p-3 md:p-6 flex flex-col h-screen overflow-hidden">
 
                 {/* Header Section */}
-                <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8 shrink-0">
-                    <div>
-                        <h1 className="text-3xl font-bold bg-linear-to-r from-white to-gray-400 bg-clip-text text-transparent flex items-center gap-3">
-                            <HiOutlineCalendarDays className="text-blue-400" />
-                            ข่าววันนี้
+                <header className="flex flex-col gap-4 mb-4 md:mb-8 md:flex-row md:items-center md:justify-between shrink-0">
+                    <div className="flex flex-col gap-1">
+                        <h1 className="text-2xl md:text-3xl font-extrabold bg-linear-to-r from-white to-gray-400 bg-clip-text text-transparent flex items-center gap-2">
+                             <HiOutlineCalendarDays className="text-blue-400" />
+                             ข่าววันนี้
                         </h1>
-                        <p className="text-gray-400 text-sm mt-1 flex items-center gap-2">
-                            <span className={`h-5 w-5 rounded-full ${isStreaming ? 'bg-blue-400 animate-pulse shadow-[0_0_8px_blue]' : 'bg-gray-600'}`}></span>
-                            {statusMessage}
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className={`h-3 w-3 rounded-full ${isStreaming ? 'bg-blue-400 animate-pulse' : 'bg-gray-600'}`}></span>
+                            <span className="text-gray-400 text-xs font-medium">{statusMessage}</span>
                             {newsResults.length > 0 && (
-                                <span className="ml-2 px-2 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-400 animate-in fade-in slide-in-from-left-2">
-                                    จำนวนข่าวในหน้านี้ {newsResults.length}
+                                <span className="px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-[10px] font-bold text-blue-400">
+                                    {newsResults.length} ข่าว
                                 </span>
                             )}
-                        </p>
+                        </div>
                     </div>
 
-                    <div className="flex items-center gap-3">
-                        {/* Layout Toggle */}
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        {/* Layout Toggle - Compact on mobile */}
                         <div className="relative" ref={layoutDropdownRef}>
                             <button
                                 onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
-                                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-sm font-medium"
+                                className="flex items-center justify-center w-10 h-10 md:w-auto md:px-4 md:py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all text-sm font-medium"
                             >
-                                {layoutMode === 'grid' ? <LuLayoutDashboard className="rotate-90" /> : <LuLayoutDashboard className="scale-y-75" />}
-                                <span className="hidden sm:inline">{layoutMode === 'grid' ? 'Grid View' : 'Compact View'}</span>
+                                {layoutMode === 'grid' ? <LuLayoutDashboard className="rotate-90 text-lg" /> : <LuLayoutDashboard className="scale-y-75 text-lg" />}
+                                <span className="hidden md:inline ml-2">{layoutMode === 'grid' ? 'Grid View' : 'Compact View'}</span>
                             </button>
 
                             {isLayoutDropdownOpen && (
-                                <div className="absolute left-0 top-full mt-2 w-48 bg-[#1e293b] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95">
+                                <div className="absolute left-0 top-full mt-2 w-40 bg-[#1e293b] border border-gray-700 rounded-xl shadow-2xl overflow-hidden z-50 animate-in fade-in zoom-in-95 backdrop-blur-xl">
                                     {LAYOUT_OPTIONS.map((option) => (
                                         <button
                                             key={option.id}
@@ -528,23 +527,23 @@ const TodayNews = () => {
                                             className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-colors ${layoutMode === option.id ? 'bg-blue-600 text-white' : 'text-gray-300 hover:bg-gray-700'}`}
                                         >
                                             {option.icon}
-                                            {option.label === 'Grid' ? 'Grid' : 'Compact'}
+                                            {option.label}
                                         </button>
                                     ))}
                                 </div>
                             )}
                         </div>
 
-                        {/* Filter Toggle */}
+                        {/* Filter Toggle - Compact on mobile */}
                         <div className="relative" ref={filterDropdownRef}>
                             <button
                                 onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border border-white/10 transition-all text-sm font-medium ${isFilterDropdownOpen || activeFilters.length > 0 ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
+                                className={`relative flex items-center justify-center w-10 h-10 md:w-auto md:px-4 md:py-2.5 rounded-xl border border-white/10 transition-all text-sm font-medium ${isFilterDropdownOpen || activeFilters.length > 0 ? 'bg-blue-600/20 text-blue-400 border-blue-500/30' : 'bg-white/5 text-gray-300 hover:bg-white/10'}`}
                             >
-                                <HiOutlineFunnel className={activeFilters.length > 0 ? 'animate-pulse' : ''} />
-                                <span className="hidden sm:inline">Filter</span>
+                                <HiOutlineFunnel className={`${activeFilters.length > 0 ? 'animate-pulse' : ''} text-lg`} />
+                                <span className="hidden md:inline ml-2">Filter</span>
                                 {activeFilters.length > 0 && (
-                                    <span className="flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-[10px] text-white font-bold ml-1">
+                                    <span className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 rounded-full bg-blue-500 text-[10px] text-white font-bold md:static md:ml-1 md:w-5 md:h-5">
                                         {activeFilters.length}
                                     </span>
                                 )}
@@ -590,19 +589,19 @@ const TodayNews = () => {
                         </div>
 
                         {/* Clear & Restore Controls */}
-                        <div className="flex items-center gap-1.5 p-1.5 bg-white/5 rounded-2xl border border-white/10">
+                        <div className="flex items-center gap-1 p-1 bg-white/5 rounded-xl border border-white/10">
                             <button
                                 onClick={handleClear}
-                                className="p-2 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-xl transition-all"
-                                title="ล้างข้อมูลทั้งหน้าจอและหยุดระบบ"
+                                className="p-2 text-gray-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+                                title="ล้างข้อมูล"
                             >
                                 <HiOutlineTrash className="text-xl" />
                             </button>
                             {isRestorable && (
                                 <button
                                     onClick={handleRestore}
-                                    className="p-2 text-gray-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-xl transition-all animate-pulse"
-                                    title="กู้คืนข้อมูลที่เพิ่งล้างไป"
+                                    className="p-2 text-gray-400 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all animate-pulse"
+                                    title="กู้คืน"
                                 >
                                     <HiOutlineArrowPath className="text-xl" />
                                 </button>
@@ -615,22 +614,20 @@ const TodayNews = () => {
                             <button
                                 onClick={() => startAnalysisStream()}
                                 disabled={hasStarted || newsResults.length > 0}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-white font-bold transition-all transform 
+                                className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-white font-bold transition-all transform 
                                     ${hasStarted || newsResults.length > 0
-                                        ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                        : 'bg-linear-to-r from-blue-600 to-blue-500 shadow-xl hover:shadow-blue-500/20 hover:-translate-y-0.5 active:scale-95'
+                                        ? 'bg-gray-800 text-gray-400 cursor-not-allowed'
+                                        : 'bg-linear-to-r from-blue-600 to-blue-500 shadow-xl active:scale-95'
                                     }`}
                             >
-                                <HiOutlineSparkles className={`text-xl ${hasStarted || newsResults.length > 0 ? 'text-gray-600' : 'text-white'}`} />
-                                <span>อ่านข่าววันนี้</span>
+                                <HiOutlineSparkles className="text-lg" />
+                                <span className="text-sm">อ่านข่าววันนี้</span>
                             </button>
                         ) : (
-                            <div className="flex items-center gap-3">
-                                <button
-                                    className="flex items-center gap-2 px-6 py-2.5 rounded-xl bg-blue-600/10 text-blue-400 font-semibold cursor-default"
-                                >
-                                    <RiLoader4Line className="text-xl animate-spin" />
-                                    <span>กำลังรับข้อมูล...</span>
+                            <div className="flex-1 sm:flex-none flex items-center gap-2">
+                                <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600/10 text-blue-400 font-bold cursor-default border border-blue-500/20">
+                                    <RiLoader4Line className="text-lg animate-spin" />
+                                    <span className="text-xs">กำลังรับข้อมูล...</span>
                                 </button>
                                 <button
                                     onClick={stopStream}
@@ -660,7 +657,7 @@ const TodayNews = () => {
                     {/* News Stream Grid */}
                     <div className={`
                         ${layoutMode === 'grid'
-                            ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-20'
+                            ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 md:gap-6 pb-20'
                             : 'flex flex-col space-y-4 pb-20'}
                     `}>
                         {newsResults.length === 0 && isStreaming && (
