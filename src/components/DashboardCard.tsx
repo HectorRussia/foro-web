@@ -2,8 +2,19 @@ import { useState, useRef, useEffect } from 'react';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/th';
-import { FaCopy, FaCheck, FaExternalLinkAlt, FaPlus, FaTrash, FaMinusCircle, FaRegComment, FaRetweet, FaRegHeart, FaQuoteLeft, FaRegChartBar } from 'react-icons/fa';
-
+import {
+    FaCopy,
+    FaCheck,
+    FaExternalLinkAlt,
+    FaPlus,
+    FaTrash,
+    FaMinusCircle,
+    FaRegComment,
+    FaRetweet,
+    FaQuoteLeft,
+    FaEye,
+} from 'react-icons/fa';
+import { AiOutlineLike } from "react-icons/ai";
 dayjs.extend(relativeTime);
 dayjs.locale('th');
 import { IoIosMore, } from 'react-icons/io';
@@ -181,6 +192,10 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
 
             {/* Interaction Stats */}
             <div className={`flex items-center gap-4 mb-4 text-xs font-medium text-gray-500/80 ${isCompact ? 'px-1' : ''}`}>
+                <div className="flex items-center gap-1.5 hover:text-rose-400 transition-colors cursor-default group/stat">
+                    <AiOutlineLike className="text-[14px]" />
+                    <span>{post.like_count?.toLocaleString() || 0}</span>
+                </div>
                 <div className="flex items-center gap-1.5 hover:text-blue-400 transition-colors cursor-default group/stat">
                     <FaRegComment className="text-[14px]" />
                     <span>{post.reply_count?.toLocaleString() || 0}</span>
@@ -189,10 +204,6 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     <FaRetweet className="text-[14px]" />
                     <span>{post.retweet_count?.toLocaleString() || 0}</span>
                 </div>
-                <div className="flex items-center gap-1.5 hover:text-rose-400 transition-colors cursor-default group/stat">
-                    <FaRegHeart className="text-[14px]" />
-                    <span>{post.like_count?.toLocaleString() || 0}</span>
-                </div>
                 {post.quote_count !== undefined && post.quote_count > 0 && (
                     <div className="flex items-center gap-1.5 hover:text-purple-400 transition-colors cursor-default group/stat">
                         <FaQuoteLeft className="text-[12px]" />
@@ -200,7 +211,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     </div>
                 )}
                 <div className="flex items-center gap-1.5 hover:text-cyan-400 transition-colors cursor-default group/stat ml-auto">
-                    <FaRegChartBar className="text-[14px]" />
+                    <FaEye className="text-[14px]" />
                     <span>{post.view_count?.toLocaleString() || 0}</span>
                 </div>
             </div>

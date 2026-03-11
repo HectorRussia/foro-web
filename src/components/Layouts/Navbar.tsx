@@ -1,5 +1,4 @@
 import { HiMiniUsers, HiOutlineCalendarDays } from 'react-icons/hi2';
-import { LuLogOut } from "react-icons/lu";
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { RiUserFollowFill, /* RiBaseStationLine  */ } from 'react-icons/ri';
@@ -14,7 +13,6 @@ const iconsNav = [
     { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
     { id: 4, icon: <BiCategory />, label: "Bookmarks", path: "/category-management" },
     // { id: 6, icon: <TbAlpha />, label: "AdvanceSearch", path: "/advance-search", requiredRole: "king" },
-    { id: 5, icon: <LuLogOut />, label: "ออกจากระบบ", path: "/" },
 ]
 
 interface NavbarProp {
