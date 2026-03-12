@@ -13,7 +13,8 @@ import {
     HiOutlineFunnel
 } from "react-icons/hi2";
 import { RiLoader4Line } from "react-icons/ri";
-import { LuLayoutDashboard } from "react-icons/lu";
+import { LuLayoutDashboard, LuSparkles } from "react-icons/lu";
+import { AnimatePresence, motion } from 'framer-motion';
 import { type NewsItem, type NewsResult, type SSEEvent } from '../interface/news';
 import { getNews, getTriggerStatus, updateTriggerStatus } from '../api/news';
 import { getCategories } from '../api/category';
@@ -33,7 +34,7 @@ const TodayNews = () => {
     const [layoutMode, setLayoutMode] = useState<'grid' | 'compact'>('grid');
     const [isLayoutDropdownOpen, setIsLayoutDropdownOpen] = useState(false);
     const layoutDropdownRef = useRef<HTMLDivElement>(null);
-    
+
     // Filter State
     const [activeFilters, setActiveFilters] = useState<string[]>([]);
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
@@ -46,6 +47,14 @@ const TodayNews = () => {
     const [backupCursor, setBackupCursor] = useState<string | null>(null);
     const [isRestorable, setIsRestorable] = useState(false);
     const [categories, setCategories] = useState<Category[]>([]);
+
+    // AI Filter State
+    const [isAIFilterOpen, setIsAIFilterOpen] = useState(false);
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [isAIProcessing, setIsAIProcessing] = useState(false);
+    const [aiFilteredIds, setAiFilteredIds] = useState<(string | number)[] | null>(null);
+    const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const aiFilterRef = useRef<HTMLDivElement>(null);
 
     // Search Parameters
     const [searchParams] = useState({
@@ -172,6 +181,25 @@ const TodayNews = () => {
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isFilterDropdownOpen]);
+
+    // Handle click outside to close AI filter dropdown
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (aiFilterRef.current && !aiFilterRef.current.contains(event.target as Node)) {
+                setIsAIFilterOpen(false);
+            }
+        };
+
+        if (isAIFilterOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        } else {
+            document.removeEventListener('mousedown', handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isAIFilterOpen]);
 
     const handleSSEEvent = (data: SSEEvent) => {
         const { event, data: eventData } = data;
@@ -395,6 +423,65 @@ const TodayNews = () => {
         }
     };
 
+    const handleAIFilter = async () => {
+        if (!aiPrompt.trim()) {
+            toast.error('กรุณาพิมพ์ข้อมูลที่ต้องการให้ AI วิเคราะห์');
+            return;
+        }
+
+        setIsAIProcessing(true);
+
+        // Structure to send to backend exactly as requested
+        const payload = {
+            prompt: aiPrompt,
+            news_items: newsResults.map(res => ({
+                id: res.id,
+                title: res.title,
+                content: res.content,
+                source: res.source,
+                url: res.url,
+                tweet_id: res.tweet_id,
+                created_at: res.created_at,
+                metrics: {
+                    retweet_count: res.retweet_count,
+                    reply_count: res.reply_count,
+                    like_count: res.like_count,
+                    quote_count: res.quote_count,
+                    view_count: res.view_count
+                }
+            }))
+        };
+
+        try {
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/news/filter`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+
+            if (data.filtered_news) {
+                setAiSummary(data.summary || null);
+                // Map IDs/TweetIDs to track matches
+                const ids = data.filtered_news.map((item: any) => item.id || item.tweet_id);
+                setAiFilteredIds(ids);
+                toast.success('คัดกรองข้อมูลสำเร็จ');
+            } else {
+                toast.error(data.message || 'คัดกรองไม่สำเร็จ');
+            }
+            setIsAIFilterOpen(false);
+        } catch (error) {
+            console.error('AI Filter failed:', error);
+            toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ AI');
+        } finally {
+            setIsAIProcessing(false);
+        }
+    };
+
     const handleClear = async () => {
         try {
             const newsIds = newsResults.map(item => item.id);
@@ -446,9 +533,9 @@ const TodayNews = () => {
     });
 
     const toggleFilter = (filter: string) => {
-        setActiveFilters(prev => 
-            prev.includes(filter) 
-                ? prev.filter(f => f !== filter) 
+        setActiveFilters(prev =>
+            prev.includes(filter)
+                ? prev.filter(f => f !== filter)
                 : [...prev, filter]
         );
     };
@@ -465,11 +552,11 @@ const TodayNews = () => {
                 const scoreB = (b.view_count || 0) + ((b.like_count || 0) + (b.retweet_count || 0)) * 5;
                 return scoreB - scoreA;
             }
-            
+
             if (hasView) {
                 return (b.view_count || 0) - (a.view_count || 0);
             }
-            
+
             if (hasLiked) {
                 const scoreA = (a.like_count || 0) + (a.retweet_count || 0);
                 const scoreB = (b.like_count || 0) + (b.retweet_count || 0);
@@ -479,6 +566,12 @@ const TodayNews = () => {
             // Default: Most Recent
             return dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf();
         });
+
+        // Apply AI Filter if active
+        if (aiFilteredIds) {
+            return sorted.filter(item => aiFilteredIds.includes(item.id) || (item.tweet_id && aiFilteredIds.includes(item.tweet_id)));
+        }
+
         return sorted;
     };
 
@@ -493,8 +586,8 @@ const TodayNews = () => {
                 <header className="flex flex-col gap-4 mb-4 md:mb-8 md:flex-row md:items-center md:justify-between shrink-0">
                     <div className="flex flex-col gap-1">
                         <h1 className="text-2xl md:text-3xl font-extrabold bg-linear-to-r from-white to-gray-400 bg-clip-text text-transparent flex items-center gap-2">
-                             <HiOutlineCalendarDays className="text-blue-400" />
-                             ข่าววันนี้
+                            <HiOutlineCalendarDays className="text-blue-400" />
+                            ข่าววันนี้
                         </h1>
                         <div className="flex flex-wrap items-center gap-2">
                             <span className={`h-3 w-3 rounded-full ${isStreaming ? 'bg-blue-400 animate-pulse' : 'bg-gray-600'}`}></span>
@@ -504,10 +597,87 @@ const TodayNews = () => {
                                     {newsResults.length} ข่าว
                                 </span>
                             )}
+                            {aiFilteredIds && (
+                                <button
+                                    onClick={() => {
+                                        setAiFilteredIds(null);
+                                        setAiSummary(null);
+                                        setAiPrompt('');
+                                    }}
+                                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-rose-500/10 border border-rose-500/20 text-xs md:text-sm font-bold text-rose-400 hover:bg-rose-500/20 transition-all active:scale-95 shadow-[0_0_15px_rgba(244,63,94,0.1)]"
+                                >
+                                    <HiOutlineStop className="text-sm md:text-base" />
+                                    ยกเลิกคัดกรอง ({aiFilteredIds.length})
+                                </button>
+                            )}
                         </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                        {/* AI Filter Feature */}
+                        <div className="relative" ref={aiFilterRef}>
+                            <button
+                                onClick={() => setIsAIFilterOpen(!isAIFilterOpen)}
+                                className={`flex items-center justify-center gap-2 px-4 md:px-6 py-2 md:py-2.5 rounded-xl transition-all duration-300 font-bold border ${isAIFilterOpen
+                                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.3)]'
+                                    : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:border-white/20'}`}
+                            >
+                                <LuSparkles className={`text-lg md:text-xl ${isAIFilterOpen ? 'animate-pulse' : 'text-blue-400'}`} />
+                                <span className="text-xs md:text-sm font-black tracking-tight text-white">AI Filter</span>
+                            </button>
+
+                            <AnimatePresence>
+                                {isAIFilterOpen && (
+                                    <motion.div
+                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                        className="absolute right-0 md:left-0 top-full mt-4 w-[280px] sm:w-72 md:w-80 p-4 md:p-5 bg-[#1a2c3e]/95 backdrop-blur-2xl border border-white/10 rounded-3xl md:rounded-4xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-70"
+                                    >
+                                        <div className="space-y-4">
+                                            <div className="bg-[#0f1a26] border border-white/5 rounded-2xl p-4">
+                                                <p className="text-sm font-medium text-gray-300 leading-relaxed text-center">
+                                                    พิมพ์บอก AI ว่าอยากได้แนวไหน AI จะคัดกรองเฉพาะทวีตที่เกี่ยวข้องมาให้จากทั้งหมด {newsResults.length} โพส
+                                                </p>
+                                            </div>
+
+                                            <textarea
+                                                value={aiPrompt}
+                                                onChange={(e) => setAiPrompt(e.target.value)}
+                                                placeholder="เช่น: สรุปคนดราม่าเรื่องอะไรกัน หรือ หาข่าวที่มีแนวโน้มบวก..."
+                                                className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none placeholder:text-gray-600"
+                                            />
+
+                                            <div className="flex justify-end pt-2">
+                                                <button
+                                                    onClick={handleAIFilter}
+                                                    disabled={isAIProcessing || newsResults.length === 0}
+                                                    className={`
+                                                        px-6 py-2.5 rounded-xl font-bold transition-all transform active:scale-95 flex items-center gap-2
+                                                        ${isAIProcessing || newsResults.length === 0
+                                                            ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                                                            : 'bg-[#ff00ff] text-white hover:bg-[#ff00ff]/80 shadow-[0_0_15px_rgba(255,0,255,0.4)] hover:shadow-[0_0_25px_rgba(255,0,255,0.6)]'}
+                                                    `}
+                                                >
+                                                    {isAIProcessing ? (
+                                                        <>
+                                                            <RiLoader4Line className="animate-spin text-lg" />
+                                                            <span>ส่งข้อมูล...</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <HiOutlineFunnel className="text-lg" />
+                                                            <span>filter</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+
                         {/* Layout Toggle - Compact on mobile */}
                         <div className="relative" ref={layoutDropdownRef}>
                             <button
@@ -572,7 +742,7 @@ const TodayNews = () => {
                                             </div>
                                             {activeFilters.includes('mostLiked') && <span className="text-[10px] opacity-70">Active</span>}
                                         </button>
-                                        
+
                                         {activeFilters.length > 0 && (
                                             <div className="pt-2 border-t border-white/5">
                                                 <button
@@ -607,8 +777,6 @@ const TodayNews = () => {
                                 </button>
                             )}
                         </div>
-
-
 
                         {!isStreaming ? (
                             <button
@@ -653,6 +821,40 @@ const TodayNews = () => {
                     </div>
                 )}
 
+                {/* AI Summary Section */}
+                {aiSummary && (
+                    <div className="mb-6 mx-1">
+                        <motion.div
+                            initial={{ opacity: 0, y: -20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="relative overflow-hidden group"
+                        >
+                            <div className="absolute inset-0 bg-blue-600/5 backdrop-blur-3xl" />
+                            <div className="relative p-4 md:p-6 bg-blue-500/10 border border-blue-500/20 rounded-3xl md:rounded-[2.5rem] shadow-2xl shadow-blue-500/5">
+                                <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 md:gap-5 text-center sm:text-left">
+                                    <div className="shrink-0 p-2.5 md:p-3.5 bg-blue-500/20 rounded-xl md:rounded-[1.25rem] shadow-inner">
+                                        <LuSparkles className="text-blue-400 text-xl md:text-2xl animate-pulse" />
+                                    </div>
+                                    <div className="flex-1 space-y-2 w-full">
+                                        <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                                            <h3 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-linear-to-r from-blue-400 to-cyan-400 tracking-tight">
+                                                บทสรุปจาก AI
+                                            </h3>
+                                            <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-400/70">
+                                                AI Insight Summary
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-200 leading-relaxed text-sm md:text-base font-medium whitespace-pre-wrap">
+                                            {aiSummary}
+                                        </p>
+                                    </div>
+                                </div>
+                                <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-500/10 blur-[100px] rounded-full hidden sm:block" />
+                            </div>
+                        </motion.div>
+                    </div>
+                )}
+
                 <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
                     {/* News Stream Grid */}
                     <div className={`
@@ -691,7 +893,7 @@ const TodayNews = () => {
 
                     </div>
 
-                    {!isStreaming && nextCursor && (
+                    {!isStreaming && nextCursor && !aiFilteredIds && (
                         <div className="flex justify-center mt-10 mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
                             <button
                                 onClick={() => startAnalysisStream(nextCursor)}
