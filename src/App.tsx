@@ -13,7 +13,7 @@ import RealtimeSearch from './pages/RealtimeSearch';
 import TodayNews from './pages/TodayNews';
 import LandingPage from './pages/LandingPage';
 import PublicRoute from './components/auth/PublicRoute';
-import { Analytics } from "@vercel/analytics/next"
+import { Analytics } from "@vercel/analytics/react"
 
 function App() {
   return (

@@ -454,6 +454,7 @@ const TodayNews = () => {
         };
 
         try {
+            // refactor to use api/news.ts pattern axios
             const response = await fetch(`${import.meta.env.VITE_API_URL}/news/filter`, {
                 method: 'POST',
                 headers: {
@@ -654,7 +655,7 @@ const TodayNews = () => {
                                                         <LuSparkles className="text-blue-400" />
                                                         AI Filter
                                                     </h3>
-                                                    <button 
+                                                    <button
                                                         onClick={() => setIsAIFilterOpen(false)}
                                                         className="p-2 hover:bg-white/10 rounded-full transition-colors group"
                                                     >
@@ -916,7 +917,7 @@ const TodayNews = () => {
                                 <LuSparkles className="text-5xl mb-4 text-blue-500/30" />
                                 <h3 className="text-lg font-bold">ไม่พบข่าวที่ตรงกับการคัดกรอง</h3>
                                 <p className="text-sm opacity-60 mt-1">ลองเปลี่ยนคำสั่งใหม่ หรือเช็คจำนวนข่าวทั้งหมด</p>
-                                <button 
+                                <button
                                     onClick={() => {
                                         setAiFilteredIds(null);
                                         setAiSummary(null);
