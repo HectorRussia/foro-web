@@ -10,7 +10,8 @@ import {
     HiOutlineCalendarDays,
     HiOutlineTrash,
     HiOutlineArrowPath,
-    HiOutlineFunnel
+    HiOutlineFunnel,
+    HiOutlineXMark
 } from "react-icons/hi2";
 import { RiLoader4Line } from "react-icons/ri";
 import { LuLayoutDashboard, LuSparkles } from "react-icons/lu";
@@ -466,8 +467,8 @@ const TodayNews = () => {
 
             if (data.filtered_news) {
                 setAiSummary(data.summary || null);
-                // Map IDs/TweetIDs to track matches
-                const ids = data.filtered_news.map((item: any) => item.id || item.tweet_id);
+                // Map IDs/TweetIDs to track matches - Use strings to avoid precision issues
+                const ids = data.filtered_news.map((item: any) => String(item.tweet_id || item.id));
                 setAiFilteredIds(ids);
                 toast.success('คัดกรองข้อมูลสำเร็จ');
             } else {
@@ -484,7 +485,7 @@ const TodayNews = () => {
 
     const handleClear = async () => {
         try {
-            const newsIds = newsResults.map(item => item.id);
+            const newsIds = newsResults.map(item => Number(item.id));
             await updateTriggerStatus(0, newsIds);
             if (newsResults.length > 0) {
                 setBackupResults(newsResults);
@@ -516,7 +517,7 @@ const TodayNews = () => {
     };
 
     const mapToNewsItem = (res: NewsResult): NewsItem => ({
-        id: res.id,
+        id: typeof res.id === 'string' ? parseInt(res.id) || 0 : res.id,
         title: res.title,
         content: typeof res.content === 'string' ? res.content : JSON.stringify(res.content),
         url: res.url,
@@ -569,7 +570,11 @@ const TodayNews = () => {
 
         // Apply AI Filter if active
         if (aiFilteredIds) {
-            return sorted.filter(item => aiFilteredIds.includes(item.id) || (item.tweet_id && aiFilteredIds.includes(item.tweet_id)));
+            return sorted.filter(item => {
+                const itemIdStr = String(item.id);
+                const tweetIdStr = item.tweet_id ? String(item.tweet_id) : null;
+                return aiFilteredIds.includes(itemIdStr) || (tweetIdStr && aiFilteredIds.includes(tweetIdStr));
+            });
         }
 
         return sorted;
@@ -628,52 +633,82 @@ const TodayNews = () => {
 
                             <AnimatePresence>
                                 {isAIFilterOpen && (
-                                    <motion.div
-                                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                        className="absolute right-0 md:left-0 top-full mt-4 w-[280px] sm:w-72 md:w-80 p-4 md:p-5 bg-[#1a2c3e]/95 backdrop-blur-2xl border border-white/10 rounded-3xl md:rounded-4xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-70"
-                                    >
-                                        <div className="space-y-4">
-                                            <div className="bg-[#0f1a26] border border-white/5 rounded-2xl p-4">
-                                                <p className="text-sm font-medium text-gray-300 leading-relaxed text-center">
-                                                    พิมพ์บอก AI ว่าอยากได้แนวไหน AI จะคัดกรองเฉพาะทวีตที่เกี่ยวข้องมาให้จากทั้งหมด {newsResults.length} โพส
-                                                </p>
-                                            </div>
+                                    <>
+                                        {/* Mobile Backdrop */}
+                                        <motion.div
+                                            initial={{ opacity: 0 }}
+                                            animate={{ opacity: 1 }}
+                                            exit={{ opacity: 0 }}
+                                            onClick={() => setIsAIFilterOpen(false)}
+                                            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-60 md:hidden"
+                                        />
+                                        <motion.div
+                                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            className="fixed md:absolute left-4 right-4 md:left-0 md:right-auto top-1/2 md:top-full -translate-y-1/2 md:translate-y-0 md:mt-4 md:w-80 p-4 md:p-5 bg-[#1a2c3e]/95 backdrop-blur-2xl border border-white/10 rounded-3xl md:rounded-4xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-70"
+                                        >
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between md:hidden mb-2">
+                                                    <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                                                        <LuSparkles className="text-blue-400" />
+                                                        AI Filter
+                                                    </h3>
+                                                    <button 
+                                                        onClick={() => setIsAIFilterOpen(false)}
+                                                        className="p-2 hover:bg-white/10 rounded-full transition-colors group"
+                                                    >
+                                                        <HiOutlineXMark className="text-xl text-gray-400 group-hover:text-white transition-colors" />
+                                                    </button>
+                                                </div>
 
-                                            <textarea
-                                                value={aiPrompt}
-                                                onChange={(e) => setAiPrompt(e.target.value)}
-                                                placeholder="เช่น: สรุปคนดราม่าเรื่องอะไรกัน หรือ หาข่าวที่มีแนวโน้มบวก..."
-                                                className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none placeholder:text-gray-600"
-                                            />
+                                                <div className="bg-[#0f1a26] border border-white/5 rounded-2xl p-4">
+                                                    <p className="text-sm font-medium text-gray-300 leading-relaxed text-center">
+                                                        พิมพ์บอก AI ว่าอยากได้แนวไหน AI จะคัดกรองเฉพาะทวีตที่เกี่ยวข้องมาให้จากทั้งหมด {newsResults.length} โพส
+                                                    </p>
+                                                </div>
 
-                                            <div className="flex justify-end pt-2">
-                                                <button
-                                                    onClick={handleAIFilter}
-                                                    disabled={isAIProcessing || newsResults.length === 0}
-                                                    className={`
-                                                        px-6 py-2.5 rounded-xl font-bold transition-all transform active:scale-95 flex items-center gap-2
-                                                        ${isAIProcessing || newsResults.length === 0
-                                                            ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
-                                                            : 'bg-[#ff00ff] text-white hover:bg-[#ff00ff]/80 shadow-[0_0_15px_rgba(255,0,255,0.4)] hover:shadow-[0_0_25px_rgba(255,0,255,0.6)]'}
-                                                    `}
-                                                >
-                                                    {isAIProcessing ? (
-                                                        <>
-                                                            <RiLoader4Line className="animate-spin text-lg" />
-                                                            <span>ส่งข้อมูล...</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <HiOutlineFunnel className="text-lg" />
-                                                            <span>filter</span>
-                                                        </>
-                                                    )}
-                                                </button>
+                                                <textarea
+                                                    autoFocus
+                                                    value={aiPrompt}
+                                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                                    placeholder="เช่น: สรุปคนดราม่าเรื่องอะไรกัน หรือ หาข่าวที่มีแนวโน้มบวก..."
+                                                    className="w-full h-32 bg-black/30 border border-white/10 rounded-xl p-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/50 transition-all resize-none placeholder:text-gray-600"
+                                                />
+
+                                                <div className="flex items-center gap-3 pt-2">
+                                                    <button
+                                                        onClick={() => setIsAIFilterOpen(false)}
+                                                        className="flex-1 px-4 py-2.5 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-all text-sm"
+                                                    >
+                                                        ยกเลิก
+                                                    </button>
+                                                    <button
+                                                        onClick={handleAIFilter}
+                                                        disabled={isAIProcessing || newsResults.length === 0}
+                                                        className={`
+                                                            flex-2 px-6 py-2.5 rounded-xl font-bold transition-all transform active:scale-95 flex items-center justify-center gap-2
+                                                            ${isAIProcessing || newsResults.length === 0
+                                                                ? 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                                                                : 'bg-[#ff00ff] text-white hover:bg-[#ff00ff]/80 shadow-[0_0_15px_rgba(255,0,255,0.4)] hover:shadow-[0_0_25px_rgba(255,0,255,0.6)]'}
+                                                        `}
+                                                    >
+                                                        {isAIProcessing ? (
+                                                            <>
+                                                                <RiLoader4Line className="animate-spin text-lg" />
+                                                                <span>ส่งข้อมูล...</span>
+                                                            </>
+                                                        ) : (
+                                                            <>
+                                                                <HiOutlineFunnel className="text-lg" />
+                                                                <span>filter</span>
+                                                            </>
+                                                        )}
+                                                    </button>
+                                                </div>
                                             </div>
-                                        </div>
-                                    </motion.div>
+                                        </motion.div>
+                                    </>
                                 )}
                             </AnimatePresence>
                         </div>
@@ -875,6 +910,22 @@ const TodayNews = () => {
                                 <HiOutlineCalendarDays className="text-6xl mb-6 opacity-10" />
                                 <h3 className="text-xl font-bold text-gray-400">ยังไม่มีข้อมูลข่าววันนี้</h3>
                                 <p className="text-sm mt-2 max-w-md">กดปุ่ม "เริ่มรับข้อมูล" เพื่อเริ่มวิเคราะห์ข่าวสารล่าสุดของวันนี้</p>
+                            </div>
+                        ) : aiFilteredIds && displayNews.length === 0 ? (
+                            <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white/5 rounded-[40px] border border-white/10 text-gray-400 text-center animate-in fade-in">
+                                <LuSparkles className="text-5xl mb-4 text-blue-500/30" />
+                                <h3 className="text-lg font-bold">ไม่พบข่าวที่ตรงกับการคัดกรอง</h3>
+                                <p className="text-sm opacity-60 mt-1">ลองเปลี่ยนคำสั่งใหม่ หรือเช็คจำนวนข่าวทั้งหมด</p>
+                                <button 
+                                    onClick={() => {
+                                        setAiFilteredIds(null);
+                                        setAiSummary(null);
+                                        setAiPrompt('');
+                                    }}
+                                    className="mt-6 px-6 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold transition-all"
+                                >
+                                    ล้างการคัดกรอง
+                                </button>
                             </div>
                         ) : (
                             displayNews.map((res) => (

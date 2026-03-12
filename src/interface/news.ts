@@ -31,7 +31,7 @@ export interface NewsAnalysisResponse {
 }
 
 export interface NewsResult {
-    id: number;
+    id: string | number;
     title: string;
     content: any;
     source: string;
