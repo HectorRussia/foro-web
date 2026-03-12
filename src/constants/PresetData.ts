@@ -11,13 +11,6 @@ export const PRESET_DATA: Record<string, PresetUser[]> = {
             profile_image: "https://unavatar.io/x/MKBHD"
         },
         {
-            name: "Benedict Evans",
-            x_account: "benedictevans",
-            reason: "นักวิเคราะห์เทคโนโลยีเชิงมหภาค วิเคราะห์ภาพรวมอุตสาหกรรม ซอฟต์แวร์ และโมเดลธุรกิจของ Big Tech ด้วยข้อมูลสถิติเชิงลึก",
-            followers: "400K", following: "1.2K", posts: "45K",
-            profile_image: "https://unavatar.io/x/benedictevans"
-        },
-        {
             name: "Casey Newton",
             x_account: "CaseyNewton",
             reason: "ผู้ก่อตั้ง Platformer เจาะลึกข่าววงในของบริษัทโซเชีลมีเดีย นโยบายแพลตฟอร์ม และผลกระทบของเทคโนโลยีต่อสังคม",
@@ -677,13 +670,6 @@ export const PRESET_DATA: Record<string, PresetUser[]> = {
             profile_image: "https://unavatar.io/x/michaelbatnick"
         },
         {
-            name: "Josh Brown",
-            x_account: "ReformedBroker",
-            reason: "CEO ของ Ritholtz Wealth Management วิเคราะห์ข่าวตลาดหุ้น ทิศทางกองทุน และให้คำแนะนำการลงทุนแบบเป็นกันเอง",
-            followers: "1.1M", following: "2.5K", posts: "80K",
-            profile_image: "https://unavatar.io/x/ReformedBroker"
-        },
-        {
             name: "Charlie Bilello",
             x_account: "charliebilello",
             reason: "เจ้าพ่อข้อมูลสถิติตลาดทุน แชร์กราฟและตัวเลขเศรษฐกิจ (เงินเฟ้อ, ดอกเบี้ย, ผลตอบแทนหุ้น) แบบอัปเดตรายวัน",
@@ -1103,13 +1089,6 @@ export const PRESET_DATA: Record<string, PresetUser[]> = {
             profile_image: "https://unavatar.io/x/JohnnyFDK"
         },
         {
-            name: "Cal Newport",
-            x_account: "calnewport",
-            reason: "ศาสตราจารย์ผู้เขียน Deep Work สอนเทคนิค Digital Minimalism การถอดปลั๊กจากโซเชีลมีเดีย เพื่อใช้ชีวิตและทำงานอย่างมีสมาธิ",
-            followers: "50K", following: "10", posts: "1K",
-            profile_image: "https://unavatar.io/x/calnewport"
-        },
-        {
             name: "Gretchen Rubin",
             x_account: "gretchenrubin",
             reason: "ผู้เชี่ยวชาญด้านความสุข (Happiness Project) วิเคราะห์ธรรมชาติของมนุษย์ และเทคนิคการสร้างนิสัยที่ทำให้ชีวิตมีความสุขขึ้นง่ายๆ",
@@ -1478,13 +1457,6 @@ export const PRESET_DATA: Record<string, PresetUser[]> = {
             reason: "ผู้ก่อตั้ง Khan Academy อัปเดตเทรนด์การศึกษาแห่งอนาคต การใช้ AI เป็นติวเตอร์ส่วนตัว (Khanmigo) เพื่อลดความเหลื่อมล้ำทางการศึกษา",
             followers: "280K", following: "400", posts: "8K",
             profile_image: "https://unavatar.io/x/salkhanacademy"
-        },
-        {
-            name: "Scott Galloway",
-            x_account: "profgalloway",
-            reason: "ศาสตราจารย์จาก NYU วิเคราะห์และวิจารณ์โครงสร้างมหาวิทยาลัยราคาแพง พร้อมให้คำแนะนำด้านอาชีพที่ดิบเถื่อนแต่จริงใจสำหรับคนรุ่นใหม่",
-            followers: "550K", following: "1.1K", posts: "25K",
-            profile_image: "https://unavatar.io/x/profgalloway"
         },
         {
             name: "Seth Godin",
