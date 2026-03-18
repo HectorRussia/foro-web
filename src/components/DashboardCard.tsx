@@ -83,7 +83,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                         }
                     </div>
                     <div className="min-w-0">
-                        <h3 className={`font-semibold text-white leading-tight wrap-break-word pr-2 ${isCompact ? 'text-base' : 'text-lg'}`}>
+                        <h3 className={`font-bold text-white leading-tight wrap-break-word pr-2 ${isCompact ? 'text-base' : (isGrid ? 'text-base lg:text-lg' : 'text-lg')}`}>
                             {post.title}
                         </h3>
                         {!isCompact && (post.tweet_created_at || post.created_at) && (
@@ -191,7 +191,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
             </div>
 
             {/* Interaction Stats */}
-            <div className={`flex items-center gap-4 mb-4 text-xs font-medium text-gray-500/80 ${isCompact ? 'px-1' : ''}`}>
+            <div className={`flex items-center ${isGrid ? 'gap-2 md:gap-3' : 'gap-4'} mb-4 text-[11px] md:text-xs font-medium text-gray-500/80 ${isCompact ? 'px-1' : ''}`}>
                 <div className="flex items-center gap-1.5 hover:text-rose-400 transition-colors cursor-default group/stat">
                     <AiOutlineLike className="text-[14px]" />
                     <span>{post.like_count?.toLocaleString() || 0}</span>
@@ -226,7 +226,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                         ${isCompact ? 'py-1.5 text-xs' : 'py-2.5 text-sm'}
                     `}>
                         {iconsDash[1].icon}
-                        <span className={isGrid ? 'md:hidden lg:inline' : ''}>ดูโพสต์</span>
+                        <span className={isGrid ? 'hidden 2xl:inline' : 'inline'}>ดูโพสต์</span>
                     </button>
                 </a>
                 <button
@@ -238,7 +238,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     {copied ? <FaCheck className="text-green-500" /> : iconsDash[2].icon}
                     {copied ?
                         <span className="text-green-500">คัดลอก</span>
-                        : <span className={isGrid ? 'md:hidden lg:inline' : ''}>แชร์ลิ้งค์</span>
+                        : <span className={isGrid ? 'hidden 2xl:inline' : 'inline'}>แชร์ลิ้งค์</span>
                     }
                 </button>
             </div>

@@ -14,6 +14,7 @@ import TodayNews from './pages/TodayNews';
 import LandingPage from './pages/LandingPage';
 import PublicRoute from './components/auth/PublicRoute';
 import { Analytics } from "@vercel/analytics/react"
+import PostListPage from './pages/PostListPage';
 
 function App() {
   return (
@@ -31,6 +32,7 @@ function App() {
         {/* Protected Routes*/}
         <Route element={<ProtectedRoute />}>
           <Route path="/today-news" element={<TodayNews />} />
+          <Route path="/post-list" element={<PostListPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/user-target" element={<UserTarget />} />
           <Route path="/user-following" element={<UserFollow />} />

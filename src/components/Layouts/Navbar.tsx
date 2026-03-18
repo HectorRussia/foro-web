@@ -5,9 +5,12 @@ import { RiUserFollowFill, /* RiBaseStationLine  */ } from 'react-icons/ri';
 import { BiCategory } from "react-icons/bi";
 // import { TbAlpha } from "react-icons/tb";
 import { FaReadme } from "react-icons/fa";
+import { IoMdListBox } from "react-icons/io";
+
 const iconsNav = [
     // { id: 7, icon: <RiBaseStationLine />, label: "หน้าแรก", path: "/realtime-search", requiredRole: "king" },
-    { id: 9, icon: <HiOutlineCalendarDays />, label: "ข่าววันนี้", path: "/today-news", requiredRole: ["king", "queen"] },
+    { id: 9, icon: <HiOutlineCalendarDays />, label: "ข่าววันนี้", path: "/today-news", requiredRole: ["king", "queen", "user"] },
+    { id: 10, icon: <IoMdListBox />, label: "PostList", path: "/post-list", mobileOnly: true },
     { id: 1, icon: <FaReadme />, label: "อ่านข่าว", path: "/dashboard" },
     { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
     { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
@@ -21,10 +24,11 @@ interface NavbarProp {
     label: string,
     active?: boolean,
     path: string,
-    requiredRole?: string | string[]
+    requiredRole?: string | string[],
+    mobileOnly?: boolean
 }
 
-const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => {
+const NavbarStruct = ({ id, icon, label, active = false, path, mobileOnly }: NavbarProp) => {
     const navigate = useNavigate()
     const { logout } = useAuth();
     const pathNave = async (path: string) => {
@@ -42,7 +46,7 @@ const NavbarStruct = ({ id, icon, label, active = false, path }: NavbarProp) => 
                 ${active
                     ? 'bg-blue-600/10 text-blue-400'
                     : 'text-gray-400 hover:bg-[#1e293b] hover:text-gray-100'
-                }`
+                } ${mobileOnly ? 'xl:hidden' : ''}`
             }>
             <div className={`${active ? 'text-blue-400' : 'text-gray-400 group-hover:text-gray-200'} text-xl`}>
                 {icon}
@@ -80,6 +84,7 @@ const Navbar = () => {
                     active={location.pathname === item.path}
                     path={item.path}
                     requiredRole={item.requiredRole}
+                    mobileOnly={(item as any).mobileOnly}
                 />
             ))}
         </nav>

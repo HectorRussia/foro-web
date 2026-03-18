@@ -71,7 +71,7 @@ const Sidebar = () => {
                     )}
                 </AnimatePresence>
 
-                <div 
+                <div
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                     className={`flex items-center gap-4 p-3 rounded-xl cursor-pointer transition-all duration-200 ${isProfileOpen ? 'bg-[#1e293b] ring-1 ring-blue-500/50' : 'hover:bg-[#1e293b]'}`}
                 >
