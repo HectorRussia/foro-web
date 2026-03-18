@@ -584,7 +584,7 @@ const TodayNews = () => {
     const displayNews = getFilteredNews();
 
     return (
-        <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100 overflow-hidden">
+        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100 overflow-hidden">
             <Sidebar />
             <main className="flex-1 ml-20 lg:ml-80 p-3 md:p-6 flex flex-col h-screen overflow-hidden">
 

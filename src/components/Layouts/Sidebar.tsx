@@ -33,7 +33,7 @@ const Sidebar = () => {
     };
 
     return (
-        <aside className="w-20 lg:w-80 shrink-0 bg-[#020a11] border-r border-[#1e293b] flex flex-col items-center lg:items-stretch py-6 px-2 lg:px-4 fixed h-full z-20">
+        <aside className="w-20 lg:w-80 shrink-0 bg-[#080809] border-r border-white/5 flex flex-col items-center lg:items-stretch py-6 px-2 lg:px-4 fixed h-full z-20">
             {/* Logo Area */}
             <div className="mb-8 flex justify-center lg:justify-start px-2">
                 <img

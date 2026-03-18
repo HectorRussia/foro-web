@@ -77,7 +77,7 @@ export const UserFollow = () => {
     }, []);
 
     return (
-        <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100">
+        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100">
             <Sidebar />
             <div className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto relative">
                 <header className="mb-6 animate-fade-in-down">

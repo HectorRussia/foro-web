@@ -137,7 +137,7 @@ const UserTarget = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100 overflow-x-hidden">
+        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
             <div className="flex-1 ml-16 md:ml-20 lg:ml-80 p-3 md:p-6 lg:p-8 min-w-0">
 
