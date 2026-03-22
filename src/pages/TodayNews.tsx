@@ -562,21 +562,21 @@ const TodayNews = () => {
                 <main className="flex-1 p-4 md:p-8 flex flex-col h-screen overflow-hidden">
                     {/* Header Section */}
                     <header className="shrink-0 mb-6">
-                        <div className="flex items-center justify-between mb-6">
+                        <div className="flex items-center justify-between mb-4 md:mb-6">
                             <div className="flex flex-col">
-                                <span className="text-xs font-medium text-gray-500 mb-1 uppercase tracking-wider">รายการที่ติดตาม</span>
-                                <h1 className="text-3xl md:text-4xl font-extrabold text-white tracking-tight">หน้าหลัก</h1>
+                                <span className="text-[10px] md:text-xs font-medium text-gray-500 mb-0.5 md:mb-1 uppercase tracking-wider">รายการที่ติดตาม</span>
+                                <h1 className="text-2xl md:text-4xl font-extrabold text-white tracking-tight">หน้าหลัก</h1>
                             </div>
 
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 md:gap-3">
                                 {/* Clear & Restore */}
-                                <div className="flex items-center gap-1.5 p-1 bg-white/3 border border-white/5 rounded-xl">
+                                <div className="flex items-center gap-1 md:gap-1.5 p-0.5 md:p-1 bg-white/3 border border-white/5 rounded-xl">
                                     <button
                                         onClick={handleClear}
-                                        className="p-2 text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
+                                        className="p-1.5 md:p-2 text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
                                         title="ล้างข้อมูล"
                                     >
-                                        <HiOutlineTrash className="text-lg" />
+                                        <HiOutlineTrash className="text-base md:text-lg" />
                                     </button>
                                     {isRestorable && (
                                         <button
@@ -593,12 +593,12 @@ const TodayNews = () => {
                                 <div className="relative" ref={aiFilterRef}>
                                     <button
                                         onClick={() => setIsAIFilterOpen(!isAIFilterOpen)}
-                                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold border transition-all ${isAIFilterOpen
+                                        className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-xl font-bold border transition-all ${isAIFilterOpen
                                             ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
                                             : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`}
                                     >
-                                        <LuSparkles className={isAIFilterOpen ? 'animate-pulse' : 'text-blue-400'} />
-                                        <span className="text-xs">AI Filter</span>
+                                        <LuSparkles className={`text-base ${isAIFilterOpen ? 'animate-pulse' : 'text-blue-400'}`} />
+                                        <span className="text-[10px] md:text-xs">AI Filter</span>
                                     </button>
                                 </div>
 
@@ -607,14 +607,15 @@ const TodayNews = () => {
                                     <button
                                         onClick={() => startAnalysisStream()}
                                         disabled={hasStarted || newsResults.length > 0}
-                                        className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all shadow-lg active:scale-95
+                                        className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-full font-bold transition-all shadow-lg active:scale-95
                                             ${hasStarted || newsResults.length > 0
                                                 ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
                                                 : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/20'
                                             }`}
                                     >
-                                        <LuRefreshCw className={`text-lg ${isStreaming ? 'animate-spin' : ''}`} />
-                                        <span className="text-sm">ซิงค์ข้อมูล</span>
+                                        <LuRefreshCw className={`text-base md:text-lg ${isStreaming ? 'animate-spin' : ''}`} />
+                                        <span className="text-[10px] md:text-sm hidden sm:inline">ซิงค์ข้อมูล</span>
+                                        <span className="text-[10px] md:text-sm sm:hidden">ซิงค์</span>
                                     </button>
                                 ) : (
                                     <div className="flex items-center gap-2">
@@ -634,13 +635,13 @@ const TodayNews = () => {
                         </div>
 
                         {/* Sort & Status Row */}
-                        <div className="flex flex-wrap items-center justify-between gap-4">
-                            <div className="flex items-center gap-3">
-                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">เรียงตาม:</span>
-                                <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center justify-between gap-3 md:gap-4">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <span className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest hidden xs:block">เรียงตาม:</span>
+                                <div className="flex items-center gap-1.5 md:gap-2">
                                     <button
                                         onClick={() => toggleFilter('mostView')}
-                                        className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeFilters.includes('mostView')
+                                        className={`px-3 md:px-6 py-1.5 md:py-2 rounded-full text-[10px] md:text-xs font-bold transition-all ${activeFilters.includes('mostView')
                                             ? 'bg-white text-black'
                                             : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'}`}
                                     >
@@ -648,7 +649,7 @@ const TodayNews = () => {
                                     </button>
                                     <button
                                         onClick={() => toggleFilter('mostLiked')}
-                                        className={`px-6 py-2 rounded-full text-xs font-bold transition-all ${activeFilters.includes('mostLiked')
+                                        className={`px-3 md:px-6 py-1.5 md:py-2 rounded-full text-[10px] md:text-xs font-bold transition-all ${activeFilters.includes('mostLiked')
                                             ? 'bg-white text-black'
                                             : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'}`}
                                     >
@@ -734,8 +735,8 @@ const TodayNews = () => {
                                 animate={{ opacity: 1, y: 0 }}
                                 className="relative overflow-hidden group"
                             >
-                                <div className="absolute inset-0 bg-blue-600/5 backdrop-blur-3xl" />
-                                <div className="relative p-4 md:p-6 bg-blue-500/10 border border-blue-500/20 rounded-3xl md:rounded-[2.5rem] shadow-2xl shadow-blue-500/5">
+                                <div className="absolute inset-0 backdrop-blur-3xl" />
+                                <div className="relative p-4 md:p-6 border border-blue-500/20 rounded-3xl md:rounded-[2.5rem] shadow-2xl shadow-blue-500/5">
                                     <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 md:gap-5 text-center sm:text-left">
                                         <div className="shrink-0 p-2.5 md:p-3.5 bg-blue-500/20 rounded-xl md:rounded-[1.25rem] shadow-inner">
                                             <LuSparkles className="text-blue-400 text-xl md:text-2xl animate-pulse" />
@@ -745,7 +746,7 @@ const TodayNews = () => {
                                                 <h3 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-linear-to-r from-blue-400 to-cyan-400 tracking-tight">
                                                     บทสรุปจาก AI
                                                 </h3>
-                                                <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-400/70">
+                                                <span className="px-3 py-1 rounded-full border border-blue-500/20 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-400/70">
                                                     AI Insight Summary
                                                 </span>
                                             </div>
@@ -754,7 +755,7 @@ const TodayNews = () => {
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-blue-500/10 blur-[100px] rounded-full hidden sm:block" />
+                                    <div className="absolute -bottom-24 -right-24 w-48 h-48 blur-[100px] rounded-full hidden sm:block" />
                                 </div>
                             </motion.div>
                         </div>

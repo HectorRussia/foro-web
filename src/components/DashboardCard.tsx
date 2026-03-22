@@ -57,8 +57,8 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
     };
 
     return (
-        <div className={`group bg-[#16181c]/60 backdrop-blur-2xl border border-white/5 rounded-[2.5rem] transition-all duration-300 hover:bg-white/4 hover:shadow-2xl shadow-black/40 flex flex-col relative
-            ${isCompact ? 'p-5' : 'p-7'}
+        <div className={`group bg-[#16181c]/60 backdrop-blur-2xl border border-white/5 rounded-3xl md:rounded-[2.5rem] transition-all duration-300 hover:bg-white/4 hover:shadow-2xl shadow-black/40 flex flex-col relative
+            ${isCompact ? 'p-4 md:p-5' : 'p-5 md:p-7'}
             ${isGrid ? 'h-full' : ''}
         `}>
             {/* Header */}
@@ -88,10 +88,10 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                 </div>
 
                 {/* Header Actions */}
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-0.5 sm:gap-1">
                     {/* Time Bubble */}
-                    <div className="px-3.5 py-1.5 bg-white/5 border border-white/5 rounded-2xl text-gray-400 text-[13px] font-black mr-1 uppercase">
-                        {dayjs(post.tweet_created_at || post.created_at).isSame(dayjs(), 'day')
+                    <div className="px-2.5 sm:px-3.5 py-1.5 bg-white/5 border border-white/5 rounded-2xl text-gray-400 text-[11px] sm:text-[13px] font-black mr-0.5 sm:mr-1 uppercase">
+                        {dayjs(post.tweet_created_at || post.created_at).isSame(dayjs(), 'day') 
                             ? dayjs(post.tweet_created_at || post.created_at).fromNow(true)
                                 .replace('วินาที', 's').replace('นาที', 'm').replace('ชั่วโมง', 'h').replace('วัน', 'd').replace('เดือน', 'mo').replace('ปี', 'y').replace(/\s+/g, '')
                             : dayjs(post.tweet_created_at || post.created_at).format('D MMM')}
@@ -101,9 +101,9 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     <div className="relative" ref={menuRef}>
                         <button
                             onClick={() => setShowMenu(!showMenu)}
-                            className="p-2.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-full transition-all"
+                            className="p-1.5 sm:p-2.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-full transition-all"
                         >
-                            <IoIosMore className="text-2xl" />
+                            <IoIosMore className="text-xl sm:text-2xl" />
                         </button>
 
                         {showMenu && (
@@ -180,21 +180,21 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
             <div className="h-px w-full bg-white/5 mb-5 shrink-0" />
 
             {/* Stats Footer (Matches image layout) */}
-            <div className="flex items-center gap-6 text-[13px] font-bold text-gray-500/80 px-1 shrink-0">
-                <div className="flex items-center gap-1.5 group/stat hover:text-blue-400 transition-colors cursor-default">
-                    <HiOutlineChartBar className="text-[19px] opacity-70" />
+            <div className="flex items-center gap-4 sm:gap-6 text-[12px] sm:text-[13px] font-bold text-gray-500/80 px-1 shrink-0 overflow-x-auto scrollbar-hide">
+                <div className="flex items-center gap-1 group/stat hover:text-blue-400 transition-colors cursor-default whitespace-nowrap">
+                    <HiOutlineChartBar className="text-[17px] sm:text-[19px] opacity-70" />
                     <span className="font-black">{formatNumber(post.view_count)}</span>
                 </div>
-                <div className="flex items-center gap-1.5 group/stat hover:text-rose-400 transition-colors cursor-default">
-                    <HiOutlineHeart className="text-[19px] opacity-70" />
+                <div className="flex items-center gap-1 group/stat hover:text-rose-400 transition-colors cursor-default whitespace-nowrap">
+                    <HiOutlineHeart className="text-[17px] sm:text-[19px] opacity-70" />
                     <span className="font-black">{formatNumber(post.like_count)}</span>
                 </div>
-                <div className="flex items-center gap-1.5 group/stat hover:text-emerald-400 transition-colors cursor-default">
-                    <HiOutlineArrowPathRoundedSquare className="text-[19px] opacity-70" />
+                <div className="flex items-center gap-1 group/stat hover:text-emerald-400 transition-colors cursor-default whitespace-nowrap">
+                    <HiOutlineArrowPathRoundedSquare className="text-[17px] sm:text-[19px] opacity-70" />
                     <span className="font-black">{formatNumber(post.retweet_count)}</span>
                 </div>
-                <div className="flex items-center gap-1.5 group/stat hover:text-cyan-400 transition-colors cursor-default">
-                    <HiOutlineChatBubbleLeft className="text-[19px] opacity-70" />
+                <div className="flex items-center gap-1 group/stat hover:text-cyan-400 transition-colors cursor-default whitespace-nowrap">
+                    <HiOutlineChatBubbleLeft className="text-[17px] sm:text-[19px] opacity-70" />
                     <span className="font-black">{formatNumber(post.reply_count)}</span>
                 </div>
             </div>
