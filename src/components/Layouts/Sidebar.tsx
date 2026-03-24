@@ -33,9 +33,9 @@ const Sidebar = () => {
     };
 
     return (
-        <aside className="w-20 lg:w-80 shrink-0 bg-[#080809] border-r border-white/5 flex flex-col items-center lg:items-stretch py-6 px-2 lg:px-4 fixed h-full z-20">
+        <aside className="w-20 lg:w-60 shrink-0 bg-[#080809] border-r border-white/5 flex flex-col items-center lg:items-stretch py-6 px-2 lg:px-4 fixed h-full z-20">
             {/* Logo Area */}
-            <div className="mb-8 flex justify-center lg:justify-start px-2">
+            <div className="mb-8 flex justify-center lg:justify-start px-2 shrink-0">
                 <img
                     src="/images/LOGO-FORO/FORO_TP_W.png"
                     alt="Foro Logo"
@@ -43,10 +43,12 @@ const Sidebar = () => {
                 />
             </div>
 
-            <Navbar />
+            <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide flex flex-col">
+                <Navbar />
+            </div>
 
             {/* User Profile (Bottom) */}
-            <div className="mt-auto px-2 py-4 relative" ref={dropdownRef}>
+            <div className="mt-auto px-2 py-4 relative shrink-0" ref={dropdownRef}>
                 <AnimatePresence>
                     {isProfileOpen && (
                         <motion.div
@@ -84,8 +86,13 @@ const Sidebar = () => {
                     </div>
                 </div>
             </div>
+            
+            <style>{`
+                .scrollbar-hide::-webkit-scrollbar { display: none; }
+                .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
         </aside>
     )
 }
 
-export default Sidebar
+export default Sidebar;

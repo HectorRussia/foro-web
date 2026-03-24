@@ -178,7 +178,7 @@ const Main = () => {
 
 
     return (
-        <main ref={mainRef} className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
+        <main ref={mainRef} className="flex-1 p-4 lg:p-6 overflow-y-auto">
             {/* Header */}
             <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                 <div>
@@ -275,7 +275,7 @@ const Main = () => {
             {/* Cards Grid */}
             <div className={`
                 ${layoutMode === 'grid'
-                    ? 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4'
+                    ? 'grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 lg:gap-6'
                     : layoutMode === 'compact'
                         ? 'flex flex-col space-y-2'
                         : 'flex flex-col space-y-4'

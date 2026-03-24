@@ -558,7 +558,7 @@ const TodayNews = () => {
         <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100 overflow-hidden">
             <Sidebar />
 
-            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-80">
+            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
                 <main className="flex-1 p-4 md:p-8 flex flex-col h-screen overflow-hidden">
                     {/* Header Section */}
                     <header className="shrink-0 mb-6">
@@ -703,7 +703,7 @@ const TodayNews = () => {
                                             <button
                                                 onClick={handleAIFilter}
                                                 disabled={isAIProcessing || newsResults.length === 0}
-                                                className="flex-1 py-3 rounded-2xl text-xs font-bold bg-[#ff00ff] text-white hover:bg-[#ff00ff]/80 transition-all shadow-lg shadow-[#ff00ff]/20"
+                                                className="flex-1 py-3 rounded-2xl text-xs font-bold bg-linear-to-r from-blue-600 to-cyan-600  text-white hover:blue-500/80 transition-all shadow-lg shadow-[#ff00ff]/20"
                                             >
                                                 {isAIProcessing ? 'กำลังวิเคราะห์...' : 'เริ่มคัดกรอง'}
                                             </button>

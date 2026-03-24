@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import Sidebar from '../components/Layouts/Sidebar';
+import PostList from '../components/PostList';
 import DashboardCard from '../components/DashboardCard';
 import SkeletonCard from '../components/SkeletonCard';
 import {
@@ -265,10 +266,11 @@ const RealtimeSearch = () => {
     });
 
     return (
-        <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100 overflow-hidden">
+        <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
 
-            <main className="flex-1 ml-20 lg:ml-80 p-6 flex flex-col h-screen overflow-hidden">
+            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
+                <main className="flex-1 p-6 flex flex-col h-screen overflow-hidden">
 
                 {/* Header Section */}
                 <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8 shrink-0">
@@ -463,7 +465,11 @@ const RealtimeSearch = () => {
                         </div>
                     </div>
                 )}
-            </main>
+                </main>
+                <div className="hidden xl:block">
+                    <PostList />
+                </div>
+            </div>
 
             <style>{`
                 .scrollbar-hide::-webkit-scrollbar { display: none; }

@@ -57,53 +57,53 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
     };
 
     return (
-        <div className={`group bg-[#16181c]/60 backdrop-blur-2xl border border-white/5 rounded-3xl md:rounded-[2.5rem] transition-all duration-300 hover:bg-white/4 hover:shadow-2xl shadow-black/40 flex flex-col relative
-            ${isCompact ? 'p-4 md:p-5' : 'p-5 md:p-7'}
+        <div className={`group bg-[#16181c]/60 backdrop-blur-2xl border border-white/5 rounded-4xl transition-all duration-300 hover:bg-white/4 hover:shadow-2xl shadow-black/40 flex flex-col relative
+            ${isCompact ? 'p-4 md:p-5' : 'p-5 md:p-6'}
             ${isGrid ? 'h-full' : ''}
         `}>
             {/* Header */}
             <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-3.5">
+                <div className="flex items-center gap-3 min-w-0">
                     {/* Avatar */}
                     <div className="relative shrink-0">
                         <div className={`
                             rounded-full flex items-center justify-center bg-gray-800 border-2 border-white/10 overflow-hidden
-                            ${isCompact ? 'w-10 h-10' : 'w-12 h-12'}
+                            ${isCompact ? 'w-9 h-9' : 'w-11 h-11'}
                         `}>
                             {post.tweet_profile_pic
                                 ? <img src={post.tweet_profile_pic} alt="owner" className="w-full h-full object-cover" />
-                                : <div className='w-full h-full bg-[#1e293b] flex items-center justify-center text-white font-bold'>{post.title.charAt(0)}</div>
+                                : <div className='w-full h-full bg-[#1e293b] flex items-center justify-center text-white font-bold text-sm'>{post.title.charAt(0)}</div>
                             }
                         </div>
                     </div>
                     {/* Name & Handle */}
                     <div className="flex flex-col min-w-0">
-                        <h3 className="font-bold text-white leading-tight truncate text-[16px]">
+                        <h3 className="font-bold text-white leading-tight truncate text-[15px] sm:text-[16px]">
                             {post.title}
                         </h3>
-                        <span className="text-gray-500 text-[14px]">
+                        <span className="text-gray-500 text-[13px] sm:text-[14px] truncate">
                             @{(post.source || 'news').replace(/\s+/g, '').toLowerCase()}
                         </span>
                     </div>
                 </div>
 
                 {/* Header Actions */}
-                <div className="flex items-center gap-0.5 sm:gap-1">
+                <div className="flex items-center gap-0.5 shrink-0">
                     {/* Time Bubble */}
-                    <div className="px-2.5 sm:px-3.5 py-1.5 bg-white/5 border border-white/5 rounded-2xl text-gray-400 text-[11px] sm:text-[13px] font-black mr-0.5 sm:mr-1 uppercase">
+                    <div className="px-2 sm:px-3 py-1 bg-white/5 border border-white/5 rounded-xl text-gray-400 text-[11px] sm:text-[12px] font-black mr-0.5 sm:mr-1 uppercase leading-none h-7 flex items-center">
                         {dayjs(post.tweet_created_at || post.created_at).isSame(dayjs(), 'day') 
                             ? dayjs(post.tweet_created_at || post.created_at).fromNow(true)
                                 .replace('วินาที', 's').replace('นาที', 'm').replace('ชั่วโมง', 'h').replace('วัน', 'd').replace('เดือน', 'mo').replace('ปี', 'y').replace(/\s+/g, '')
                             : dayjs(post.tweet_created_at || post.created_at).format('D MMM')}
                     </div>
 
-                    {/* Options (Three Dots) - User wanted this instead of bookmarks */}
+                    {/* Options (Three Dots) */}
                     <div className="relative" ref={menuRef}>
                         <button
                             onClick={() => setShowMenu(!showMenu)}
-                            className="p-1.5 sm:p-2.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-full transition-all"
+                            className="p-1.5 text-gray-500 hover:text-white hover:bg-white/5 rounded-full transition-all"
                         >
-                            <IoIosMore className="text-xl sm:text-2xl" />
+                            <IoIosMore className="text-xl" />
                         </button>
 
                         {showMenu && (
@@ -162,39 +162,39 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
 
                     {/* External Link */}
                     <a href={post.url} target="_blank" rel="noopener noreferrer"
-                        className="p-2.5 text-gray-500 hover:text-blue-400 hover:bg-white/5 rounded-full transition-all">
-                        <HiOutlineArrowTopRightOnSquare className="text-2xl" />
+                        className="p-1.5 sm:p-2 text-gray-500 hover:text-blue-400 hover:bg-white/5 rounded-full transition-all shrink-0">
+                        <HiOutlineArrowTopRightOnSquare className="text-xl sm:text-2xl" />
                     </a>
                 </div>
             </div>
 
             {/* Content Body */}
             <div className={`text-gray-200 leading-relaxed tracking-tight wrap-break-word
-                ${isCompact ? 'text-[14px] mb-4 line-clamp-3' : 'text-[16px] mb-6 mt-2'}
+                ${isCompact ? 'text-[14px] mb-4 line-clamp-3' : 'text-[15px] sm:text-[16px] mb-6 mt-1'}
                 ${isGrid ? 'grow' : ''}
             `}>
                 {post.content}
             </div>
 
-            {/* Subtle Divider (Matches image aesthetic) */}
+            {/* Subtle Divider */}
             <div className="h-px w-full bg-white/5 mb-5 shrink-0" />
 
-            {/* Stats Footer (Matches image layout) */}
-            <div className="flex items-center gap-4 sm:gap-6 text-[12px] sm:text-[13px] font-bold text-gray-500/80 px-1 shrink-0 overflow-x-auto scrollbar-hide">
+            {/* Stats Footer */}
+            <div className="flex items-center gap-4 sm:gap-5 text-[12px] sm:text-[13px] font-bold text-gray-500/80 px-0.5 shrink-0 overflow-x-auto scrollbar-hide">
                 <div className="flex items-center gap-1 group/stat hover:text-blue-400 transition-colors cursor-default whitespace-nowrap">
-                    <HiOutlineChartBar className="text-[17px] sm:text-[19px] opacity-70" />
+                    <HiOutlineChartBar className="text-[16px] sm:text-[18px] opacity-70" />
                     <span className="font-black">{formatNumber(post.view_count)}</span>
                 </div>
                 <div className="flex items-center gap-1 group/stat hover:text-rose-400 transition-colors cursor-default whitespace-nowrap">
-                    <HiOutlineHeart className="text-[17px] sm:text-[19px] opacity-70" />
+                    <HiOutlineHeart className="text-[16px] sm:text-[18px] opacity-70" />
                     <span className="font-black">{formatNumber(post.like_count)}</span>
                 </div>
                 <div className="flex items-center gap-1 group/stat hover:text-emerald-400 transition-colors cursor-default whitespace-nowrap">
-                    <HiOutlineArrowPathRoundedSquare className="text-[17px] sm:text-[19px] opacity-70" />
+                    <HiOutlineArrowPathRoundedSquare className="text-[16px] sm:text-[18px] opacity-70" />
                     <span className="font-black">{formatNumber(post.retweet_count)}</span>
                 </div>
                 <div className="flex items-center gap-1 group/stat hover:text-cyan-400 transition-colors cursor-default whitespace-nowrap">
-                    <HiOutlineChatBubbleLeft className="text-[17px] sm:text-[19px] opacity-70" />
+                    <HiOutlineChatBubbleLeft className="text-[16px] sm:text-[18px] opacity-70" />
                     <span className="font-black">{formatNumber(post.reply_count)}</span>
                 </div>
             </div>

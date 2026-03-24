@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Layouts/Sidebar';
+import PostList from '../components/PostList';
 import DashboardCard from '../components/DashboardCard';
 import { deleteCategoryNews, getNewsByCategory } from '../api/categoryNews';
 import { FaArrowLeft, FaLayerGroup } from 'react-icons/fa';
@@ -106,9 +107,10 @@ const CategoryNews = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100">
+        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
-            <main className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto">
+            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
+                <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen relative">
                 {/* Header */}
                 <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-8">
                     <div>
@@ -195,7 +197,11 @@ const CategoryNews = () => {
                         ))}
                     </div>
                 )}
-            </main>
+                </main>
+                <div className="hidden xl:block">
+                    <PostList />
+                </div>
+            </div>
 
             {/* Custom Delete Modal */}
             {isDeleteModalOpen && (

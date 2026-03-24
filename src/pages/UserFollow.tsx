@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { FaTwitter, FaUserMinus, FaEllipsis, FaTrash } from 'react-icons/fa6';
 import { Toaster, toast } from 'react-hot-toast';
 import Sidebar from '../components/Layouts/Sidebar';
+import PostList from '../components/PostList';
 import api from '../api/axiosInstance';
 import type { FollowedUser } from '../interface/userTarget';
 
@@ -77,9 +78,10 @@ export const UserFollow = () => {
     }, []);
 
     return (
-        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100">
+        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
-            <div className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto relative">
+            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
+                <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen relative">
                 <header className="mb-6 animate-fade-in-down">
                     <h1 className="text-2xl md:text-3xl font-extrabold bg-clip-text text-gray-100 bg-linear-to-r ">
                         บัญชีที่คุณกำลังติดตาม
@@ -170,6 +172,10 @@ export const UserFollow = () => {
                         )}
                     </div>
                 )}
+                </main>
+                <div className="hidden xl:block">
+                    <PostList />
+                </div>
             </div>
 
             {/* Confirmation Modal */}

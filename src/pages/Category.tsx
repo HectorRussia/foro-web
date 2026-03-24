@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { toast } from 'react-hot-toast';
 import { FaPlus, FaEdit, FaTrash, FaSearch, FaLayerGroup, FaTimes } from 'react-icons/fa';
 import Sidebar from '../components/Layouts/Sidebar';
+import PostList from '../components/PostList';
 import type { Category as CategoryType } from '../interface/category';
 import * as itemService from '../api/category';
 
@@ -120,9 +121,10 @@ const Category = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100">
+        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
-            <div className="flex-1 ml-20 lg:ml-80 p-4 lg:p-8 overflow-y-auto relative">
+            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
+                <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen relative">
                 <div className="space-y-6">
                     {/* Header Section */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#1e293b]/50 p-6 rounded-2xl backdrop-blur-sm border border-slate-700/50 shadow-xl">
@@ -213,6 +215,10 @@ const Category = () => {
                         </div>
                     )}
 
+                </div>
+                </main>
+                <div className="hidden xl:block">
+                    <PostList />
                 </div>
             </div>
 
