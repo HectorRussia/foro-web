@@ -47,3 +47,9 @@ export const getTriggerStatus = async (): Promise<{ trigger: number }> => {
 export const updateTriggerStatus = async (trigger: number, news_ids?: number[]): Promise<void> => {
     await api.patch('/news/trigger', { trigger, news_ids });
 };
+
+export const searchAndAnalyzeBulk = async (payload: any, signal?: AbortSignal): Promise<any> => {
+    const response = await api.post('/advanced-search/search-and-analyze-bulk', payload, { signal });
+    return response.data;
+};
+

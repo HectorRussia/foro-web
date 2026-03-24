@@ -14,12 +14,13 @@ import { RiLoader4Line } from "react-icons/ri";
 import { LuSparkles, LuRefreshCw } from "react-icons/lu";
 import { AnimatePresence, motion } from 'framer-motion';
 import PostList from '../components/PostList';
-import { type NewsItem, type NewsResult, type SSEEvent } from '../interface/news';
-import { getNews, getTriggerStatus, updateTriggerStatus } from '../api/news';
+import { type NewsItem, type NewsResult } from '../interface/news';
+import { getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk } from '../api/news';
 import { getCategories } from '../api/category';
 import { createCategoryNews } from '../api/categoryNews';
 import { toast } from 'react-hot-toast';
 import { type Category } from '../interface/category';
+import { type PostListWithMembers } from '../components/PostList';
 
 const TodayNews = () => {
 
@@ -48,17 +49,20 @@ const TodayNews = () => {
     const aiFilterRef = useRef<HTMLDivElement>(null);
 
     // Search Parameters
+    const [newsResults, setNewsResults] = useState<NewsResult[]>([]);
+    const [progress, setProgress] = useState({ current: 0, total: 0 });
+    const [selectedPostList, setSelectedPostList] = useState<PostListWithMembers | null>(null);
     const [searchParams] = useState({
-        query_type: "Latest",
+
+        query: "",
+        query_type: "latest",
         since_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
         until_date: dayjs().add(1, 'day').format('YYYY-MM-DD'),
-        use_followed_users: true,
         cursor: ""
     });
 
-    // Results
-    const [newsResults, setNewsResults] = useState<NewsResult[]>([]);
-    const [progress, setProgress] = useState({ current: 0, total: 0 });
+
+
 
     // Refs
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -173,136 +177,11 @@ const TodayNews = () => {
         };
     }, [isAIFilterOpen]);
 
-    const handleSSEEvent = (data: SSEEvent) => {
-        const { event, data: eventData } = data;
-
-        if (eventData.message) {
-            setStatusMessage(eventData.message);
-        }
-
-        // Initial capture of next_cursor if provided in any event (fallback)
-        const rawData = { ...data, ...(eventData || {}) } as any;
-        const potentialCursor = rawData.next_cursor || rawData.twitter_cursor;
-        if (potentialCursor && potentialCursor !== nextCursor) {
-            setNextCursor(potentialCursor);
-            localStorage.setItem('today_news_twitter_cursor', potentialCursor);
-        }
-
-
-        switch (event) {
-            case 'progress':
-                if (eventData.step === 'analyzing' && eventData.current !== undefined && eventData.total !== undefined) {
-                    setProgress({ current: eventData.current, total: eventData.total });
-                }
-                break;
-
-            case 'individual_result':
-                let parsedAnalysis = eventData.analysis;
-                if (typeof eventData.analysis === 'string') {
-                    try {
-                        const potentialJson = JSON.parse(eventData.analysis);
-                        if (potentialJson && typeof potentialJson === 'object') {
-                            parsedAnalysis = potentialJson;
-                        }
-                    } catch (e) {
-                        // Not JSON
-                    }
-                }
-
-                // Extremely robust helper to find values in any possible location
-                const findVal = (keys: string[], containers: any[] = []): any => {
-                    const eData = eventData as any;
-                    const allContainers = [
-                        eData,
-                        parsedAnalysis,
-                        eData?.data,
-                        eData?.tweet,
-                        parsedAnalysis?.tweet,
-                        parsedAnalysis?.public_metrics,
-                        eData?.public_metrics,
-                        data,
-                        ...containers
-                    ];
-
-                    for (const container of allContainers) {
-                        if (!container || typeof container !== 'object') continue;
-                        for (const key of keys) {
-                            if (container[key] !== undefined && container[key] !== null) {
-                                return container[key];
-                            }
-                        }
-                    }
-                    return undefined;
-                };
-
-                const getNum = (keys: string[]) => {
-                    const val = findVal(keys);
-                    return (val !== undefined && val !== null) ? Number(val) : 0;
-                };
-
-                const content = findVal(['content', 'text', 'full_text']) || parsedAnalysis?.llm_analysis || eventData?.analysis;
-
-                if (parsedAnalysis?.llm_analysis || (typeof eventData?.analysis === 'string' && eventData.analysis.trim().length > 0) || findVal(['content', 'text'])) {
-                    const newsItem: NewsResult = {
-                        id: findVal(['id', 'tweet_id']) || Date.now() + Math.random(),
-                        title: findVal(['title', 'name', 'tweet_name']) || parsedAnalysis?.tweet_name || extractTitle(content),
-                        content: content,
-                        source: parsedAnalysis?.tweet_name || findVal(['source', 'user_name', 'screen_name']) || 'Twitter',
-                        url: findVal(['url', 'post_url']) || parsedAnalysis?.url || '#',
-                        tweet_id: findVal(['tweet_id', 'id_str', 'id']),
-                        tweet_profile_pic: parsedAnalysis?.tweet_profile_pic || findVal(['tweet_profile_pic', 'profile_image_url', 'profile_image_url_https']),
-                        current: eventData.current,
-                        total: eventData.total,
-                        created_at: findVal(['tweet_created_at', 'created_at', 'timestamp']) || new Date().toISOString(),
-                        tweet_created_at: findVal(['tweet_created_at', 'created_at', 'timestamp']),
-                        retweet_count: getNum(['retweet_count', 'retweets', 'retweetCount']),
-                        reply_count: getNum(['reply_count', 'replies', 'comment_count', 'replyCount']),
-                        like_count: getNum(['like_count', 'likes', 'favorite_count', 'favorites', 'likeCount']),
-                        quote_count: getNum(['quote_count', 'quotes', 'quoteCount']),
-                        view_count: getNum(['view_count', 'views', 'impression_count', 'viewCount'])
-                    };
-                    setNewsResults(prev => {
-                        const isDuplicate = prev.some(item => (item.tweet_id && item.tweet_id === newsItem.tweet_id) || item.id === newsItem.id);
-                        let next;
-                        if (isDuplicate) {
-                            next = prev.map(item => ((item.tweet_id && item.tweet_id === newsItem.tweet_id) || item.id === newsItem.id) ? newsItem : item);
-                        } else {
-                            next = [...prev, newsItem];
-                        }
-                        return next.sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
-                    });
-                }
-                break;
-
-            case 'complete':
-                if (eventData.twitter_cursor) {
-                    localStorage.setItem('today_news_twitter_cursor', eventData.twitter_cursor);
-                    setNextCursor(eventData.twitter_cursor);
-                }
-                setStatusMessage('วิเคราะห์ชุดล่าสุดเสร็จสิ้น');
-                setIsStreaming(false);
-                break;
-            case 'error':
-                // Individual errors shouldn't stop the whole stream
-                // We show the message but let it continue
-                setStatusMessage(`⚠️ ${eventData.message?.substring(0, 50)}...`);
-                break;
-        }
-    };
-
-    const extractTitle = (content: any): string => {
-        if (typeof content === 'string') {
-            const lines = content.split('\n');
-            const firstLine = lines[0].replace(/Title:|#|###/g, '').trim();
-            return firstLine || 'Today Intelligence';
-        }
-        return 'Today Intelligence';
-    };
-
-    const startAnalysisStream = async (cursorOverride?: string) => {
+    // Start Bulk Analysis
+    const startBulkAnalysis = async (cursorOverride?: string) => {
         if (isStreaming) return;
         setIsStreaming(true);
-        setStatusMessage('กำลังเชื่อมต่อ...');
+        setStatusMessage('กำลังเชื่อมต่อและวิเคราะห์ข่าว...');
 
         // If not loading more, clear previous results and cache
         if (!cursorOverride || typeof cursorOverride !== 'string') {
@@ -313,56 +192,80 @@ const TodayNews = () => {
             setHasStarted(true);
         }
 
-        setProgress({ current: 0, total: 0 });
+        setProgress({ current: 0, total: 0 }); // Hide progress bar for bulk call
         abortControllerRef.current = new AbortController();
 
-        const payload = {
-            ...searchParams,
+        const payload: any = {
+            query_type: "Latest",
+            since_date: searchParams.since_date,
             cursor: (typeof cursorOverride === 'string') ? cursorOverride : searchParams.cursor
         };
 
+        if (searchParams.query) {
+            payload.query = searchParams.query;
+        }
+
+        if (selectedPostList) {
+            payload.post_list_id = selectedPostList.id;
+        } else {
+            payload.use_followed_users = true;
+        }
+
+
+
+
+
         try {
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/advanced-search/search-and-analyze-stream`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                },
-                body: JSON.stringify(payload),
-                signal: abortControllerRef.current.signal
-            });
+            const result = await searchAndAnalyzeBulk(payload, abortControllerRef.current.signal);
 
-            if (!response.body) throw new Error("Stream body missing");
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-            let buffer = '';
 
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
+            if (result && result.items) {
+                const mappedResults: NewsResult[] = result.items.map((item: any) => ({
+                    id: item.id,
+                    title: item.title || item.tweet_name || 'Twitter News',
+                    content: item.llm_analysis || item.content,
+                    source: item.tweet_name || item.source || 'Twitter',
+                    url: item.url || '#',
+                    tweet_id: item.tweet_id,
+                    tweet_profile_pic: item.tweet_profile_pic,
+                    created_at: item.tweet_created_at || item.created_at || new Date().toISOString(),
+                    tweet_created_at: item.tweet_created_at,
+                    retweet_count: item.retweet_count || 0,
+                    reply_count: item.reply_count || 0,
+                    like_count: item.like_count || 0,
+                    quote_count: item.quote_count || 0,
+                    view_count: item.view_count || 0
+                }));
 
-                buffer += decoder.decode(value, { stream: true });
-                const lines = buffer.split('\n');
+                setNewsResults(prev => {
+                    // Update or Add items
+                    const existingIds = new Set(prev.map(p => String(p.tweet_id || p.id)));
+                    const newItems = mappedResults.filter(m => !existingIds.has(String(m.tweet_id || m.id)));
+                    const updatedItems = prev.map(p => {
+                        const match = mappedResults.find(m => String(m.tweet_id || m.id) === String(p.tweet_id || p.id));
+                        return match ? match : p;
+                    });
+                    
+                    return [...updatedItems, ...newItems]
+                        .sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
+                });
 
-                for (let i = 0; i < lines.length - 1; i++) {
-                    const line = lines[i].trim();
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const eventData = JSON.parse(line.slice(6));
-                            handleSSEEvent(eventData);
-                        } catch (e) {
-                            console.error('Error parsing SSE line:', line);
-                        }
-                    }
+                if (result.twitter_cursor) {
+                    localStorage.setItem('today_news_twitter_cursor', result.twitter_cursor);
+                    setNextCursor(result.twitter_cursor);
                 }
-                buffer = lines[lines.length - 1];
+
+                setStatusMessage('วิเคราะห์เสร็จสิ้น');
+            } else {
+                setStatusMessage('ไม่พบข้อมูลข่าวใหม่');
             }
         } catch (error: any) {
-            if (error.name !== 'AbortError') {
-                console.error('Stream failed:', error);
-            }
+            console.error('Bulk analysis failed:', error);
+            setStatusMessage(`เกิดข้อผิดพลาด: ${error.message || 'Unknown error'}`);
+            toast.error('เกิดข้อผิดพลาดในการดึงข้อมูลข่าว');
         } finally {
             setIsStreaming(false);
+            setProgress({ current: 0, total: 0 });
         }
     };
 
@@ -514,7 +417,30 @@ const TodayNews = () => {
     };
 
     const getFilteredNews = () => {
-        const sorted = [...newsResults].sort((a, b) => {
+        let filtered = [...newsResults];
+
+        // 1. Filter by Post List if selected
+        if (selectedPostList && selectedPostList.members) {
+            const memberAccounts = new Set(selectedPostList.members.map(m => {
+                const handle = m.follow_user_x_account || "";
+                return handle.startsWith('@') ? handle.slice(1).toLowerCase() : handle.toLowerCase();
+            }));
+
+            filtered = filtered.filter(item => {
+                // Try to extract handle from URL: https://x.com/BBCBreaking/status/123 -> BBCBreaking
+                const urlMatch = item.url?.toLowerCase().match(/x\.com\/([^/]+)/);
+                const handleFromUrl = urlMatch ? urlMatch[1] : null;
+                
+                // Also check source if it looks like a handle
+                const sourceHandle = item.source?.startsWith('@') ? item.source.slice(1).toLowerCase() : item.source?.toLowerCase();
+
+                return (handleFromUrl && memberAccounts.has(handleFromUrl)) || 
+                       (sourceHandle && memberAccounts.has(sourceHandle));
+            });
+        }
+
+        const sorted = filtered.sort((a, b) => {
+
             const hasView = activeFilters.includes('mostView');
             const hasLiked = activeFilters.includes('mostLiked');
 
@@ -564,9 +490,14 @@ const TodayNews = () => {
                     <header className="shrink-0 mb-6">
                         <div className="flex items-center justify-between mb-4 md:mb-6">
                             <div className="flex flex-col">
-                                <span className="text-[10px] md:text-xs font-medium text-gray-500 mb-0.5 md:mb-1 uppercase tracking-wider">รายการที่ติดตาม</span>
+                                <span className={`text-[10px] md:text-xs font-medium mb-0.5 md:mb-1 uppercase tracking-wider transition-colors ${selectedPostList ? 'text-blue-400' : 'text-gray-500'}`}>
+                                    {selectedPostList ? `• กำลังวิเคราะห์ตาม PostList ${selectedPostList.name}` : 'รายการที่ติดตาม'}
+                                </span>
+
+
                                 <h1 className="text-2xl md:text-4xl font-extrabold text-white tracking-tight">หน้าหลัก</h1>
                             </div>
+
 
                             <div className="flex items-center gap-2 md:gap-3">
                                 {/* Clear & Restore */}
@@ -605,8 +536,9 @@ const TodayNews = () => {
                                 {/* Sync Data Button */}
                                 {!isStreaming ? (
                                     <button
-                                        onClick={() => startAnalysisStream()}
+                                        onClick={() => startBulkAnalysis()}
                                         disabled={hasStarted || newsResults.length > 0}
+
                                         className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-full font-bold transition-all shadow-lg active:scale-95
                                             ${hasStarted || newsResults.length > 0
                                                 ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
@@ -818,7 +750,8 @@ const TodayNews = () => {
                         {!isStreaming && nextCursor && !aiFilteredIds && (
                             <div className="flex justify-center mt-10 mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
                                 <button
-                                    onClick={() => startAnalysisStream(nextCursor)}
+                                    onClick={() => startBulkAnalysis(nextCursor)}
+
                                     className="group relative flex items-center justify-center gap-4 px-12 py-5 rounded-4xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 w-full md:w-[400px] overflow-hidden shadow-2xl shadow-amber-500/5 active:scale-95"
                                     title={`Next Signal: ${nextCursor}`}
                                 >
@@ -865,8 +798,13 @@ const TodayNews = () => {
                 `}</style>
                 </main>
                 <div className="hidden xl:block">
-                    <PostList />
+                    <PostList 
+                        activeId={selectedPostList?.id} 
+                        onSelect={(list) => setSelectedPostList(list)} 
+                    />
                 </div>
+
+
             </div>
         </div>
     );

@@ -76,3 +76,15 @@ export interface SSEEvent {
     event: string;
     data: SSEEventData;
 }
+
+export interface AdvancedSearchBulkResponse {
+    items: NewsItem[];
+    total: number;
+    page: number;
+    limit: number;
+    has_next: boolean;
+    has_previous: boolean;
+    twitter_cursor?: string;
+    twitter_has_next?: boolean;
+    search_query?: string;
+}

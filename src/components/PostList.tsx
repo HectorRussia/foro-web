@@ -7,9 +7,10 @@ import type { FollowedUser } from '../interface/userTarget';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 
-interface PostListWithMembers extends IPostList {
+export interface PostListWithMembers extends IPostList {
     members: PostListUser[];
 }
+
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
@@ -23,7 +24,15 @@ const colors = [
     '#EC4899', // Pink
 ];
 
-const PostList = ({ showBorder = true }: { showBorder?: boolean }) => {
+const PostList = ({ 
+    showBorder = true, 
+    activeId, 
+    onSelect 
+}: { 
+    showBorder?: boolean,
+    activeId?: number | null,
+    onSelect?: (list: PostListWithMembers | null) => void
+}) => {
     const [lists, setLists] = useState<PostListWithMembers[]>([]);
     const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +104,7 @@ const PostList = ({ showBorder = true }: { showBorder?: boolean }) => {
             await postListApi.deletePostList(id);
             fetchAllData();
             if (selectedListId === id) setSelectedListId(null);
+            if (activeId === id && onSelect) onSelect(null);
             toast.success('ลบรายการสำเร็จ');
         } catch (error) {
             toast.error('ไม่สามารถลบรายการได้');
@@ -217,13 +227,23 @@ const PostList = ({ showBorder = true }: { showBorder?: boolean }) => {
                     </div>
                 ) : (
                     lists.map((list) => {
-                        const isSelected = selectedListId === list.id;
+                        const currentActiveId = activeId !== undefined ? activeId : selectedListId;
+                        const isSelected = currentActiveId === list.id;
                         const availableUsers = getAvailableUsers(list.members);
 
                         return (
                             <div
                                 key={list.id}
-                                onClick={() => setSelectedListId(isSelected ? null : list.id)}
+                                onClick={() => {
+                                    const nextList = isSelected ? null : list;
+                                    if (onSelect) {
+                                        onSelect(nextList);
+                                    } else {
+                                        setSelectedListId(nextList ? nextList.id : null);
+                                    }
+                                }}
+
+
                                 className={`group bg-[#111112] border transition-all duration-300 cursor-pointer overflow-hidden ${isSelected ? 'border-white/20 rounded-4xl' : 'border-white/5 rounded-3xl hover:bg-[#1a1a1b]'}`}
                             >
                                 <div className="p-3.5 flex items-center gap-4">
