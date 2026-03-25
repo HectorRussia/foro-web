@@ -58,6 +58,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
 
     return (
         <div className={`group bg-[#16181c]/60 backdrop-blur-2xl border border-white/5 rounded-4xl transition-all duration-300 hover:bg-white/4 hover:shadow-2xl shadow-black/40 flex flex-col relative
+            ${showMenu ? 'z-50' : 'z-auto'}
             ${isCompact ? 'p-4 md:p-5' : 'p-5 md:p-6'}
             ${isGrid ? 'h-full' : ''}
         `}>

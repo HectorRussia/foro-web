@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { HiOutlinePlus, HiOutlineTrash, HiOutlineShare, HiBars3BottomLeft } from 'react-icons/hi2';
+import { HiOutlinePlus, HiOutlineTrash, HiOutlineShare, HiBars3, HiOutlineUsers } from 'react-icons/hi2';
 import * as postListApi from '../api/postList';
 import type { PostList as IPostList, PostListUser } from '../api/postList';
 import api from '../api/axiosInstance';
@@ -138,7 +138,7 @@ const PostList = ({
     };
 
     return (
-        <div className={`flex flex-col h-full bg-[#0d0d0e] ${showBorder ? 'border-l border-white/5' : ''} w-full max-w-full lg:max-w-xl mx-auto shrink-0 transition-all duration-500`}>
+        <div className={`flex flex-col h-full bg-[#0a0a0b] ${showBorder ? 'border-l border-white/5' : ''} w-[350px] shrink-0 transition-all duration-500`}>
 
             {/* Header */}
             <div className="px-6 py-8 flex items-center justify-between">
@@ -244,17 +244,26 @@ const PostList = ({
                                 }}
 
 
-                                className={`group bg-[#111112] border transition-all duration-300 cursor-pointer overflow-hidden ${isSelected ? 'border-white/20 rounded-4xl' : 'border-white/5 rounded-3xl hover:bg-[#1a1a1b]'}`}
+                                className={`group bg-[#111112] border transition-all duration-500 overflow-hidden ${isSelected ? 'border-white/10 rounded-[32px]' : 'border-white/5 rounded-2xl hover:bg-[#1a1a1b]'}`}
                             >
-                                <div className="p-3.5 flex items-center gap-4">
+                                <div className="p-3 flex items-center gap-4">
                                     <div
-                                        className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg relative transition-all duration-300"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            const nextList = isSelected ? null : list;
+                                            if (onSelect) {
+                                                onSelect(nextList);
+                                            } else {
+                                                setSelectedListId(nextList ? nextList.id : null);
+                                            }
+                                        }}
+                                        className="w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-lg relative transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
                                         style={{
                                             backgroundColor: list.color_list || colors[0],
-                                            boxShadow: isSelected ? `0 0 20px ${(list.color_list || colors[0])}40` : 'none'
+                                            boxShadow: isSelected ? `0 0 25px ${(list.color_list || colors[0])}40` : 'none'
                                         }}
                                     >
-                                        <HiBars3BottomLeft className="text-2xl text-white transform -rotate-90" />
+                                        <HiBars3 className="text-2xl text-white" />
                                         {isSelected && (
                                             <div className="absolute inset-0 bg-white/10 rounded-2xl" />
                                         )}
@@ -262,11 +271,11 @@ const PostList = ({
 
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center justify-between">
-                                            <h4 className={`font-extrabold text-sm truncate pr-2 tracking-tight transition-colors ${isSelected ? 'text-white' : 'text-blue-400'}`}>
+                                            <h4 className="font-extrabold text-[15px] text-white truncate pr-2 tracking-tight">
                                                 {list.name}
                                             </h4>
                                             {isSelected && (
-                                                <div className="flex items-center gap-1">
+                                                <div className="flex items-center gap-0.5">
                                                     <button className="p-2 text-gray-400 hover:text-white transition-colors">
                                                         <HiOutlineShare className="text-lg" />
                                                     </button>
@@ -279,8 +288,9 @@ const PostList = ({
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="text-[11px] text-gray-500 font-bold mt-0.5">
-                                            List • {list.members.length} accounts
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-500 font-bold mt-1">
+                                            <HiOutlineUsers className="text-sm opacity-60" />
+                                            {list.members.length}
                                         </div>
                                     </div>
                                 </div>
@@ -292,7 +302,7 @@ const PostList = ({
                                             initial={{ opacity: 0, height: 0 }}
                                             animate={{ opacity: 1, height: 'auto' }}
                                             exit={{ opacity: 0, height: 0 }}
-                                            className="px-6 pb-6 pt-2 space-y-6"
+                                            className="px-5 pb-6 pt-3 space-y-6"
                                             onClick={(e) => e.stopPropagation()}
                                         >
                                             {/* Color Picker */}
@@ -316,7 +326,7 @@ const PostList = ({
                                                 />
                                             </div>
 
-                                            <div className="text-[11px] text-gray-500 font-medium leading-relaxed">
+                                            <div className="text-[12px] text-gray-500 font-medium leading-relaxed px-1">
                                                 Browse all {availableUsers.length} available accounts from your saved people and lists.
                                             </div>
 

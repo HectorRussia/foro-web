@@ -245,7 +245,7 @@ const TodayNews = () => {
                         const match = mappedResults.find(m => String(m.tweet_id || m.id) === String(p.tweet_id || p.id));
                         return match ? match : p;
                     });
-                    
+
                     return [...updatedItems, ...newItems]
                         .sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
                 });
@@ -430,12 +430,12 @@ const TodayNews = () => {
                 // Try to extract handle from URL: https://x.com/BBCBreaking/status/123 -> BBCBreaking
                 const urlMatch = item.url?.toLowerCase().match(/x\.com\/([^/]+)/);
                 const handleFromUrl = urlMatch ? urlMatch[1] : null;
-                
+
                 // Also check source if it looks like a handle
                 const sourceHandle = item.source?.startsWith('@') ? item.source.slice(1).toLowerCase() : item.source?.toLowerCase();
 
-                return (handleFromUrl && memberAccounts.has(handleFromUrl)) || 
-                       (sourceHandle && memberAccounts.has(sourceHandle));
+                return (handleFromUrl && memberAccounts.has(handleFromUrl)) ||
+                    (sourceHandle && memberAccounts.has(sourceHandle));
             });
         }
 
@@ -490,12 +490,14 @@ const TodayNews = () => {
                     <header className="shrink-0 mb-6">
                         <div className="flex items-center justify-between mb-4 md:mb-6">
                             <div className="flex flex-col">
-                                <span className={`text-[10px] md:text-xs font-medium mb-0.5 md:mb-1 uppercase tracking-wider transition-colors ${selectedPostList ? 'text-blue-400' : 'text-gray-500'}`}>
-                                    {selectedPostList ? `• กำลังวิเคราะห์ตาม PostList ${selectedPostList.name}` : 'รายการที่ติดตาม'}
+                                <span className="text-[10px] md:text-xs font-medium mb-0.5 md:mb-1 uppercase tracking-wider text-gray-500">
+                                    WATCHLIST FEED
                                 </span>
 
 
-                                <h1 className="text-2xl md:text-4xl font-extrabold text-white tracking-tight">หน้าหลัก</h1>
+                                <h1 className={`text-2xl md:text-4xl font-extrabold tracking-tight transition-colors duration-300 ${selectedPostList ? 'text-blue-400' : 'text-white'}`}>
+                                    {selectedPostList ? selectedPostList.name : 'หน้าหลัก'}
+                                </h1>
                             </div>
 
 
@@ -607,42 +609,73 @@ const TodayNews = () => {
                         </div>
                     </header>
 
-                    {/* AI Filter Modal (Absolute positioning handled by AnimatePresence) */}
+                    {/* AI Filter Modal */}
                     <AnimatePresence>
                         {isAIFilterOpen && (
-                            <div className="relative z-50">
+                            <>
+                                {/* Backdrop */}
                                 <motion.div
-                                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                                    className="absolute right-0 top-0 mt-2 w-80 p-5 bg-[#1a1a1c] border border-white/10 rounded-3xl shadow-2xl"
-                                >
-                                    <div className="space-y-4">
-                                        <textarea
-                                            autoFocus
-                                            value={aiPrompt}
-                                            onChange={(e) => setAiPrompt(e.target.value)}
-                                            placeholder="บอก AI ว่าอยากได้ข่าวแนวไหน..."
-                                            className="w-full h-32 bg-black/40 border border-white/5 rounded-2xl p-4 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500/50 resize-none"
-                                        />
-                                        <div className="flex gap-2">
-                                            <button
-                                                onClick={() => setIsAIFilterOpen(false)}
-                                                className="flex-1 py-3 rounded-2xl text-xs font-bold text-gray-400 hover:bg-white/5 transition-all"
-                                            >
-                                                ยกเลิก
-                                            </button>
-                                            <button
-                                                onClick={handleAIFilter}
-                                                disabled={isAIProcessing || newsResults.length === 0}
-                                                className="flex-1 py-3 rounded-2xl text-xs font-bold bg-linear-to-r from-blue-600 to-cyan-600  text-white hover:blue-500/80 transition-all shadow-lg shadow-[#ff00ff]/20"
-                                            >
-                                                {isAIProcessing ? 'กำลังวิเคราะห์...' : 'เริ่มคัดกรอง'}
-                                            </button>
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    exit={{ opacity: 0 }}
+                                    onClick={() => setIsAIFilterOpen(false)}
+                                    className="fixed inset-0 bg-black/80 backdrop-blur-md z-100"
+                                />
+
+                                {/* Modal Container */}
+                                <div className="fixed inset-0 flex items-center justify-center z-101 p-4 pointer-events-none">
+                                    <motion.div
+                                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                        className="w-full max-w-xl bg-[#141416] border border-white/10 rounded-[40px] p-8 md:p-10 shadow-3xl pointer-events-auto"
+                                    >
+                                        <div className="flex flex-col gap-6">
+                                            {/* Header */}
+                                            <div className="space-y-2">
+                                                <div className="flex items-center gap-3 text-blue-500">
+                                                    <LuSparkles className="text-3xl" />
+                                                    <h2 className="text-2xl font-black tracking-tight">AI Smart Filter</h2>
+                                                </div>
+                                                <p className="text-sm text-gray-500 leading-relaxed max-w-md">
+                                                    กรองเนื้อหาที่ต้องการโดยระบุเป็นภาษามนุษย์ (เช่น "หาเฉพาะเรื่องระดมทุนของส้มหยุด" หรือ "ข่าวที่เกี่ยวกับ Apple")
+                                                </p>
+                                            </div>
+
+                                            {/* Input Area */}
+                                            <div className="relative group">
+                                                <textarea
+                                                    autoFocus
+                                                    value={aiPrompt}
+                                                    onChange={(e) => setAiPrompt(e.target.value)}
+                                                    placeholder="ระบุสิ่งที่ต้องการกรองที่นี่ . . ."
+                                                    className="w-full h-48 bg-[#1a1a1c] border-2 border-white/5 rounded-3xl p-6 text-base text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all resize-none shadow-inner"
+                                                />
+                                            </div>
+
+                                            {/* Actions */}
+                                            <div className="flex gap-4 pt-2">
+                                                <button
+                                                    onClick={() => setIsAIFilterOpen(false)}
+                                                    className="flex-1 py-4 rounded-2xl text-sm font-black text-gray-400 bg-[#1c1c1e] hover:bg-white/5 transition-all uppercase tracking-widest"
+                                                >
+                                                    ยกเลิก
+                                                </button>
+                                                <button
+                                                    onClick={handleAIFilter}
+                                                    disabled={isAIProcessing || newsResults.length === 0}
+                                                    className={`flex-1 py-4 rounded-2xl text-sm font-black text-white transition-all uppercase tracking-widest shadow-xl
+                                                        ${isAIProcessing || newsResults.length === 0
+                                                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
+                                                            : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20 active:scale-[0.98]'}`}
+                                                >
+                                                    {isAIProcessing ? 'กำลังวิเคราะห์...' : 'กรองข้อมูล'}
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                </motion.div>
-                            </div>
+                                    </motion.div>
+                                </div>
+                            </>
                         )}
                     </AnimatePresence>
 
@@ -798,9 +831,9 @@ const TodayNews = () => {
                 `}</style>
                 </main>
                 <div className="hidden xl:block">
-                    <PostList 
-                        activeId={selectedPostList?.id} 
-                        onSelect={(list) => setSelectedPostList(list)} 
+                    <PostList
+                        activeId={selectedPostList?.id}
+                        onSelect={(list) => setSelectedPostList(list)}
                     />
                 </div>
 
