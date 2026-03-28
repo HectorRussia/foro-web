@@ -24,11 +24,11 @@ const colors = [
     '#EC4899', // Pink
 ];
 
-const PostList = ({ 
-    showBorder = true, 
-    activeId, 
-    onSelect 
-}: { 
+const PostList = ({
+    showBorder = true,
+    activeId,
+    onSelect
+}: {
     showBorder?: boolean,
     activeId?: number | null,
     onSelect?: (list: PostListWithMembers | null) => void
@@ -138,7 +138,7 @@ const PostList = ({
     };
 
     return (
-        <div className={`flex flex-col h-full bg-[#0a0a0b] ${showBorder ? 'border-l border-white/5' : ''} w-[350px] shrink-0 transition-all duration-500`}>
+        <div className={`flex flex-col h-full bg-[#121212] ${showBorder ? 'border-l border-white/5' : ''} w-[350px] shrink-0 transition-all duration-500`}>
 
             {/* Header */}
             <div className="px-6 py-8 flex items-center justify-between">
