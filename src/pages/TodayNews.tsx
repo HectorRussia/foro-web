@@ -4,11 +4,9 @@ import Sidebar from '../components/Layouts/Sidebar';
 import DashboardCard from '../components/DashboardCard';
 import SkeletonCard from '../components/SkeletonCard';
 import {
-    HiOutlineStop,
-    HiOutlineClock,
-    HiOutlineCalendarDays,
     HiOutlineTrash,
-    HiOutlineArrowPath
+    HiOutlineClock,
+    HiOutlineArrowUturnLeft
 } from "react-icons/hi2";
 import { RiLoader4Line } from "react-icons/ri";
 import { LuSparkles, LuRefreshCw } from "react-icons/lu";
@@ -21,6 +19,9 @@ import { createCategoryNews } from '../api/categoryNews';
 import { toast } from 'react-hot-toast';
 import { type Category } from '../interface/category';
 import { type PostListWithMembers } from '../components/PostList';
+import HomeCanvas from '../components/Canvas/HomeCanvas';
+
+
 
 const TodayNews = () => {
 
@@ -61,8 +62,7 @@ const TodayNews = () => {
         cursor: ""
     });
 
-
-
+    const [searchTerm, setSearchTerm] = useState('');
 
     // Refs
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -419,6 +419,16 @@ const TodayNews = () => {
     const getFilteredNews = () => {
         let filtered = [...newsResults];
 
+        // Search filter
+        if (searchTerm) {
+            const lowTerm = searchTerm.toLowerCase();
+            filtered = filtered.filter(item =>
+                (item.title?.toLowerCase().includes(lowTerm)) ||
+                (item.content?.toLowerCase().includes(lowTerm)) ||
+                (item.source?.toLowerCase().includes(lowTerm))
+            );
+        }
+
         // 1. Filter by Post List if selected
         if (selectedPostList && selectedPostList.members) {
             const memberAccounts = new Set(selectedPostList.members.map(m => {
@@ -474,7 +484,6 @@ const TodayNews = () => {
                 return aiFilteredIds.includes(itemIdStr) || (tweetIdStr && aiFilteredIds.includes(tweetIdStr));
             });
         }
-
         return sorted;
     };
 
@@ -483,129 +492,91 @@ const TodayNews = () => {
     return (
         <div className="flex min-h-screen w-full bg-[#121212] font-sans text-gray-100 overflow-hidden">
             <Sidebar />
-
             <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
                 <main className="flex-1 p-4 md:p-8 flex flex-col h-screen overflow-hidden">
                     {/* Header Section */}
-                    <header className="shrink-0 mb-6">
-                        <div className="flex items-center justify-between mb-4 md:mb-6">
-                            <div className="flex flex-col">
-                                <span className="text-[10px] md:text-xs font-medium mb-0.5 md:mb-1 uppercase tracking-wider text-gray-500">
-                                    WATCHLIST FEED
-                                </span>
+                    <header className="shrink-0 mb-8">
+                        <div className="flex flex-col mb-8">
+                            <span className="text-gray-500 text-[10px] sm:text-[11px] font-black tracking-widest uppercase mb-1 opacity-70">
+                                WATCHLIST FEED
+                            </span>
+                            <h1 className="text-4xl font-black text-white tracking-tight mb-2">
+                                หน้าหลัก
+                            </h1>
+                        </div>
 
+                        {/* Search & Actions Bar */}
+                        <div className="relative z-10">
+                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0c] border border-[#1a1a1c] p-2 pl-4 pr-3.5 rounded-[22px] min-h-[64px] shadow-2xl">
 
-                                <h1 className={`text-2xl md:text-4xl font-extrabold tracking-tight transition-colors duration-300 ${selectedPostList ? 'text-blue-400' : 'text-white'}`}>
-                                    {selectedPostList ? selectedPostList.name : 'หน้าหลัก'}
-                                </h1>
-                            </div>
-
-
-                            <div className="flex items-center gap-2 md:gap-3">
-                                {/* Clear & Restore */}
-                                <div className="flex items-center gap-1 md:gap-1.5 p-0.5 md:p-1 bg-white/3 border border-white/5 rounded-xl">
-                                    <button
-                                        onClick={handleClear}
-                                        className="p-1.5 md:p-2 text-gray-500 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-all"
-                                        title="ล้างข้อมูล"
-                                    >
-                                        <HiOutlineTrash className="text-base md:text-lg" />
-                                    </button>
-                                    {isRestorable && (
+                                {/* Left Section: Trash or Back or Empty */}
+                                <div className="flex items-center gap-3">
+                                    {!hasStarted && isRestorable ? (
                                         <button
                                             onClick={handleRestore}
-                                            className="p-2 text-gray-500 hover:text-emerald-400 hover:bg-emerald-400/10 rounded-lg transition-all"
-                                            title="กู้คืน"
+                                            className="p-3 bg-[#1a1a1c] text-gray-500 hover:text-white border border-white/5 transition-all rounded-2xl"
+                                            title="ย้อนกลับ"
                                         >
-                                            <HiOutlineArrowPath className="text-lg" />
+                                            <HiOutlineArrowUturnLeft className="text-lg" />
                                         </button>
+                                    ) : hasStarted && displayNews.length > 0 ? (
+                                        <button
+                                            onClick={handleClear}
+                                            className="p-3 bg-[#1a1a1c] text-gray-500 hover:text-rose-400 hover:bg-rose-400/10 border border-white/5 transition-all rounded-2xl"
+                                            title="ล้างข้อมูลทั้งหมด"
+                                        >
+                                            <HiOutlineTrash className="text-lg" />
+                                        </button>
+                                    ) : (
+                                        <div className="w-10" /> // Placeholder
                                     )}
                                 </div>
 
-                                {/* AI Filter */}
-                                <div className="relative" ref={aiFilterRef}>
-                                    <button
-                                        onClick={() => setIsAIFilterOpen(!isAIFilterOpen)}
-                                        className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-4 py-2 md:py-2.5 rounded-xl font-bold border transition-all ${isAIFilterOpen
-                                            ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
-                                            : 'bg-white/5 border-white/10 text-gray-300 hover:bg-white/10'}`}
-                                    >
-                                        <LuSparkles className={`text-base ${isAIFilterOpen ? 'animate-pulse' : 'text-blue-400'}`} />
-                                        <span className="text-[10px] md:text-xs">AI Filter</span>
-                                    </button>
-                                </div>
-
-                                {/* Sync Data Button */}
-                                {!isStreaming ? (
-                                    <button
-                                        onClick={() => startBulkAnalysis()}
-                                        disabled={hasStarted || newsResults.length > 0}
-
-                                        className={`flex items-center gap-1.5 md:gap-2 px-3 md:px-5 py-2 md:py-2.5 rounded-full font-bold transition-all shadow-lg active:scale-95
-                                            ${hasStarted || newsResults.length > 0
-                                                ? 'bg-gray-800 text-gray-500 cursor-not-allowed opacity-50'
-                                                : 'bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/20'
-                                            }`}
-                                    >
-                                        <LuRefreshCw className={`text-base md:text-lg ${isStreaming ? 'animate-spin' : ''}`} />
-                                        <span className="text-[10px] md:text-sm hidden sm:inline">ซิงค์ข้อมูล</span>
-                                        <span className="text-[10px] md:text-sm sm:hidden">ซิงค์</span>
-                                    </button>
-                                ) : (
-                                    <div className="flex items-center gap-2">
-                                        <button className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600/10 text-blue-400 font-bold border border-blue-500/20">
-                                            <RiLoader4Line className="text-lg animate-spin" />
-                                            <span className="text-xs">กำลังรับข้อมูล...</span>
-                                        </button>
+                                {/* Right Section: Search/AI/Sync */}
+                                <div className="flex items-center gap-2.5">
+                                    {/* AI Filter Button */}
+                                    <div className="relative" ref={aiFilterRef}>
                                         <button
-                                            onClick={stopStream}
-                                            className="p-2.5 bg-rose-500/10 border border-rose-500/20 text-rose-500 rounded-full hover:bg-rose-500/20 transition-all"
+                                            onClick={() => setIsAIFilterOpen(!isAIFilterOpen)}
+                                            className={`flex items-center gap-2 px-4.5 py-2.5 rounded-full font-bold border transition-all text-xs
+                                                ${isAIFilterOpen
+                                                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
+                                                    : 'bg-[#0c0c0c] border-[#1a1a1c] text-gray-200 hover:text-white hover:bg-white/5'}`}
                                         >
-                                            <HiOutlineStop className="text-lg" />
+                                            <LuSparkles className={`text-[15px] ${isAIFilterOpen ? 'animate-pulse' : 'text-blue-400'}`} />
+                                            <span>AI Filter</span>
                                         </button>
                                     </div>
-                                )}
-                            </div>
-                        </div>
 
-                        {/* Sort & Status Row */}
-                        <div className="flex flex-wrap items-center justify-between gap-3 md:gap-4">
-                            <div className="flex items-center gap-2 md:gap-3">
-                                <span className="text-[10px] md:text-xs font-bold text-gray-500 uppercase tracking-widest hidden xs:block">เรียงตาม:</span>
-                                <div className="flex items-center gap-1.5 md:gap-2">
-                                    <button
-                                        onClick={() => toggleFilter('mostView')}
-                                        className={`px-3 md:px-6 py-1.5 md:py-2 rounded-full text-[10px] md:text-xs font-bold transition-all ${activeFilters.includes('mostView')
-                                            ? 'bg-white text-black'
-                                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'}`}
-                                    >
-                                        ยอดวิว
-                                    </button>
-                                    <button
-                                        onClick={() => toggleFilter('mostLiked')}
-                                        className={`px-3 md:px-6 py-1.5 md:py-2 rounded-full text-[10px] md:text-xs font-bold transition-all ${activeFilters.includes('mostLiked')
-                                            ? 'bg-white text-black'
-                                            : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-white/5'}`}
-                                    >
-                                        เอนเกจเมนต์
-                                    </button>
+                                    {/* Sync Button */}
+                                    {!isStreaming ? (
+                                        <button
+                                            onClick={() => startBulkAnalysis()}
+                                            disabled={isStreaming}
+                                            className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all shadow-xl active:scale-95 bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/30 text-xs"
+                                        >
+                                            <LuRefreshCw className={`text-[15px] ${isStreaming ? 'animate-spin' : ''}`} />
+                                            <span>ฟีดข้อมูล</span>
+                                        </button>
+                                    ) : (
+                                        <button
+                                            onClick={stopStream}
+                                            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600/10 text-blue-400 font-bold border border-blue-500/20 text-xs"
+                                        >
+                                            <RiLoader4Line className="text-[15px] animate-spin" />
+                                            <span>กำลังฟีด...</span>
+                                        </button>
+                                    )}
                                 </div>
                             </div>
 
-                            <div className="flex items-center gap-4">
-                                <div className="flex items-center gap-2">
-                                    <div className={`h-1.5 w-1.5 rounded-full ${isStreaming ? 'bg-blue-400 animate-pulse' : 'bg-green-500'}`} />
-                                    <span className="text-xs font-bold text-blue-400 tracking-wide">{statusMessage}</span>
-                                </div>
-                                {newsResults.length > 0 && (
-                                    <div className="h-4 w-px bg-white/10" />
-                                )}
-                                {newsResults.length > 0 && (
-                                    <span className="text-xs font-bold text-gray-500">
-                                        {newsResults.length} ข่าวล่าสุด
-                                    </span>
-                                )}
-                            </div>
+                            {/* Status Indicator (Optional) - Hidden for now to match clean bar design */}
+                            {/* <div className="flex items-center justify-start gap-2 pl-2 mt-3">
+                                <div className={`w-1.5 h-1.5 rounded-full ${statusMessage.includes('วิเคราะห์') || statusMessage.includes('ประมวลผล') ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`} />
+                                <span className={`text-[10px] font-black uppercase tracking-tighter ${statusMessage.includes('วิเคราะห์') || statusMessage.includes('ประมวลผล') ? 'text-emerald-400/80' : 'text-blue-400/80'}`}>
+                                    {statusMessage}
+                                </span>
+                            </div> */}
                         </div>
                     </header>
 
@@ -730,7 +701,7 @@ const TodayNews = () => {
                         {/* News Stream Grid */}
                         <div className={`
                         ${layoutMode === 'grid'
-                                ? 'grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 md:gap-6 pb-20'
+                                ? 'grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-20'
                                 : 'flex flex-col space-y-4 pb-20'}
                     `}>
                             {newsResults.length === 0 && isStreaming && (
@@ -742,10 +713,30 @@ const TodayNews = () => {
                             )}
 
                             {newsResults.length === 0 && !isStreaming ? (
-                                <div className="col-span-full py-40 flex flex-col items-center justify-center bg-white/2 rounded-[40px] border-2 border-dashed border-white/5 text-gray-500 text-center animate-in fade-in duration-700">
-                                    <HiOutlineCalendarDays className="text-6xl mb-6 opacity-10" />
-                                    <h3 className="text-xl font-bold text-gray-400">ยังไม่มีข้อมูลข่าววันนี้</h3>
-                                    <p className="text-sm mt-2 max-w-md">กดปุ่ม "เริ่มรับข้อมูล" เพื่อเริ่มวิเคราะห์ข่าวสารล่าสุดของวันนี้</p>
+                                <div className="col-span-full py-64 flex flex-col items-center justify-center text-center relative overflow-hidden">
+                                    <HomeCanvas />
+                                    
+                                    {/* Radial Glow Effect in the Center */}
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0.8 }}
+                                        animate={{ opacity: [0.25, 0.55, 0.25], scale: [0.98, 1.02, 0.98] }}
+                                        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[450px] pointer-events-none rounded-[100%]"
+                                        style={{
+                                            background: 'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.28) 0%, rgba(37, 99, 235, 0.12) 40%, transparent 60%)',
+                                            filter: 'blur(80px)'
+                                        }}
+                                    />
+
+                                    <motion.div 
+                                        animate={{ opacity: [0.3, 0.7, 0.3] }}
+                                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                                        className="relative z-10"
+                                    >
+                                        <h3 className="text-[28px] md:text-[38px] font-black text-transparent bg-clip-text bg-linear-to-b from-white via-white/90 to-white/30 tracking-tight uppercase">
+                                            FORO ติดตามทุกเรื่องที่คุณสนใจ
+                                        </h3>
+                                    </motion.div>
                                 </div>
                             ) : aiFilteredIds && displayNews.length === 0 ? (
                                 <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white/5 rounded-[40px] border border-white/10 text-gray-400 text-center animate-in fade-in">
@@ -764,17 +755,46 @@ const TodayNews = () => {
                                     </button>
                                 </div>
                             ) : (
-                                displayNews.map((res) => (
-                                    <div key={res.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                        <DashboardCard
-                                            post={mapToNewsItem(res)}
-                                            variant={layoutMode}
-                                            categories={categories}
-                                            onAddToCategory={handleAddNewsToCategory}
-                                            onDelete={handleDeleteIndividual}
-                                        />
+                                <>
+                                    {/* Content Header (Only when data present) */}
+                                    <div className="col-span-full flex items-center justify-between mb-2 px-1">
+                                        <h3 className="text-[13px] font-black text-white uppercase tracking-widest">
+                                            โพสต์ล่าสุด
+                                        </h3>
+                                        <div className="flex items-center gap-1.5">
+                                            <button
+                                                onClick={() => toggleFilter('mostView')}
+                                                className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all border
+                                                    ${activeFilters.includes('mostView')
+                                                        ? 'bg-white text-black border-white'
+                                                        : 'bg-transparent text-gray-500 border-white/10 hover:border-white/20'}`}
+                                            >
+                                                ยอดวิว
+                                            </button>
+                                            <button
+                                                onClick={() => toggleFilter('mostLiked')}
+                                                className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all border
+                                                    ${activeFilters.includes('mostLiked')
+                                                        ? 'bg-white text-black border-white'
+                                                        : 'bg-transparent text-gray-500 border-white/10 hover:border-white/20'}`}
+                                            >
+                                                เอนเกจเมนต์
+                                            </button>
+                                        </div>
                                     </div>
-                                ))
+
+                                    {displayNews.map((res) => (
+                                        <div key={res.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <DashboardCard
+                                                post={mapToNewsItem(res)}
+                                                variant={layoutMode}
+                                                categories={categories}
+                                                onAddToCategory={handleAddNewsToCategory}
+                                                onDelete={handleDeleteIndividual}
+                                            />
+                                        </div>
+                                    ))}
+                                </>
                             )}
 
 

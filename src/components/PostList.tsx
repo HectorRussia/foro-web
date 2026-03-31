@@ -288,8 +288,8 @@ const PostList = ({
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-1.5 text-xs text-gray-500 font-bold mt-1">
-                                            <HiOutlineUsers className="text-sm opacity-60" />
+                                        <div className="flex items-center gap-1 text-[11px] text-gray-500 font-medium mt-0.5">
+                                            <HiOutlineUsers className="text-xs opacity-60" />
                                             {list.members.length}
                                         </div>
                                     </div>
