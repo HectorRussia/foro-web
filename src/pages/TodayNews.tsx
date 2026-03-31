@@ -158,24 +158,9 @@ const TodayNews = () => {
         };
     }, [isFilterDropdownOpen]);
 
-    // Handle click outside to close AI filter dropdown
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (aiFilterRef.current && !aiFilterRef.current.contains(event.target as Node)) {
-                setIsAIFilterOpen(false);
-            }
-        };
+    // Handle click outside to close AI filter dropdown is now handled by the backdrop in the modal itself 
+    // to avoid conflicts with the new portal-like structure.
 
-        if (isAIFilterOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        } else {
-            document.removeEventListener('mousedown', handleClickOutside);
-        }
-
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isAIFilterOpen]);
 
     // Start Bulk Analysis
     const startBulkAnalysis = async (cursorOverride?: string) => {
@@ -599,17 +584,23 @@ const TodayNews = () => {
                                         initial={{ opacity: 0, scale: 0.9, y: 20 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-                                        className="w-full max-w-xl bg-[#141416] border border-white/10 rounded-[40px] p-8 md:p-10 shadow-3xl pointer-events-auto"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="w-full max-w-lg bg-[#141416] border-t-[3px] border-t-blue-500 rounded-[28px] p-6 md:p-8 shadow-3xl pointer-events-auto relative overflow-hidden"
                                     >
-                                        <div className="flex flex-col gap-6">
+                                        <div className="flex flex-col gap-5">
                                             {/* Header */}
-                                            <div className="space-y-2">
-                                                <div className="flex items-center gap-3 text-blue-500">
-                                                    <LuSparkles className="text-3xl" />
-                                                    <h2 className="text-2xl font-black tracking-tight">AI Smart Filter</h2>
+                                            <div className="space-y-4">
+                                                <div className="flex items-center gap-3.5">
+                                                    <div className="p-3 bg-[#1a1a1c] border border-white/5 rounded-xl">
+                                                        <LuSparkles className="text-xl text-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.25)]" />
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <h2 className="text-xl font-black text-white tracking-tight leading-none mb-1">AI Smart Filter</h2>
+                                                        <p className="text-gray-500 text-[13px] font-bold opacity-80">บอก AI ว่าอยากหาอะไรในฟีดนี้</p>
+                                                    </div>
                                                 </div>
-                                                <p className="text-sm text-gray-500 leading-relaxed max-w-md">
-                                                    กรองเนื้อหาที่ต้องการโดยระบุเป็นภาษามนุษย์ (เช่น "หาเฉพาะเรื่องระดมทุนของส้มหยุด" หรือ "ข่าวที่เกี่ยวกับ Apple")
+                                                <p className="text-[11px] text-gray-400 font-bold opacity-60">
+                                                    เลือก preset ไปโชว์บนหน้าข่าววันนี้ได้สูงสุด 3 อัน
                                                 </p>
                                             </div>
 
@@ -619,28 +610,28 @@ const TodayNews = () => {
                                                     autoFocus
                                                     value={aiPrompt}
                                                     onChange={(e) => setAiPrompt(e.target.value)}
-                                                    placeholder="ระบุสิ่งที่ต้องการกรองที่นี่ . . ."
-                                                    className="w-full h-48 bg-[#1a1a1c] border-2 border-white/5 rounded-3xl p-6 text-base text-white placeholder-gray-600 focus:outline-none focus:border-blue-500/50 transition-all resize-none shadow-inner"
+                                                    placeholder="เช่น AI ที่มี engagement สูง"
+                                                    className="w-full h-32 bg-[#0c0c0c] border border-white/5 rounded-xl p-5 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-blue-500/20 transition-all resize-none shadow-inner"
                                                 />
                                             </div>
 
                                             {/* Actions */}
-                                            <div className="flex gap-4 pt-2">
+                                            <div className="flex gap-3 pt-1">
                                                 <button
                                                     onClick={() => setIsAIFilterOpen(false)}
-                                                    className="flex-1 py-4 rounded-2xl text-sm font-black text-gray-400 bg-[#1c1c1e] hover:bg-white/5 transition-all uppercase tracking-widest"
+                                                    className="flex-1 py-3.5 rounded-xl text-[13px] font-black text-white/60 bg-[#1c1c1e]/50 border border-white/5 hover:bg-white/5 hover:text-white transition-all uppercase tracking-widest"
                                                 >
                                                     ยกเลิก
                                                 </button>
                                                 <button
                                                     onClick={handleAIFilter}
                                                     disabled={isAIProcessing || newsResults.length === 0}
-                                                    className={`flex-1 py-4 rounded-2xl text-sm font-black text-white transition-all uppercase tracking-widest shadow-xl
+                                                    className={`flex-1 py-3.5 rounded-xl text-[13px] font-black text-white transition-all uppercase tracking-widest shadow-2xl
                                                         ${isAIProcessing || newsResults.length === 0
                                                             ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                                            : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/20 active:scale-[0.98]'}`}
+                                                            : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/30 active:scale-[0.98]'}`}
                                                 >
-                                                    {isAIProcessing ? 'กำลังวิเคราะห์...' : 'กรองข้อมูล'}
+                                                    {isAIProcessing ? 'กำลังวิเคราะห์...' : 'กรองฟีด'}
                                                 </button>
                                             </div>
                                         </div>
