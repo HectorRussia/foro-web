@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { FaMagnifyingGlass, FaTwitter, FaUserPlus, FaRobot, FaWandMagicSparkles, FaArrowRight, FaCopy } from 'react-icons/fa6';
+import { FaMagnifyingGlass, FaUserPlus, FaRobot, FaWandMagicSparkles, FaCopy } from 'react-icons/fa6';
 import { Toaster, toast } from 'react-hot-toast';
-import { HiCheckBadge } from 'react-icons/hi2';
+import { HiCheckBadge, HiOutlinePlus } from 'react-icons/hi2';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from '../components/Layouts/Sidebar';
 import PostList from '../components/PostList';
 import api from '../api/axiosInstance';
 import type { UserTweetSearch, Recommendation } from '../interface/userTarget';
 import PresetUserTarget from '../components/PresetUserTarget';
+import AILoader from '../components/AILoader';
 
 
 const BASE_URL = import.meta.env.VITE_API_URL;
@@ -141,85 +142,78 @@ const UserTarget = () => {
         <div className="flex min-h-screen w-full bg-[#121212] font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
             <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
-                <main className="flex-1 p-3 md:p-6 lg:p-8 min-w-0 overflow-y-auto h-screen">
+                <main className="flex-1 p-3 md:p-6 lg:p-10 min-w-0 overflow-y-auto h-screen no-scrollbar">
 
-                    {/* ── Tabs ── */}
-                    <div className="flex items-center gap-2 mb-5">
+                    {/* ── Header ── */}
+                    <div className="mb-8">
+                        <h1 className="text-4xl font-black text-white flex items-center gap-3 mb-2">
+                            <span className="text-yellow-400">
+                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M3.5 12H7L10 4L14 20L17 12H20.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                            </span>
+                            Smart Target Discovery
+                        </h1>
+                        <p className="text-gray-500 text-sm font-bold opacity-80">
+                            ค้นหาและเพิ่มแหล่งข้อมูลที่ตรงกับความสนใจของคุณ
+                        </p>
+                    </div>
+
+                    {/* ── Tabs (Segmented Control) ── */}
+                    <div className="flex sm:inline-flex items-center p-1.5 bg-[#1a1a1c] border border-white/5 rounded-[22px] mb-8 w-full sm:w-auto">
                         <button
                             onClick={() => setActiveTab('recommend')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'recommend'
-                                ? 'bg-linear-to-r from-blue-600 to-indigo-600 text-white shadow-lg shadow-indigo-500/30'
-                                : 'bg-[#0f172a] text-gray-400 border border-[#1e293b] hover:border-gray-600'
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-[18px] font-bold text-xs transition-all duration-300 ${activeTab === 'recommend'
+                                ? 'bg-[#111112] text-white shadow-xl border border-white/5'
+                                : 'text-gray-500 hover:text-gray-300'
                                 }`}
                         >
-                            <FaRobot className={activeTab === 'recommend' ? 'animate-pulse' : ''} />
+                            <FaWandMagicSparkles className={`text-[14px] ${activeTab === 'recommend' ? 'text-gray-300' : 'text-gray-600'}`} />
                             <span>แนะนำโดย AI</span>
                         </button>
                         <button
                             onClick={() => setActiveTab('search')}
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'search'
-                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/30'
-                                : 'bg-[#0f172a] text-gray-400 border border-[#1e293b] hover:border-gray-600'
+                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-[18px] font-bold text-xs transition-all duration-300 ${activeTab === 'search'
+                                ? 'bg-[#111112] text-white shadow-xl border border-white/5'
+                                : 'text-gray-500 hover:text-gray-300'
                                 }`}
                         >
-                            <FaMagnifyingGlass />
+                            <FaMagnifyingGlass className={`text-[14px] ${activeTab === 'search' ? 'text-gray-300' : 'text-gray-600'}`} />
                             <span>ค้นหาชื่อ</span>
                         </button>
                     </div>
 
-                    {/* ── AI Header ── */}
-                    <AnimatePresence>
-                        {activeTab === 'recommend' && (
-                            <motion.div
-                                initial={{ opacity: 0, x: -20 }}
-                                animate={{ opacity: 1, x: 0 }}
-                                exit={{ opacity: 0, x: -20 }}
-                                className="mb-5"
-                            >
-                                <h2 className="text-base md:text-xl font-black bg-clip-text text-transparent bg-linear-to-r from-blue-400 via-indigo-400 to-purple-400 flex items-center gap-2">
-                                    <FaWandMagicSparkles className="text-yellow-400/80 animate-pulse" />
-                                    <span>Smart Target Discovery</span>
-                                </h2>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
+                    {/* ── Search Category Label ── */}
+                    <div className={`mb-3 ${activeTab === 'search' ? 'block' : 'hidden'}`}>
+                        <h4 className="text-[12px] font-black text-white uppercase tracking-widest opacity-90">
+                            {activeTab === 'search' ? 'ค้นหาด้วย X USERNAME โดยตรง' : ''}
+                        </h4>
+                    </div>
 
                     {/* ── Search Bar ── */}
-                    <div className="w-full max-w-2xl mb-6">
-                        <form onSubmit={handleSearch} className="flex items-center gap-2">
+                    <div className="w-full max-w-3xl mb-3">
+                        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                             {/* Input */}
-                            <div className={`flex-1 flex items-center gap-2 bg-[#0f172a] border-2 rounded-xl px-3 py-2.5 transition-all duration-300 ${activeTab === 'search'
-                                ? 'border-[#1e293b] focus-within:border-blue-500'
-                                : 'border-indigo-500/40 focus-within:border-indigo-500'
-                                }`}>
-                                {activeTab === 'search'
-                                    ? <FaMagnifyingGlass className="text-gray-500 text-sm shrink-0" />
-                                    : <FaRobot className="text-indigo-400 text-sm shrink-0 animate-pulse" />
-                                }
+                            <div className="flex-1 flex items-center gap-4 bg-[#111112] border border-white/5 rounded-[22px] px-6 py-4 transition-all duration-300 focus-within:border-white/10 focus-within:bg-[#1a1a1c]">
+                                <FaMagnifyingGlass className="text-gray-500 text-lg" />
                                 <input
                                     type="text"
                                     value={activeTab === 'search' ? searchQuery : recommendQuery}
                                     onChange={(e) => activeTab === 'search' ? setSearchQuery(e.target.value) : setRecommendQuery(e.target.value)}
-                                    placeholder={activeTab === 'search' ? "ค้นหาบัญชี X..." : "บอก AI ว่าอยากติดตามอะไร..."}
-                                    className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-600 outline-none text-xs md:text-sm min-w-0"
+                                    placeholder={activeTab === 'search' ? "กรอก X Username (เช่น elonmusk)..." : "เช่น ฉันอยากติดตามเรื่องเทคโนโลยี..."}
+                                    className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-700 outline-none text-sm font-bold min-w-0"
                                 />
                             </div>
                             {/* Submit Button */}
                             <button
                                 type="submit"
                                 disabled={isLoading || isRecommending || isSearchingMore}
-                                className={`shrink-0 flex items-center gap-2 px-4 md:px-6 py-2.5 rounded-xl font-black text-xs md:text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-wide ${activeTab === 'search'
-                                    ? 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/20'
-                                    : 'bg-linear-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 shadow-lg shadow-indigo-500/20'
-                                    }`}
+                                className={`w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 px-10 py-5 rounded-[22px] font-black text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest bg-blue-600 hover:bg-blue-500 active:scale-95 shadow-xl shadow-blue-600/30 whitespace-nowrap`}
                             >
                                 {(isLoading || isRecommending) ? (
-                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                 ) : (
-                                    <>
-                                        <span>Search</span>
-                                        <FaArrowRight className="text-[10px] hidden md:block" />
-                                    </>
+                                    <span>ค้นหา</span>
                                 )}
                             </button>
                         </form>
@@ -229,7 +223,7 @@ const UserTarget = () => {
                     <div className="relative">
                         <AnimatePresence mode="wait">
                             {activeTab === 'search' ? (
-                                /* Search: single-col on mobile, 2-col on lg */
+                                /* Search Results */
                                 <motion.div
                                     key="search-results"
                                     initial={{ opacity: 0, y: 10 }}
@@ -244,150 +238,197 @@ const UserTarget = () => {
                                             initial={{ opacity: 0, y: 20 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: idx * 0.05 }}
-                                            className="group flex items-center gap-3 bg-[#0f172a]/80 border border-[#1e293b] p-3 md:p-4 rounded-2xl hover:border-blue-500/40 hover:bg-[#0f172a] transition-all duration-300"
+                                            className="group flex items-center gap-3 bg-[#111112] border border-white/5 p-3 md:p-4 rounded-2xl hover:border-blue-500/40 hover:bg-[#1a1a1c] transition-all duration-300"
                                         >
-
                                             {/* Avatar */}
-                                            <div className="shrink-0 relative">
-                                                <img
-                                                    src={user.profile_image_url_https}
-                                                    alt={user.name}
-                                                    className="w-11 h-11 md:w-14 md:h-14 rounded-full border-2 border-[#1e293b] group-hover:border-blue-500/50 object-cover transition-all duration-300"
-                                                />
-                                                {user.isBlueVerified && (
-                                                    <div className="absolute -bottom-0.5 -right-0.5 bg-white text-blue-500 rounded-full p-0.5 ring-2 ring-[#0f172a]">
-                                                        <HiCheckBadge className="text-[10px] md:text-[12px]" />
-                                                    </div>
-                                                )}
-                                            </div>
+                                            {user.profile_image_url_https && (
+                                                <div className="shrink-0 relative">
+                                                    <img
+                                                        src={user.profile_image_url_https}
+                                                        alt={user.name}
+                                                        className="w-14 h-14 md:w-16 md:h-16 rounded-full border-2 border-white/5 group-hover:border-blue-500/50 object-cover transition-all duration-300"
+                                                        onError={(e) => (e.currentTarget.style.display = 'none')}
+                                                    />
+                                                    {user.isBlueVerified && (
+                                                        <div className="absolute -bottom-0.5 -right-0.5 bg-white text-blue-500 rounded-full p-0.5 ring-2 ring-[#0f172a]">
+                                                            <HiCheckBadge className="text-[10px] md:text-[12px]" />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
 
                                             {/* Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <div className="flex items-center gap-1.5 mb-0.5 min-w-0">
-                                                    <h2 className="text-xs md:text-sm font-black text-white truncate group-hover:text-blue-400 transition-colors">{user.name}</h2>
-                                                    <span className="text-gray-500 bg-[#1e293b] px-1.5 py-0.5 rounded text-[8px] font-bold shrink-0">@{user.screen_name}</span>
+                                            <div className="flex-1 min-w-0 ml-2">
+                                                <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mb-1 min-w-0">
+                                                    <h2 className="text-sm md:text-base font-black text-white truncate uppercase tracking-tight">{user.name}</h2>
+                                                    <span className="text-gray-400 font-bold text-xs">@{user.screen_name}</span>
                                                 </div>
-                                                <p className="text-gray-500 text-[9px] md:text-[10px] line-clamp-1 mb-1.5 leading-relaxed">
-                                                    {user.description}
-                                                </p>
-                                                <div className="flex items-center gap-3">
-                                                    <div>
-                                                        <span className="font-black text-white text-[10px] md:text-xs">{formatNumber(user.followers_count)}</span>
-                                                        <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold ml-0.5">F</span>
+                                                
+                                                <div className="text-blue-500 font-bold text-xs mb-2">
+                                                    @{user.screen_name.toLowerCase()}
+                                                </div>
+
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="font-black text-white text-xs md:text-sm">{formatNumber(user.followers_count)}</span>
+                                                        <span className="text-gray-600 text-[8px] uppercase tracking-widest font-black">F</span>
                                                     </div>
-                                                    <div>
-                                                        <span className="font-black text-white text-[10px] md:text-xs">{formatNumber(user.following_count)}</span>
-                                                        <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold ml-0.5">Fw</span>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="font-black text-white text-xs md:text-sm">{formatNumber(user.following_count)}</span>
+                                                        <span className="text-gray-600 text-[8px] uppercase tracking-widest font-black">Fw</span>
                                                     </div>
-                                                    <div>
-                                                        <span className="font-black text-white text-[10px] md:text-xs">{formatNumber(user.statuses_count)}</span>
-                                                        <span className="text-gray-600 text-[7px] uppercase tracking-widest font-bold ml-0.5">P</span>
+                                                    <div className="flex items-baseline gap-1">
+                                                        <span className="font-black text-white text-xs md:text-sm">{formatNumber(user.statuses_count)}</span>
+                                                        <span className="text-gray-600 text-[8px] uppercase tracking-widest font-black">P</span>
                                                     </div>
                                                 </div>
                                             </div>
 
-                                            {/* Buttons */}
-                                            <div className="shrink-0 flex flex-col gap-1.5">
+                                            {/* Action Button */}
+                                            <div className="shrink-0 ml-4">
                                                 <button
                                                     onClick={() => handleFollow(user.name, user.screen_name, user.profile_image_url_https)}
-                                                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-black text-[9px] md:text-[10px] uppercase tracking-wide transition-all duration-200 active:scale-95 shadow-md shadow-blue-600/30 whitespace-nowrap"
+                                                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-xs md:text-sm uppercase tracking-wide transition-all duration-300 active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] whitespace-nowrap"
                                                 >
-                                                    <FaUserPlus className="text-[8px]" />
-                                                    <span>Follow</span>
+                                                    <FaUserPlus className="text-xs" />
+                                                    <span>+ เพิ่มเข้า Watchlist</span>
                                                 </button>
-                                                <a
-                                                    href={`https://twitter.com/${user.screen_name}`}
-                                                    target="_blank"
-                                                    rel="noreferrer"
-                                                    className="flex items-center justify-center gap-1 px-3 py-1.5 bg-[#1e293b] hover:bg-[#334155] border border-gray-700/50 rounded-lg text-gray-400 hover:text-white font-black text-[9px] md:text-[10px] uppercase tracking-wide transition-all duration-200 whitespace-nowrap"
-                                                >
-                                                    <FaTwitter className="text-[8px]" />
-                                                    <span>Profile</span>
-                                                </a>
                                             </div>
                                         </motion.div>
                                     ))}
                                 </motion.div>
                             ) : (
-                                /* Recommend: 1-col mobile, 2-col md, 3-col lg */
+                                /* AI Recommendation Results */
                                 <motion.div
                                     key="recommend-results"
                                     initial={{ opacity: 0, y: 10 }}
                                     animate={{ opacity: 1, y: 0 }}
                                     exit={{ opacity: 0, y: -10 }}
                                     transition={{ duration: 0.3 }}
-                                    className="flex flex-col"
                                 >
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {isRecommending && recommendations.length === 0 && (
+                                        <div className="py-20">
+                                            <AILoader />
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {recommendations.map((rec, idx) => (
-                                            <motion.div
-                                                key={`${rec.x_account}-${idx}`}
-                                                initial={{ opacity: 0, y: 20 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: idx * 0.05 }}
-                                                className="group flex flex-col bg-[#0f172a]/80 border border-indigo-500/20 p-5 rounded-2xl hover:border-indigo-500/60 hover:shadow-[0_15px_30px_rgba(99,102,241,0.1)] transition-all duration-500 relative overflow-hidden"
-                                            >
-                                                <div className="absolute -top-8 -right-8 w-24 h-24 bg-indigo-600/10 blur-2xl rounded-full group-hover:bg-indigo-600/20 transition-all duration-500" />
-
-                                                <div className="flex items-center justify-between mb-3 relative z-10">
-                                                    <div className="bg-indigo-600/20 border border-indigo-500/30 px-2.5 py-1 rounded-full flex items-center gap-1.5">
-                                                        <FaRobot className="text-indigo-400 text-[9px] animate-pulse" />
-                                                        <span className="text-[9px] font-black text-indigo-300 uppercase tracking-widest">AI Pick</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(rec.x_account);
-                                                            toast.success(`คัดลอก @${rec.x_account} แล้ว`);
+                                                <motion.div
+                                                    key={`${rec.x_account}-${idx}`}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: idx * 0.05 }}
+                                                    whileHover={{ y: -4 }}
+                                                    className="group flex flex-col p-6 rounded-[24px] transition-all duration-500 relative overflow-hidden h-full"
+                                                    style={{
+                                                        backgroundColor: 'rgba(13, 17, 23, 0.4)',
+                                                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                                                    }}
+                                                >
+                                                    {/* Top Right Glow */}
+                                                    <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
+                                                        style={{
+                                                            background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.15), transparent 70%)'
                                                         }}
-                                                        className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-[#1e293b]/50 text-gray-400 hover:text-indigo-400 hover:bg-indigo-500/10 transition-all duration-300 border border-transparent hover:border-indigo-500/30 group/copy"
-                                                        title="คัดลอกชื่อผู้ใช้"
+                                                    />
+
+                                                    {/* Hover Border Overlay (To avoid border jumping) */}
+                                                    <div className="absolute inset-0 rounded-[24px] border border-transparent group-hover:border-[#0070f3]/50 transition-colors duration-500 pointer-events-none" />
+
+                                                    <div className="flex items-center justify-between mb-5 relative z-10">
+                                                        <div className="bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 px-3 py-1 rounded-full flex items-center gap-1.5">
+                                                            <FaRobot className="text-[#8b5cf6] text-[10px]" />
+                                                            <span className="text-[9px] font-black text-[#8b5cf6] uppercase tracking-widest">AI Pick</span>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(rec.x_account);
+                                                                    toast.success(`คัดลอก @${rec.x_account} แล้ว`);
+                                                                }}
+                                                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm group/btn"
+                                                                title="คัดลอกชื่อผู้ใช้"
+                                                            >
+                                                                <FaCopy className="text-sm group-hover/btn:scale-110 transition-transform" />
+                                                            </button>
+                                                            <button
+                                                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm"
+                                                                title="Options"
+                                                            >
+                                                                <HiOutlinePlus className="text-sm" />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    {/* Header with Avatar */}
+                                                    <div className="flex items-start gap-4 mb-5 relative z-10">
+                                                        <div className="relative group/avatar shrink-0">
+                                                            <img
+                                                                src={`https://unavatar.io/twitter/${rec.x_account}`}
+                                                                alt={rec.name}
+                                                                className="w-14 h-14 rounded-full border border-white/10 group-hover:border-[#0070f3]/30 object-cover transition-all"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.parentElement?.classList.add('hidden');
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <div className="min-w-0 pt-1">
+                                                            <h3 className="text-base font-black text-white group-hover:text-blue-400 transition-colors truncate tracking-tight uppercase mb-0.5">
+                                                                {rec.name}
+                                                            </h3>
+                                                            <span className="text-gray-500 font-black text-sm tracking-tight truncate block opacity-70">@{rec.x_account}</span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mb-8 flex-1 relative z-10">
+                                                        <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-4 group-hover:text-gray-300 transition-colors">
+                                                            "{rec.reason}"
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Action Button */}
+                                                    <button
+                                                        onClick={() => handleFollow(rec.name, rec.x_account, `https://unavatar.io/twitter/${rec.x_account}`)}
+                                                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white/5 border border-white/5 text-gray-300 hover:text-white hover:bg-white/10 group-hover:border-[#0070f3]/30 transition-all font-bold text-xs uppercase tracking-widest mt-auto shadow-sm relative z-10"
                                                     >
-                                                        <span className="text-[9px] font-bold uppercase tracking-wider hidden group-hover/copy:block transition-all">Copy</span>
-                                                        <FaCopy className="text-[12px]" />
+                                                        <span>+ เพิ่มเข้า Watchlist</span>
                                                     </button>
-                                                </div>
-
-                                                <h3 className="text-md md:text-base font-black text-white group-hover:text-indigo-400 transition-colors truncate tracking-tight uppercase mb-0.5">
-                                                    {rec.name}
-                                                </h3>
-                                                <span className="text-indigo-400/80 font-bold text-md tracking-tight italic mb-3">@{rec.x_account}</span>
-
-                                                <div className="mt-auto border-t border-indigo-500/10 pt-3 relative">
-                                                    <div className="absolute top-0 left-0 w-8 h-0.5 bg-indigo-500 rounded-full" />
-                                                    <p className="text-gray-400 text-md leading-relaxed italic line-clamp-5 group-hover:text-gray-300 transition-colors">
-                                                        "{rec.reason}"
-                                                    </p>
-                                                </div>
-                                            </motion.div>
+                                                </motion.div>
                                         ))}
                                     </div>
+
+                                    {/* ── Additional Loader ── */}
+                                    {isSearchingMore && (
+                                        <div className="py-12">
+                                            <AILoader />
+                                        </div>
+                                    )}
 
                                     {/* ── Search More Button ── */}
                                     {recommendations.length > 0 && (
                                         <motion.div
                                             initial={{ opacity: 0, y: 10 }}
                                             animate={{ opacity: 1, y: 0 }}
-                                            className="flex justify-center mt-10 mb-10"
+                                            className="flex justify-start mt-10 mb-10"
                                         >
                                             <button
                                                 onClick={handleSearchMore}
                                                 disabled={isRecommending || isSearchingMore}
-                                                className="group relative flex items-center gap-3 px-8 py-4 bg-[#0f172a] border border-indigo-500/30 rounded-2xl font-black text-xs md:text-sm text-indigo-400 hover:text-white hover:border-indigo-500 hover:bg-indigo-600/10 transition-all duration-500 shadow-xl shadow-indigo-500/5 hover:shadow-indigo-500/20 active:scale-95 overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="group relative flex items-center gap-3 px-8 py-3 bg-[#111112] border border-white/5 rounded-full font-black text-sm text-gray-300 hover:text-white hover:bg-white/5 transition-all duration-300 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                                             >
-                                                <div className="absolute inset-0 bg-linear-to-r from-indigo-600/0 via-indigo-600/5 to-indigo-600/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
                                                 {isSearchingMore ? (
-                                                    <div className="w-4 h-4 border-2 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
+                                                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                                                 ) : (
-                                                    <FaWandMagicSparkles className="text-indigo-400 group-hover:rotate-12 transition-transform" />
+                                                    <FaWandMagicSparkles className="text-gray-400 group-hover:rotate-12 transition-transform" />
                                                 )}
-                                                <span className="tracking-widest uppercase">
+                                                <span className="tracking-widest uppercase text-xs">
                                                     {isSearchingMore ? "กำลังค้นหาเพิ่ม..." : "ค้นหาเพิ่มเติม"}
                                                 </span>
                                             </button>
                                         </motion.div>
                                     )}
 
-                                    {/* ── Empty State ── */}
+                                    {/* ── Empty State / Presets ── */}
                                     {!isRecommending && recommendations.length === 0 && (
                                         <motion.div
                                             initial={{ opacity: 0 }}

@@ -20,18 +20,18 @@ export interface CategoryPreset {
 }
 
 const CATEGORIES: CategoryPreset[] = [
-    { id: 'tech', name: 'เทคโนโลยี', icon: <FaMicrochip />, color: 'from-blue-500 to-cyan-500' },
-    { id: 'ai', name: 'AI', icon: <FaRobot />, color: 'from-purple-500 to-indigo-500' },
-    { id: 'business', name: 'ธุรกิจ', icon: <FaBriefcase />, color: 'from-emerald-500 to-teal-500' },
-    { id: 'marketing', name: 'การตลาด', icon: <FaChartLine />, color: 'from-orange-500 to-red-500' },
-    { id: 'finance', name: 'การเงิน', icon: <FaBuildingColumns />, color: 'from-amber-500 to-yellow-500' },
-    { id: 'investment', name: 'การลงทุน', icon: <FaHandHoldingDollar />, color: 'from-green-500 to-emerald-500' },
-    { id: 'crypto', name: 'คริปโต', icon: <FaBitcoin />, color: 'from-orange-400 to-yellow-600' },
-    { id: 'health', name: 'สุขภาพ', icon: <FaHeartPulse />, color: 'from-rose-500 to-pink-500' },
-    { id: 'lifestyle', name: 'ไลฟ์สไตล์', icon: <FaPersonWalking />, color: 'from-fuchsia-500 to-purple-500' },
-    { id: 'economy', name: 'เศรษฐกิจ', icon: <FaGlobe />, color: 'from-sky-500 to-blue-500' },
-    { id: 'politics', name: 'การเมือง', icon: <FaGavel />, color: 'from-slate-500 to-gray-500' },
-    { id: 'self_dev', name: 'การพัฒนาตัวเอง', icon: <FaLightbulb />, color: 'from-lime-500 to-green-500' },
+    { id: 'tech', name: 'เทคโนโลยี', icon: <FaMicrochip />, color: '#3b82f6' },
+    { id: 'ai', name: 'AI', icon: <FaRobot />, color: '#a855f7' },
+    { id: 'business', name: 'ธุรกิจ', icon: <FaBriefcase />, color: '#eab308' },
+    { id: 'marketing', name: 'การตลาด', icon: <FaChartLine />, color: '#f43f5e' },
+    { id: 'finance', name: 'การเงิน', icon: <FaBuildingColumns />, color: '#10b981' },
+    { id: 'investment', name: 'การลงทุน', icon: <FaHandHoldingDollar />, color: '#0ea5e9' },
+    { id: 'crypto', name: 'คริปโต', icon: <FaBitcoin />, color: '#f59e0b' },
+    { id: 'health', name: 'สุขภาพ', icon: <FaHeartPulse />, color: '#ec4899' },
+    { id: 'lifestyle', name: 'ไลฟ์สไตล์', icon: <FaPersonWalking />, color: '#22c55e' },
+    { id: 'economy', name: 'เศรษฐกิจ', icon: <FaGlobe />, color: '#3b82f6' },
+    { id: 'politics', name: 'การเมือง', icon: <FaGavel />, color: '#64748b' },
+    { id: 'self_dev', name: 'การพัฒนาตัวเอง', icon: <FaLightbulb />, color: '#d946ef' },
 ];
 
 interface PresetUserTargetProps {
@@ -40,6 +40,7 @@ interface PresetUserTargetProps {
 
 const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
     const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+    const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
     const [seed, setSeed] = useState(0);
     const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -51,7 +52,6 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
 
     const handleShuffle = async () => {
         setIsRefreshing(true);
-        // Add a small artificial delay to show the "loading" effect as requested by user
         await new Promise(resolve => setTimeout(resolve, 600));
         setSeed(prev => prev + 1);
         setIsRefreshing(false);
@@ -66,7 +66,6 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
         }
     };
 
-    // Auto trigger initial load if needed or handle logic
     useEffect(() => {
         if (selectedCategory && seed === 0) {
             setSeed(1);
@@ -75,41 +74,82 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
 
     return (
         <div className="w-full mt-10">
-            <motion.h2
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="text-sm font-black text-gray-400 mb-6 flex items-center justify-center gap-3 uppercase tracking-widest text-center"
-            >
-                <span className="w-1.5 h-4 bg-blue-600 rounded-full"></span>
-                ลองติดตามผู้เชี่ยวชาญจากหมวดหมู่ที่คุณสนใจ
-                <span className="w-1.5 h-4 bg-blue-600 rounded-full"></span>
-            </motion.h2>
+            <div className="mb-12 border-t border-white/5 pt-12 relative overflow-hidden">
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-linear-to-r from-transparent via-blue-500/50 to-transparent" />
+                <motion.h2
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="text-[11px] font-black text-gray-400 mb-10 flex items-center justify-center gap-3 uppercase tracking-[0.25em] text-center opacity-60"
+                >
+                    DISCOVER BY CATEGORY
+                </motion.h2>
 
-            {/* Category Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 mb-8 max-w-4xl mx-auto">
-                {CATEGORIES.map((cat, idx) => (
-                    <motion.button
-                        key={cat.id}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        transition={{ delay: idx * 0.05 }}
-                        onClick={() => handleCategoryClick(cat.id)}
-                        disabled={isRefreshing}
-                        className={`group relative flex flex-col items-center justify-center p-3 rounded-xl border transition-all duration-300 disabled:opacity-70 ${selectedCategory === cat.id
-                            ? 'bg-linear-to-br ' + cat.color + ' border-transparent shadow-lg shadow-blue-500/20'
-                            : 'bg-[#0f172a]/40 border-[#1e293b] hover:border-gray-500 hover:bg-[#0f172a]/60'
+                {/* Category Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto px-4">
+                    {CATEGORIES.map((cat, idx) => (
+                        <motion.button
+                            key={cat.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            whileHover={{ y: -8 }}
+                            transition={{ 
+                                type: "spring",
+                                stiffness: 400,
+                                damping: 25,
+                                opacity: { delay: idx * 0.05 },
+                                y: { duration: 0.2 }
+                            }}
+                            onMouseEnter={() => setHoveredCategory(cat.id)}
+                            onMouseLeave={() => setHoveredCategory(null)}
+                            onClick={() => handleCategoryClick(cat.id)}
+                            disabled={isRefreshing}
+                            className={`group relative flex flex-col items-center justify-center p-6 rounded-[32px] border transition-all duration-500 disabled:opacity-70 ${selectedCategory === cat.id
+                                ? 'border-white/20 shadow-2xl'
+                                : 'bg-[#111112] border-white/5 hover:border-white/20'
+                                }`}
+                            style={{
+                                backgroundColor: selectedCategory === cat.id || hoveredCategory === cat.id 
+                                    ? `${cat.color}15` // 15 = roughly 8% opacity in hex
+                                    : '#111112'
+                            }}
+                        >
+                            {/* Icon Container */}
+                            <div 
+                                className={`w-14 h-14 rounded-[22px] flex items-center justify-center mb-4 transition-all duration-500 text-2xl
+                                    ${selectedCategory === cat.id ? 'shadow-lg' : 'group-hover:scale-110'}`}
+                                style={{
+                                    backgroundColor: `${cat.color}20`, // 20 = 12% opacity
+                                    color: cat.color,
+                                    boxShadow: selectedCategory === cat.id || hoveredCategory === cat.id 
+                                        ? `0 0 20px ${cat.color}30` 
+                                        : 'none'
+                                }}
+                            >
+                                {cat.icon}
+                            </div>
+
+                            <span className={`text-[12px] font-black uppercase tracking-widest transition-all duration-300 ${
+                                selectedCategory === cat.id || hoveredCategory === cat.id ? 'text-white' : 'text-gray-500'
                             }`}
-                    >
-                        <div className={`text-xl mb-1.5 transition-transform group-hover:scale-110 ${selectedCategory === cat.id ? 'text-white' : 'text-gray-500'
-                            }`}>
-                            {cat.icon}
-                        </div>
-                        <span className={`text-[10px] font-black uppercase tracking-wider ${selectedCategory === cat.id ? 'text-white' : 'text-gray-500 group-hover:text-gray-300'
-                            }`}>
-                            {cat.name}
-                        </span>
-                    </motion.button>
-                ))}
+                            style={{
+                                color: selectedCategory === cat.id || hoveredCategory === cat.id ? '#ffffff' : undefined
+                            }}>
+                                {cat.name}
+                            </span>
+
+                            {/* Active Glow */}
+                            {(selectedCategory === cat.id || hoveredCategory === cat.id) && (
+                                <motion.div
+                                    layoutId="active-glow"
+                                    className="absolute inset-0 rounded-[32px] blur-2xl -z-10"
+                                    style={{ backgroundColor: `${cat.color}10` }}
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                />
+                            )}
+                        </motion.button>
+                    ))}
+                </div>
             </div>
 
             {/* Random Users View */}

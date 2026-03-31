@@ -141,7 +141,7 @@ const PostList = ({
         <div className={`flex flex-col h-full bg-[#121212] ${showBorder ? 'border-l border-white/5' : ''} w-[350px] shrink-0 transition-all duration-500`}>
 
             {/* Header */}
-            <div className="px-6 py-8 flex items-center justify-between">
+            <div className="px-6 pt-8 flex items-center justify-between mb-2">
                 <div className="flex items-center gap-3">
                     <div className="flex items-end gap-[3px] mb-1">
                         <div className="w-[3px] h-3 bg-white/80 rounded-full" />
@@ -149,19 +149,25 @@ const PostList = ({
                         <div className="w-[3px] h-4 bg-white/60 rounded-full" />
                         <div className="w-[3px] h-[18px] bg-white/40 rounded-full ml-0.5 transform rotate-20 origin-bottom" />
                     </div>
-                    <span className="font-black text-lg tracking-[0.15em] text-gray-200">POST LIST</span>
+                    <span className="font-black text-xs tracking-[0.2em] text-gray-500 uppercase">POST LIST</span>
                 </div>
                 <button
                     onClick={() => setIsCreating(true)}
                     className="p-1 hover:bg-white/5 rounded-lg text-gray-400 group transition-all"
                 >
-                    <HiOutlinePlus className="text-2xl group-hover:text-white" />
+                    <HiOutlinePlus className="text-xl group-hover:text-white" />
                 </button>
             </div>
 
-            <div className="px-6">
-                <div className="h-px w-full bg-white/5 mb-6" />
-                <h3 className="text-[10px] font-black tracking-[0.2em] text-gray-500 uppercase mb-4">YOUR LISTS</h3>
+            {/* Create Shortcut Button */}
+            <div className="px-5 mb-8">
+                <button
+                    onClick={() => setIsCreating(true)}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[20px] bg-[#1a1a1c] border border-white/5 text-gray-300 hover:text-white hover:bg-[#252527] transition-all font-bold text-[13px] shadow-sm"
+                >
+                    <HiOutlinePlus className="text-lg text-gray-400" />
+                    <span>สร้าง Post List</span>
+                </button>
             </div>
 
             {/* Create Section */}
@@ -224,6 +230,25 @@ const PostList = ({
                 {isLoading && lists.length === 0 ? (
                     <div className="flex justify-center py-10">
                         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                ) : lists.length === 0 ? (
+                    /* Empty State - Redesigned */
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 px-6 text-center">
+                        <div className="flex items-end gap-1.5 mb-8 opacity-20">
+                            <div className="w-1.5 h-8 bg-white rounded-full" />
+                            <div className="w-1.5 h-12 bg-white rounded-full" />
+                            <div className="w-1.5 h-10 bg-white rounded-full" />
+                        </div>
+                        <h4 className="text-white font-black text-lg mb-2">ไม่มีรายการ Post list</h4>
+                        <p className="text-gray-500 text-[13px] font-bold leading-relaxed mb-8 opacity-80">
+                            สร้างใหม่เพื่อจัดระเบียบแหล่งข้อมูลของคุณ
+                        </p>
+                        <button
+                            onClick={() => setIsCreating(true)}
+                            className="px-10 py-3.5 rounded-full bg-linear-to-r from-[#3b82f6] to-[#8b5cf6] text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-blue-500/20 hover:scale-[1.02] active:scale-95 transition-all"
+                        >
+                            สร้างลิสต์
+                        </button>
                     </div>
                 ) : (
                     lists.map((list) => {
