@@ -33,7 +33,7 @@ const TodayNews = () => {
     const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
     const filterDropdownRef = useRef<HTMLDivElement>(null);
 
-    const [statusMessage, setStatusMessage] = useState('ระบบพร้อมทำงาน');
+    const [/* statusMessage */, setStatusMessage] = useState('ระบบพร้อมทำงาน');
     const [nextCursor, setNextCursor] = useState<string | null>(() => localStorage.getItem('today_news_twitter_cursor'));
     const [hasStarted, setHasStarted] = useState(false);
     const [backupResults, setBackupResults] = useState<NewsResult[]>([]);
@@ -62,7 +62,7 @@ const TodayNews = () => {
         cursor: ""
     });
 
-    const [searchTerm, setSearchTerm] = useState('');
+    const [searchTerm, /* setSearchTerm */] = useState('');
 
     // Refs
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -706,9 +706,9 @@ const TodayNews = () => {
                             {newsResults.length === 0 && !isStreaming ? (
                                 <div className="col-span-full py-64 flex flex-col items-center justify-center text-center relative overflow-hidden">
                                     <HomeCanvas />
-                                    
+
                                     {/* Radial Glow Effect in the Center */}
-                                    <motion.div 
+                                    <motion.div
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: [0.25, 0.55, 0.25], scale: [0.98, 1.02, 0.98] }}
                                         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
@@ -719,7 +719,7 @@ const TodayNews = () => {
                                         }}
                                     />
 
-                                    <motion.div 
+                                    <motion.div
                                         animate={{ opacity: [0.3, 0.7, 0.3] }}
                                         transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                                         className="relative z-10"
