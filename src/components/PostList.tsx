@@ -27,11 +27,13 @@ const colors = [
 const PostList = ({
     showBorder = true,
     activeId,
-    onSelect
+    onSelect,
+    refreshKey
 }: {
     showBorder?: boolean,
     activeId?: number | null,
-    onSelect?: (list: PostListWithMembers | null) => void
+    onSelect?: (list: PostListWithMembers | null) => void,
+    refreshKey?: any
 }) => {
     const [lists, setLists] = useState<PostListWithMembers[]>([]);
     const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
@@ -71,7 +73,7 @@ const PostList = ({
 
     useEffect(() => {
         fetchAllData();
-    }, []);
+    }, [refreshKey]);
 
     const handleCreateList = async () => {
         if (!newListName.trim()) return;

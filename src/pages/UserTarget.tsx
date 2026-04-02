@@ -1,14 +1,18 @@
-import { useState } from 'react';
-import { FaMagnifyingGlass, FaUserPlus, FaRobot, FaWandMagicSparkles, FaCopy } from 'react-icons/fa6';
-import { Toaster, toast } from 'react-hot-toast';
-import { HiCheckBadge, HiOutlinePlus } from 'react-icons/hi2';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Toaster, toast } from 'react-hot-toast';
+import { FaMagnifyingGlass, FaUserPlus, FaRobot, FaWandMagicSparkles, FaCopy, FaTrash } from 'react-icons/fa6';
+import { HiCheckBadge, HiOutlinePlus, HiXMark, HiArrowTopRightOnSquare } from 'react-icons/hi2';
+
 import Sidebar from '../components/Layouts/Sidebar';
 import PostList from '../components/PostList';
-import api from '../api/axiosInstance';
-import type { UserTweetSearch, Recommendation } from '../interface/userTarget';
 import PresetUserTarget from '../components/PresetUserTarget';
 import AILoader from '../components/AILoader';
+
+import api from '../api/axiosInstance';
+import * as postListApi from '../api/postList';
+import type { PostList as IPostList, PostListUser } from '../api/postList';
+import type { UserTweetSearch, Recommendation, FollowedUser } from '../interface/userTarget';
 
 
 const BASE_URL = import.meta.env.VITE_API_URL;
@@ -24,6 +28,16 @@ const UserTarget = () => {
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [isRecommending, setIsRecommending] = useState(false);
     const [isSearchingMore, setIsSearchingMore] = useState(false);
+
+    // Followed users state
+    const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
+    const [isFetchingFollowed, setIsFetchingFollowed] = useState(false);
+
+    // Post List state for options
+    const [selectedUserForOptions, setSelectedUserForOptions] = useState<number | null>(null);
+    const [postLists, setPostLists] = useState<(IPostList & { members: PostListUser[] })[]>([]);
+    const [isFetchingLists, setIsFetchingLists] = useState(false);
+    const [refreshSidebar, setRefreshSidebar] = useState(0);
 
     const formatNumber = (num: number) => {
         return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
@@ -58,6 +72,8 @@ const UserTarget = () => {
             });
 
             toast.success(`Followed ${name} successfully`);
+            fetchFollowedUsers();
+            setRefreshSidebar(prev => prev + 1);
 
         } catch (error: any) {
             if (error.response && error.response.status === 400) {
@@ -96,6 +112,77 @@ const UserTarget = () => {
             setIsRecommending(false);
         }
     };
+
+    const fetchFollowedUsers = async () => {
+        setIsFetchingFollowed(true);
+        try {
+            const response = await api.get(`${BASE_URL}/follow`);
+
+            if (Array.isArray(response.data)) {
+                setFollowedUsers(response.data);
+            } else if (Array.isArray(response.data?.data)) {
+                setFollowedUsers(response.data.data);
+            } else {
+                setFollowedUsers([]);
+            }
+        } catch (error) {
+            console.error("Error fetching followed users:", error);
+        } finally {
+            setIsFetchingFollowed(false);
+        }
+    };
+
+    const handleUnfollow = async (userId: number, name: string) => {
+        try {
+            await api.delete(`${BASE_URL}/follow/users/${userId}`);
+            toast.success(`Unfollowed ${name}`);
+            setFollowedUsers(prev => prev.filter(u => u.id !== userId));
+            setRefreshSidebar(prev => prev + 1);
+        } catch (error) {
+            console.error("Error unfollowing:", error);
+            toast.error("ไม่สามารถยกเลิกการติดตามได้");
+        }
+    };
+
+    const fetchPostLists = async () => {
+        try {
+            setIsFetchingLists(true);
+            const lists = await postListApi.getPostLists();
+            const listsWithMembers = await Promise.all(
+                lists.map(async (list) => {
+                    const members = await postListApi.getPostListUsers(list.id);
+                    return { ...list, members };
+                })
+            );
+            setPostLists(listsWithMembers);
+        } catch (error) {
+            console.error('Failed to fetch post lists:', error);
+        } finally {
+            setIsFetchingLists(false);
+        }
+    };
+
+    const handleToggleList = async (listId: number, userId: number, isMember: boolean) => {
+        try {
+            if (isMember) {
+                await postListApi.deletePostListUserRelation(listId, userId);
+                toast.success('นำออกจากรายการแล้ว');
+            } else {
+                await postListApi.createPostListUser(listId, userId);
+                toast.success('เพิ่มเข้าในรายการแล้ว');
+            }
+            fetchPostLists(); // Refresh lists to show update
+            setRefreshSidebar(prev => prev + 1); // Refresh sidebar count
+        } catch (error) {
+            console.error('Failed to toggle list membership:', error);
+            toast.error('ไม่สามารถดำเนินการได้');
+        }
+    };
+
+    useEffect(() => {
+        fetchFollowedUsers();
+        fetchPostLists();
+    }, []);
 
     const handleSearchMore = async () => {
         if (!recommendQuery.trim() || isRecommending || isSearchingMore) return;
@@ -169,7 +256,7 @@ const UserTarget = () => {
                                 }`}
                         >
                             <FaWandMagicSparkles className={`text-[14px] ${activeTab === 'recommend' ? 'text-gray-300' : 'text-gray-600'}`} />
-                            <span>แนะนำโดย AI</span>
+                            <span>แนะนำโดย FORO</span>
                         </button>
                         <button
                             onClick={() => setActiveTab('search')}
@@ -263,7 +350,7 @@ const UserTarget = () => {
                                                     <h2 className="text-sm md:text-base font-black text-white truncate uppercase tracking-tight">{user.name}</h2>
                                                     <span className="text-gray-400 font-bold text-xs">@{user.screen_name}</span>
                                                 </div>
-                                                
+
                                                 <div className="text-blue-500 font-bold text-xs mb-2">
                                                     @{user.screen_name.toLowerCase()}
                                                 </div>
@@ -313,87 +400,87 @@ const UserTarget = () => {
                                     )}
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                                         {recommendations.map((rec, idx) => (
-                                                <motion.div
-                                                    key={`${rec.x_account}-${idx}`}
-                                                    initial={{ opacity: 0, y: 20 }}
-                                                    animate={{ opacity: 1, y: 0 }}
-                                                    transition={{ delay: idx * 0.05 }}
-                                                    whileHover={{ y: -4 }}
-                                                    className="group flex flex-col p-6 rounded-[24px] transition-all duration-500 relative overflow-hidden h-full"
+                                            <motion.div
+                                                key={`${rec.x_account}-${idx}`}
+                                                initial={{ opacity: 0, y: 20 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                whileHover={{ y: -4 }}
+                                                className="group flex flex-col p-6 rounded-[24px] transition-all duration-500 relative overflow-hidden h-full"
+                                                style={{
+                                                    backgroundColor: 'rgba(13, 17, 23, 0.4)',
+                                                    border: '1px solid rgba(255, 255, 255, 0.08)'
+                                                }}
+                                            >
+                                                {/* Top Right Glow */}
+                                                <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
                                                     style={{
-                                                        backgroundColor: 'rgba(13, 17, 23, 0.4)',
-                                                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                                                        background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.15), transparent 70%)'
                                                     }}
+                                                />
+
+                                                {/* Hover Border Overlay (To avoid border jumping) */}
+                                                <div className="absolute inset-0 rounded-[24px] border border-transparent group-hover:border-[#0070f3]/50 transition-colors duration-500 pointer-events-none" />
+
+                                                <div className="flex items-center justify-between mb-5 relative z-10">
+                                                    <div className="bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 px-3 py-1 rounded-full flex items-center gap-1.5">
+                                                        <FaRobot className="text-[#8b5cf6] text-[10px]" />
+                                                        <span className="text-[9px] font-black text-[#8b5cf6] uppercase tracking-widest">AI Pick</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <button
+                                                            onClick={() => {
+                                                                navigator.clipboard.writeText(rec.x_account);
+                                                                toast.success(`คัดลอก @${rec.x_account} แล้ว`);
+                                                            }}
+                                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm group/btn"
+                                                            title="คัดลอกชื่อผู้ใช้"
+                                                        >
+                                                            <FaCopy className="text-sm group-hover/btn:scale-110 transition-transform" />
+                                                        </button>
+                                                        <button
+                                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm"
+                                                            title="Options"
+                                                        >
+                                                            <HiOutlinePlus className="text-sm" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Header with Avatar */}
+                                                <div className="flex items-start gap-4 mb-5 relative z-10">
+                                                    <div className="relative group/avatar shrink-0">
+                                                        <img
+                                                            src={`https://unavatar.io/twitter/${rec.x_account}`}
+                                                            alt={rec.name}
+                                                            className="w-14 h-14 rounded-full border border-white/10 group-hover:border-[#0070f3]/30 object-cover transition-all"
+                                                            onError={(e) => {
+                                                                e.currentTarget.parentElement?.classList.add('hidden');
+                                                            }}
+                                                        />
+                                                    </div>
+                                                    <div className="min-w-0 pt-1">
+                                                        <h3 className="text-base font-black text-white group-hover:text-blue-400 transition-colors truncate tracking-tight uppercase mb-0.5">
+                                                            {rec.name}
+                                                        </h3>
+                                                        <span className="text-gray-500 font-black text-sm tracking-tight truncate block opacity-70">@{rec.x_account}</span>
+                                                    </div>
+                                                </div>
+
+                                                <div className="mb-8 flex-1 relative z-10">
+                                                    <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-4 group-hover:text-gray-300 transition-colors">
+                                                        "{rec.reason}"
+                                                    </p>
+                                                </div>
+
+                                                {/* Action Button */}
+                                                <button
+                                                    onClick={() => handleFollow(rec.name, rec.x_account, `https://unavatar.io/twitter/${rec.x_account}`)}
+                                                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white/5 border border-white/5 text-gray-300 hover:text-white hover:bg-white/10 group-hover:border-[#0070f3]/30 transition-all font-bold text-xs uppercase tracking-widest mt-auto shadow-sm relative z-10"
                                                 >
-                                                    {/* Top Right Glow */}
-                                                    <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                                                        style={{
-                                                            background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.15), transparent 70%)'
-                                                        }}
-                                                    />
-
-                                                    {/* Hover Border Overlay (To avoid border jumping) */}
-                                                    <div className="absolute inset-0 rounded-[24px] border border-transparent group-hover:border-[#0070f3]/50 transition-colors duration-500 pointer-events-none" />
-
-                                                    <div className="flex items-center justify-between mb-5 relative z-10">
-                                                        <div className="bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 px-3 py-1 rounded-full flex items-center gap-1.5">
-                                                            <FaRobot className="text-[#8b5cf6] text-[10px]" />
-                                                            <span className="text-[9px] font-black text-[#8b5cf6] uppercase tracking-widest">AI Pick</span>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <button
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(rec.x_account);
-                                                                    toast.success(`คัดลอก @${rec.x_account} แล้ว`);
-                                                                }}
-                                                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm group/btn"
-                                                                title="คัดลอกชื่อผู้ใช้"
-                                                            >
-                                                                <FaCopy className="text-sm group-hover/btn:scale-110 transition-transform" />
-                                                            </button>
-                                                            <button
-                                                                className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm"
-                                                                title="Options"
-                                                            >
-                                                                <HiOutlinePlus className="text-sm" />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Header with Avatar */}
-                                                    <div className="flex items-start gap-4 mb-5 relative z-10">
-                                                        <div className="relative group/avatar shrink-0">
-                                                            <img
-                                                                src={`https://unavatar.io/twitter/${rec.x_account}`}
-                                                                alt={rec.name}
-                                                                className="w-14 h-14 rounded-full border border-white/10 group-hover:border-[#0070f3]/30 object-cover transition-all"
-                                                                onError={(e) => {
-                                                                    e.currentTarget.parentElement?.classList.add('hidden');
-                                                                }}
-                                                            />
-                                                        </div>
-                                                        <div className="min-w-0 pt-1">
-                                                            <h3 className="text-base font-black text-white group-hover:text-blue-400 transition-colors truncate tracking-tight uppercase mb-0.5">
-                                                                {rec.name}
-                                                            </h3>
-                                                            <span className="text-gray-500 font-black text-sm tracking-tight truncate block opacity-70">@{rec.x_account}</span>
-                                                        </div>
-                                                    </div>
-
-                                                    <div className="mb-8 flex-1 relative z-10">
-                                                        <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-4 group-hover:text-gray-300 transition-colors">
-                                                            "{rec.reason}"
-                                                        </p>
-                                                    </div>
-
-                                                    {/* Action Button */}
-                                                    <button
-                                                        onClick={() => handleFollow(rec.name, rec.x_account, `https://unavatar.io/twitter/${rec.x_account}`)}
-                                                        className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white/5 border border-white/5 text-gray-300 hover:text-white hover:bg-white/10 group-hover:border-[#0070f3]/30 transition-all font-bold text-xs uppercase tracking-widest mt-auto shadow-sm relative z-10"
-                                                    >
-                                                        <span>+ เพิ่มเข้า Watchlist</span>
-                                                    </button>
-                                                </motion.div>
+                                                    <span>+ เพิ่มเข้า Watchlist</span>
+                                                </button>
+                                            </motion.div>
                                         ))}
                                     </div>
 
@@ -442,9 +529,162 @@ const UserTarget = () => {
                             )}
                         </AnimatePresence>
                     </div>
+
+                    {/* ── Followed Accounts Section ── */}
+                    {activeTab === 'search' && (
+                        <div className="mt-20">
+                            <hr className="border-t border-white/5 mb-10 w-full" />
+
+                            <div className="flex items-center justify-between mb-8">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-3 h-3 bg-white/20 rounded-sm" />
+                                    <h3 className="text-base font-black text-white/80 uppercase tracking-widest flex items-center gap-2">
+                                        บัญชีที่ติดตามอยู่
+                                        <span className="text-gray-600">({followedUsers.length})</span>
+                                    </h3>
+                                </div>
+                            </div>
+
+                            {isFetchingFollowed && followedUsers.length === 0 ? (
+                                <div className="py-12 flex justify-center">
+                                    <div className="w-8 h-8 border-3 border-blue-600/20 border-t-blue-600 rounded-full animate-spin" />
+                                </div>
+                            ) : followedUsers.length > 0 ? (
+                                <motion.div
+                                    initial={{ opacity: 0 }}
+                                    animate={{ opacity: 1 }}
+                                    className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+                                >
+                                    {followedUsers.map((fuser, idx) => {
+                                        const isSelected = selectedUserForOptions === fuser.id;
+
+                                        return (
+                                            <motion.div
+                                                key={fuser.id}
+                                                layout
+                                                initial={{ opacity: 0, y: 10 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                transition={{ delay: idx * 0.05 }}
+                                                className="group relative bg-[#161617] border border-white/5 rounded-[24px] p-4 hover:border-white/10 transition-all duration-300"
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    {/* Avatar */}
+                                                    <div className="shrink-0 relative">
+                                                        <img
+                                                            src={fuser.profile_image_url_https}
+                                                            alt={fuser.name}
+                                                            className="w-12 h-12 rounded-full border-2 border-white/5 object-cover"
+                                                            onError={(e) => (e.currentTarget.src = `https://unavatar.io/twitter/${fuser.x_account}`)}
+                                                        />
+                                                    </div>
+
+                                                    {/* Info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <h4 className="text-sm font-black text-white truncate leading-tight uppercase tracking-tight">
+                                                            {fuser.name}
+                                                        </h4>
+                                                        <p className="text-xs font-bold text-gray-500 truncate mt-0.5">
+                                                            @{fuser.x_account.replace('@', '')}
+                                                        </p>
+                                                        <a
+                                                            href={`https://x.com/${fuser.x_account.replace('@', '')}`}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            className="inline-flex items-center gap-1 text-blue-500 font-bold text-[10px] mt-1.5 hover:underline group/link"
+                                                        >
+                                                            X Profile
+                                                            <HiArrowTopRightOnSquare className="text-[9px] transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
+                                                        </a>
+                                                    </div>
+
+                                                    {/* Actions */}
+                                                    <div className="flex items-center gap-2 self-center">
+                                                        <button
+                                                            onClick={() => handleUnfollow(fuser.id, fuser.name)}
+                                                            className="w-8 h-8 flex items-center justify-center rounded-xl bg-[#251818] text-red-500 hover:bg-[#2d1c1c] transition-all"
+                                                            title="Unfollow"
+                                                        >
+                                                            <FaTrash className="text-[11px]" />
+                                                        </button>
+                                                        <button
+                                                            onClick={() => setSelectedUserForOptions(isSelected ? null : fuser.id)}
+                                                            className={`w-8 h-8 flex items-center justify-center rounded-xl transition-all ${isSelected ? 'bg-white/10 text-white' : 'bg-[#1a1c22] text-gray-300 hover:text-white'
+                                                                }`}
+                                                        >
+                                                            {isSelected ? <HiXMark className="text-lg" /> : <HiOutlinePlus className="text-lg" />}
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {/* Dropdown Menu */}
+                                                <AnimatePresence>
+                                                    {isSelected && (
+                                                        <motion.div
+                                                            initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                            exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                                                            className="absolute right-0 top-12 z-50 w-52 bg-[#0D0D0E] border border-white/10 rounded-2xl shadow-2xl overflow-hidden shadow-black/50"
+                                                        >
+                                                            <div className="px-4 py-2.5 border-b border-white/5">
+                                                                <h5 className="text-[9px] font-black text-white/20 uppercase tracking-[0.2em]">
+                                                                    ADD TO POST LIST
+                                                                </h5>
+                                                            </div>
+                                                            <div className="p-2 max-h-60 overflow-y-auto no-scrollbar space-y-1">
+                                                                {isFetchingLists ? (
+                                                                    <div className="flex justify-start py-4 px-4">
+                                                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                                                    </div>
+                                                                ) : postLists.length > 0 ? (
+                                                                    postLists.map((list: any) => {
+                                                                        const isMember = list.members.some((m: any) => m.follower_user_id === fuser.id);
+                                                                        return (
+                                                                            <button
+                                                                                key={list.id}
+                                                                                onClick={() => handleToggleList(list.id, fuser.id, isMember)}
+                                                                                className="w-full flex items-center justify-between px-3 py-2 rounded-xl transition-all hover:bg-white/5 group/list-item"
+                                                                            >
+                                                                                <span className={`text-[13px] font-black transition-colors ${isMember ? 'text-blue-500' : 'text-white/70 group-hover/list-item:text-white'
+                                                                                    }`}>
+                                                                                    {list.name}
+                                                                                </span>
+                                                                                {isMember && (
+                                                                                    <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.8)]" />
+                                                                                )}
+                                                                            </button>
+                                                                        );
+                                                                    })
+                                                                ) : (
+                                                                    <div className="px-4 py-3">
+                                                                        <p className="text-[12px] text-gray-700 font-bold italic">ไม่มีรายการที่สร้างไว้</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </motion.div>
+                                                    )}
+                                                </AnimatePresence>
+                                            </motion.div>
+                                        );
+                                    })}
+                                </motion.div>
+                            ) : (
+                                <div className="py-20 bg-[#111112]/50 rounded-[32px] border border-dashed border-white/5 flex flex-col items-center justify-center text-center px-6">
+                                    <div className="w-12 h-12 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                                        <FaUserPlus className="text-gray-600 text-xl" />
+                                    </div>
+                                    <p className="text-xs font-black text-gray-600 uppercase tracking-widest">
+                                        ยังไม่มีบัญชีที่ติดตามอยู่
+                                    </p>
+                                    <p className="text-[10px] text-gray-700 mt-2 font-bold italic">
+                                        ค้นหาชื่อหรือขอคำแนะนำจาก AI เพื่อเริ่มติดตาม
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
                 </main>
                 <div className="hidden xl:block">
-                    <PostList />
+                    <PostList refreshKey={refreshSidebar} />
                 </div>
             </div>
             <Toaster position="bottom-right" />

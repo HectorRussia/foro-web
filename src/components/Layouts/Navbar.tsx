@@ -1,20 +1,19 @@
 import { HiMiniUsers, HiOutlineCalendarDays } from 'react-icons/hi2';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { RiUserFollowFill, /* RiBaseStationLine  */ } from 'react-icons/ri';
-import { BiCategory } from "react-icons/bi";
-// import { TbAlpha } from "react-icons/tb";
+import { PiBookmarkSimple } from "react-icons/pi";
 import { FaReadme } from "react-icons/fa";
 import { IoMdListBox } from "react-icons/io";
 
 const iconsNav = [
     // { id: 7, icon: <RiBaseStationLine />, label: "หน้าแรก", path: "/realtime-search", requiredRole: "king" },
-    { id: 9, icon: <HiOutlineCalendarDays />, label: "ข่าววันนี้", path: "/today-news", requiredRole: ["king", "queen", "user"] },
+    { id: 9, icon: <HiOutlineCalendarDays />, label: "สรุปข่าววันนี้", path: "/today-news", requiredRole: ["king", "queen", "user"] },
+    { id: 11, icon: <IoMdListBox />, label: "คอนเทนต์", path: "/" },
     { id: 10, icon: <IoMdListBox />, label: "PostList", path: "/post-list", mobileOnly: true },
     { id: 1, icon: <FaReadme />, label: "อ่านข่าว", path: "/dashboard" },
     { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
-    { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
-    { id: 4, icon: <BiCategory />, label: "Bookmarks", path: "/category-management" },
+    // { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
+    { id: 4, icon: <PiBookmarkSimple />, label: "Bookmarks", path: "/category-management" },
     // { id: 6, icon: <TbAlpha />, label: "AdvanceSearch", path: "/advance-search", requiredRole: "king" },
 ]
 
