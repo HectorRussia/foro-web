@@ -107,7 +107,7 @@ const Main = () => {
     };
 
     return (
-        <main ref={mainRef} className="flex-1 p-4 lg:p-8 overflow-y-auto no-scrollbar bg-[#121212]">
+        <main ref={mainRef} className="flex-1 p-4 lg:p-8 overflow-y-auto no-scrollbar bg-transparent">
             {/* Header */}
             <header className="mb-10">
                 <h1 className="text-4xl md:text-5xl font-black text-white mb-3">

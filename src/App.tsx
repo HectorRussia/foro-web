@@ -15,6 +15,8 @@ import LandingPage from './pages/LandingPage';
 import PublicRoute from './components/auth/PublicRoute';
 import { Analytics } from "@vercel/analytics/react"
 import PostListPage from './pages/PostListPage';
+import Contents from './pages/Contents';
+
 
 function App() {
   return (
@@ -31,7 +33,9 @@ function App() {
 
         {/* Protected Routes*/}
         <Route element={<ProtectedRoute />}>
+          <Route path="/contents" element={<Contents />} />
           <Route path="/today-news" element={<TodayNews />} />
+
           <Route path="/post-list" element={<PostListPage />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/user-target" element={<UserTarget />} />

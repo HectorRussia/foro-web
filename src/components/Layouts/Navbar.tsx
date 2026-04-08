@@ -5,10 +5,10 @@ import { PiBookmarkSimple } from "react-icons/pi";
 import { FaReadme } from "react-icons/fa";
 import { IoMdListBox } from "react-icons/io";
 
-const iconsNav = [
+export const NAV_ITEMS = [
     // { id: 7, icon: <RiBaseStationLine />, label: "หน้าแรก", path: "/realtime-search", requiredRole: "king" },
     { id: 9, icon: <HiOutlineCalendarDays />, label: "สรุปข่าววันนี้", path: "/today-news", requiredRole: ["king", "queen", "user"] },
-    { id: 11, icon: <IoMdListBox />, label: "คอนเทนต์", path: "/" },
+    { id: 11, icon: <IoMdListBox />, label: "คอนเทนต์", path: "/contents" },
     { id: 10, icon: <IoMdListBox />, label: "PostList", path: "/post-list", mobileOnly: true },
     { id: 1, icon: <FaReadme />, label: "อ่านข่าว", path: "/dashboard" },
     { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
@@ -45,7 +45,7 @@ const NavbarStruct = ({ id, icon, label, active = false, path, mobileOnly }: Nav
                 ${active
                     ? 'bg-blue-600/10 text-blue-400'
                     : 'text-gray-400 hover:bg-[#1e293b] hover:text-gray-100'
-                } ${mobileOnly ? 'xl:hidden' : ''}`
+                } ${mobileOnly ? 'lg:hidden' : ''}`
             }>
             <div className={`${active ? 'text-blue-400' : 'text-gray-400 group-hover:text-gray-200'} text-xl`}>
                 {icon}
@@ -59,7 +59,7 @@ const NavbarStruct = ({ id, icon, label, active = false, path, mobileOnly }: Nav
 const Navbar = () => {
     const location = useLocation();
     const { hasRole } = useAuth();
-    const filteredNavItems = iconsNav.filter(item => {
+    const filteredNavItems = NAV_ITEMS.filter(item => {
         // no role display normal
         if (!item.requiredRole) {
             return true;

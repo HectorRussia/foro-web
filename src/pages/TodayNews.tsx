@@ -475,9 +475,9 @@ const TodayNews = () => {
     const displayNews = getFilteredNews();
 
     return (
-        <div className="flex min-h-screen w-full bg-[#121212] font-sans text-gray-100 overflow-hidden">
+        <div className="flex min-h-screen w-full gap-3 bg-[#121212] p-3 font-sans text-gray-100 overflow-hidden">
             <Sidebar />
-            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
+            <div className="flex-1 flex min-w-0 overflow-hidden">
                 <main className="flex-1 p-4 md:p-8 flex flex-col h-screen overflow-hidden">
                     {/* Header Section */}
                     <header className="shrink-0 mb-8">

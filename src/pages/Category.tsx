@@ -121,9 +121,9 @@ const Category = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full bg-[#0a0a0b] font-sans text-gray-100 overflow-x-hidden">
+        <div className="flex min-h-screen w-full gap-3 bg-[#0a0a0b] p-3 font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
-            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
+            <div className="flex-1 flex min-w-0 overflow-hidden">
                 <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen relative">
                 <div className="space-y-6">
                     {/* Header Section */}

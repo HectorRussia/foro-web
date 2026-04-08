@@ -140,7 +140,7 @@ const PostList = ({
     };
 
     return (
-        <div className={`flex flex-col h-full bg-[#121212] ${showBorder ? 'border-l border-white/5' : ''} w-[350px] shrink-0 transition-all duration-500`}>
+        <div className={`flex flex-col h-full bg-[#121212] ${showBorder ? 'border-l border-white/5' : ''} w-[320px] shrink-0 transition-all duration-500`}>
 
             {/* Header */}
             <div className="px-6 pt-8 flex items-center justify-between mb-2">
@@ -271,7 +271,7 @@ const PostList = ({
                                 }}
 
 
-                                className={`group bg-[#111112] border transition-all duration-500 overflow-hidden ${isSelected ? 'border-white/10 rounded-[32px]' : 'border-white/5 rounded-2xl hover:bg-[#1a1a1b]'}`}
+                                className={`group bg-[#111112] border transition-all duration-500 overflow-hidden ${isSelected ? 'border-white/10 rounded-[22px]' : 'border-white/5 rounded-2xl hover:bg-[#1a1a1b]'}`}
                             >
                                 <div className="p-3 flex items-center gap-4">
                                     <div

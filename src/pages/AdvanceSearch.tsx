@@ -320,10 +320,10 @@ const AdvancedSearchStream = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full bg-[#030e17] font-sans text-gray-100 overflow-x-hidden">
+        <div className="flex min-h-screen w-full gap-3 bg-[#030e17] p-3 font-sans text-gray-100 overflow-x-hidden">
             <Sidebar />
 
-            <div className="flex-1 flex overflow-hidden ml-20 lg:ml-60">
+            <div className="flex-1 flex min-w-0 overflow-hidden">
                 <main className="flex-1 flex flex-col h-screen overflow-hidden">
                     {/* Header Section */}
                     <header className="px-6 py-6 border-b border-white/5 bg-[#030e17]/80 backdrop-blur-xl z-10">
