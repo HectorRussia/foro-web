@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
 import { FaMagnifyingGlass, FaUserPlus, FaRobot, FaWandMagicSparkles, FaCopy, FaTrash } from 'react-icons/fa6';
-import { HiCheckBadge, HiOutlinePlus, HiXMark, HiArrowTopRightOnSquare } from 'react-icons/hi2';
+import { HiCheckBadge, HiOutlinePlus, HiXMark, HiArrowTopRightOnSquare, HiOutlineUsers, HiOutlineNewspaper } from 'react-icons/hi2';
 
 import Sidebar from '../components/Layouts/Sidebar';
 import PostList from '../components/PostList';
@@ -226,76 +226,85 @@ const UserTarget = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full gap-3 bg-[#121212] p-3 font-sans text-gray-100 overflow-x-hidden">
+        <div className="flex h-screen w-full gap-4 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_28%),linear-gradient(180deg,#070708_0%,#09090a_45%,#060607_100%)] p-4 font-sans text-gray-100">
             <Sidebar />
-            <div className="flex-1 flex min-w-0 overflow-hidden">
-                <main className="flex-1 p-3 md:p-6 lg:p-10 min-w-0 overflow-y-auto h-screen no-scrollbar">
+            <div className="flex flex-1 min-w-0 gap-3">
+                <section className="relative flex min-w-0 flex-1 flex-col overflow-y-auto rounded-[36px] border border-white/5 bg-[#0a0a0b] p-8 h-[calc(100dvh-2rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
                     {/* ── Header ── */}
                     <div className="mb-8">
-                        <h1 className="text-4xl font-black text-white flex items-center gap-3 mb-2">
+                        <h1 className="text-3xl font-black text-white flex items-center gap-3 mb-2">
                             <span className="text-yellow-400">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                     <path d="M3.5 12H7L10 4L14 20L17 12H20.5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                                 </svg>
                             </span>
                             Smart Target Discovery
                         </h1>
-                        <p className="text-gray-500 text-sm font-bold opacity-80">
+                        <p className="text-gray-500 text-[13px] font-bold opacity-80">
                             ค้นหาและเพิ่มแหล่งข้อมูลที่ตรงกับความสนใจของคุณ
                         </p>
                     </div>
 
                     {/* ── Tabs (Segmented Control) ── */}
-                    <div className="flex sm:inline-flex items-center p-1.5 bg-[#1a1a1c] border border-white/5 rounded-[22px] mb-8 w-full sm:w-auto">
+                    <div className="flex items-center gap-2 p-1.5 bg-[#141415] border border-white/5 rounded-2xl mb-10 w-fit">
                         <button
                             onClick={() => setActiveTab('recommend')}
-                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-[18px] font-bold text-xs transition-all duration-300 ${activeTab === 'recommend'
-                                ? 'bg-[#111112] text-white shadow-xl border border-white/5'
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'recommend'
+                                ? 'bg-[#222224] text-white shadow-lg border border-white/5'
                                 : 'text-gray-500 hover:text-gray-300'
                                 }`}
                         >
-                            <FaWandMagicSparkles className={`text-[14px] ${activeTab === 'recommend' ? 'text-gray-300' : 'text-gray-600'}`} />
+                            <HiOutlineUsers className={`text-lg transition-colors ${activeTab === 'recommend' ? 'text-white' : 'text-gray-600'}`} />
                             <span>แนะนำโดย FORO</span>
                         </button>
+
+                        <button
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs text-gray-500 hover:text-gray-300 transition-all duration-300"
+                        >
+                            <HiOutlineNewspaper className="text-lg text-gray-600" />
+                            <span>แหล่งข่าว</span>
+                            <span className="bg-blue-600/20 text-blue-400 px-1.5 py-0.5 rounded-full text-[10px] font-black">2</span>
+                        </button>
+
                         <button
                             onClick={() => setActiveTab('search')}
-                            className={`flex-1 sm:flex-none flex items-center justify-center gap-2 px-6 py-2.5 rounded-[18px] font-bold text-xs transition-all duration-300 ${activeTab === 'search'
-                                ? 'bg-[#111112] text-white shadow-xl border border-white/5'
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'search'
+                                ? 'bg-[#222224] text-white shadow-lg border border-white/5'
                                 : 'text-gray-500 hover:text-gray-300'
                                 }`}
                         >
-                            <FaMagnifyingGlass className={`text-[14px] ${activeTab === 'search' ? 'text-gray-300' : 'text-gray-600'}`} />
+                            <FaMagnifyingGlass className={`text-sm transition-colors ${activeTab === 'search' ? 'text-white' : 'text-gray-600'}`} />
                             <span>ค้นหาชื่อ</span>
                         </button>
                     </div>
 
                     {/* ── Search Category Label ── */}
-                    <div className={`mb-3 ${activeTab === 'search' ? 'block' : 'hidden'}`}>
-                        <h4 className="text-[12px] font-black text-white uppercase tracking-widest opacity-90">
-                            {activeTab === 'search' ? 'ค้นหาด้วย X USERNAME โดยตรง' : ''}
+                    <div className="mb-4">
+                        <h4 className="text-[11px] font-black text-white/90 uppercase tracking-[0.15em]">
+                            {activeTab === 'search' ? 'ค้นหาด้วย X USERNAME โดยตรง' : 'ค้นหาด้วย AI'}
                         </h4>
                     </div>
 
                     {/* ── Search Bar ── */}
-                    <div className="w-full max-w-3xl mb-3">
-                        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                            {/* Input */}
-                            <div className="flex-1 flex items-center gap-4 bg-[#111112] border border-white/5 rounded-[22px] px-6 py-4 transition-all duration-300 focus-within:border-white/10 focus-within:bg-[#1a1a1c]">
-                                <FaMagnifyingGlass className="text-gray-500 text-lg" />
+                    <div className="w-full max-w-2xl mb-12">
+                        <form onSubmit={handleSearch} className="flex items-center gap-3">
+                            {/* Input Container */}
+                            <div className="flex-1 flex items-center gap-4 bg-[#141415] border border-white/5 rounded-2xl px-5 py-3.5 transition-all duration-300 focus-within:border-white/10 focus-within:bg-[#1a1a1b]">
+                                <FaMagnifyingGlass className="text-gray-500 text-base" />
                                 <input
                                     type="text"
                                     value={activeTab === 'search' ? searchQuery : recommendQuery}
                                     onChange={(e) => activeTab === 'search' ? setSearchQuery(e.target.value) : setRecommendQuery(e.target.value)}
                                     placeholder={activeTab === 'search' ? "กรอก X Username (เช่น elonmusk)..." : "เช่น ฉันอยากติดตามเรื่องเทคโนโลยี..."}
-                                    className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-700 outline-none text-sm font-bold min-w-0"
+                                    className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-700 outline-none text-sm font-medium min-w-0"
                                 />
                             </div>
                             {/* Submit Button */}
                             <button
                                 type="submit"
                                 disabled={isLoading || isRecommending || isSearchingMore}
-                                className={`w-full sm:w-auto shrink-0 flex items-center justify-center gap-2 px-10 py-5 rounded-[22px] font-black text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed uppercase tracking-widest bg-blue-600 hover:bg-blue-500 active:scale-95 shadow-xl shadow-blue-600/30 whitespace-nowrap`}
+                                className={`shrink-0 flex items-center justify-center gap-2 px-8 py-3.5 rounded-2xl font-black text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-r from-indigo-500 via-blue-500 to-purple-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-95 whitespace-nowrap`}
                             >
                                 {(isLoading || isRecommending) ? (
                                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -682,10 +691,10 @@ const UserTarget = () => {
                             )}
                         </div>
                     )}
-                </main>
-                <div className="hidden xl:block">
+                </section>
+                <aside className="hidden xl:flex w-[340px] shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] overflow-hidden rounded-[22px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
                     <PostList refreshKey={refreshSidebar} />
-                </div>
+                </aside>
             </div>
             <Toaster position="bottom-right" />
         </div>
