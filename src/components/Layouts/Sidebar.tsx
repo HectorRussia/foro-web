@@ -46,7 +46,7 @@ const Sidebar = () => {
 
     return (
         <>
-            <aside className="hidden lg:flex w-20 lg:w-60 shrink-0 self-start sticky top-3 h-[calc(100vh-1.5rem)] bg-[#121212]/95 border border-white/5 rounded-[22px] shadow-[0_24px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl flex-col items-center lg:items-stretch py-6 px-2 lg:px-4 overflow-hidden">
+            <aside className="hidden lg:flex w-20 lg:w-60 shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] bg-[#121212]/95 border border-white/5 rounded-[22px] shadow-[0_24px_90px_rgba(0,0,0,0.45)] backdrop-blur-xl flex-col items-center lg:items-stretch py-6 px-2 lg:px-4 overflow-hidden">
                 {/* Logo Area */}
                 <div className="mb-8 flex justify-center lg:justify-start px-2 shrink-0">
                     <img

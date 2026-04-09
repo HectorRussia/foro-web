@@ -1,8 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Kanit:wght@300;400;500;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 @theme {
-    --font-sans: "Kanit", sans-serif;
+    --font-sans: "Inter", "Noto Sans Thai", "Kanit", sans-serif;
+    --font-card: "Inter", "Noto Sans Thai", sans-serif;
 }
 
 body {

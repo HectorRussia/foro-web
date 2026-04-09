@@ -14,7 +14,6 @@ import {
     HiOutlinePencilSquare
 } from "react-icons/hi2";
 import { IoIosMore } from 'react-icons/io';
-import { LuChevronLeft } from "react-icons/lu";
 import type { NewsItem } from '../interface/news';
 import type { Category } from '../interface/category';
 
@@ -57,21 +56,26 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
     };
 
     return (
-        <div className={`group relative flex flex-col p-6 lg:p-7 rounded-[28px] transition-all duration-500 overflow-hidden h-full
+        <div className={`group relative flex flex-col rounded-[30px] transition-all overflow-hidden h-full font-card
             ${showMenu ? 'z-50' : 'z-auto'}
-            bg-[#111112] border border-white/5 hover:border-blue-500/30
-        `}>
+            border border-white/6 hover:border-blue-500/20
+        `}
+            style={{
+                background: 'linear-gradient(145deg, #111112 0%, #181819 100%)',
+                padding: '20px 24px 16px',
+                transition: '0.5s cubic-bezier(0.16, 1, 0.3, 1)'
+            }}>
             {/* Hover Glow Effect */}
             <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
                 style={{ background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.1), transparent 70%)' }}
             />
 
             {/* Header Area */}
-            <div className="flex items-start justify-between mb-5 relative z-10">
+            <div className="flex items-start justify-between mb-4.5 relative z-10">
                 <div className="flex items-center gap-3.5 min-w-0">
                     {/* Avatar */}
                     <div className="shrink-0">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#1a1a1c] border border-white/10 overflow-hidden">
+                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#1a1a1c] border border-white/10 overflow-hidden shadow-[0_10px_24px_rgba(0,0,0,0.15)]">
                             {post.tweet_profile_pic ? (
                                 <img src={post.tweet_profile_pic} alt="owner" className="w-full h-full object-cover" />
                             ) : (
@@ -82,11 +86,11 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                         </div>
                     </div>
                     {/* Info */}
-                    <div className="flex flex-col min-w-0 pt-0.5">
-                        <h3 className="font-black text-white text-base leading-tight truncate tracking-tight uppercase group-hover:text-blue-400 transition-colors">
+                    <div className="flex flex-col min-w-0">
+                        <h3 className="font-bold text-white text-[15px] leading-tight truncate tracking-tight group-hover:text-blue-400 transition-colors capitalize">
                             {post.title}
                         </h3>
-                        <span className="text-gray-500 font-bold text-xs tracking-tight truncate opacity-70">
+                        <span className="text-gray-500 font-medium text-[13px] tracking-tight truncate opacity-80 mt-1">
                             @{(post.source || 'news').replace(/\s+/g, '').toLowerCase()}
                         </span>
                     </div>
@@ -94,8 +98,8 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
 
                 {/* Right Header Actions */}
                 <div className="flex items-center gap-1 shrink-0">
-                    <div className="px-3 py-1.5 bg-white/5 rounded-full text-gray-500 text-[10px] font-black uppercase tracking-widest mr-1">
-                        {dayjs(post.tweet_created_at || post.created_at).isSame(dayjs(), 'day') 
+                        <div className="px-3 py-1 bg-[#0f1419]/80 rounded-full text-white text-[11px] font-bold tracking-tight mr-2 flex items-center justify-center border border-white/5">
+                        {dayjs(post.tweet_created_at || post.created_at).isSame(dayjs(), 'day')
                             ? dayjs(post.tweet_created_at || post.created_at).fromNow(true)
                                 .replace('วินาที', 's').replace('นาที', 'm').replace('ชั่วโมง', 'h').replace('วัน', 'd').replace('เดือน', 'mo').replace('ปี', 'y').replace(/\s+/g, '')
                             : dayjs(post.tweet_created_at || post.created_at).format('D MMM')}
@@ -106,7 +110,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     </button>
 
                     <div className="relative" ref={menuRef}>
-                        <button onClick={() => setShowMenu(!showMenu)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-all">
+                    <button onClick={() => setShowMenu(!showMenu)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-all">
                             <IoIosMore className="text-lg" />
                         </button>
                         {showMenu && (
@@ -136,25 +140,25 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
             {/* Reply Badge Component */}
             {post.content.toLowerCase().includes('http') && (
                 <div className="mb-5 flex relative z-10">
-                    <div className="bg-blue-600/10 border border-blue-500/10 px-3 py-1.5 rounded-xl flex items-center gap-2 text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                        <LuChevronLeft className="rotate-180 text-xs" />
+                    <div className="bg-blue-500/10 border border-blue-400/10 px-3.5 py-1.5 rounded-full flex items-center gap-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest cursor-default hover:bg-blue-500/20 transition-colors">
+                        <HiOutlineChatBubbleLeft className="text-xs" />
                         <span>ตอบกลับ @{(post.source || 'news').split(' ')[0]}</span>
                     </div>
                 </div>
             )}
 
             {/* Content Body */}
-            <div className={`text-gray-100 font-bold leading-[1.6] tracking-tight wrap-break-word relative z-10
-                ${isCompact ? 'text-xs md:text-sm line-clamp-3 mb-5' : 'text-sm md:text-base mb-8'}
+            <div className={`text-white leading-relaxed tracking-tight wrap-break-word relative z-10
+                ${isCompact ? 'text-[13px] line-clamp-3 mb-4' : 'text-[15px] mb-5'}
                 grow
-            `}>
+            `} style={{ fontFamily: 'var(--font-card)', fontWeight: 500 }}>
                 {post.content}
             </div>
 
             {/* Action Footer */}
-            <div className="flex items-center justify-between mt-auto pt-6 border-t border-white/5 relative z-10">
-                <div className="flex items-center gap-4 text-[11px] font-black text-gray-500">
-                    <div className="flex items-center gap-1.5 hover:text-gray-300 transition-colors cursor-default">
+            <div className="flex items-center justify-between mt-auto pt-4.5 border-t border-white/5 relative z-10">
+                <div className="flex items-center gap-4 text-[11px] font-bold text-gray-500">
+                    <div className="flex items-center gap-1.5 hover:text-blue-400 transition-colors cursor-default">
                         <HiOutlineChartBar className="text-sm opacity-60" />
                         <span>{formatNumber(post.view_count)}</span>
                     </div>
@@ -172,7 +176,7 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     </div>
                 </div>
 
-                <button className="flex items-center gap-2 px-4 py-2 bg-white/5 border border-white/5 rounded-full text-[10px] font-black text-gray-400 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest group/action">
+                <button className="flex items-center gap-2 px-4 py-2 bg-[#2a2a2c] border border-white/5 rounded-xl text-[10px] font-black text-gray-300 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest group/action shadow-lg">
                     <HiOutlinePencilSquare className="text-sm group-hover/action:scale-110 transition-transform" />
                     <span>สร้างคอนเทนต์</span>
                 </button>

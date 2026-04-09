@@ -475,24 +475,25 @@ const TodayNews = () => {
     const displayNews = getFilteredNews();
 
     return (
-        <div className="flex min-h-screen w-full gap-3 bg-[#121212] p-3 font-sans text-gray-100 overflow-hidden">
+        <div className="flex h-screen w-full gap-4 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_28%),linear-gradient(180deg,#070708_0%,#09090a_45%,#060607_100%)] p-4 font-sans text-gray-100">
             <Sidebar />
-            <div className="flex-1 flex min-w-0 overflow-hidden">
-                <main className="flex-1 p-4 md:p-8 flex flex-col h-screen overflow-hidden">
+            <div className="flex flex-1 min-w-0 gap-3">
+                <section className="relative flex min-w-0 flex-1 flex-col overflow-y-auto rounded-[36px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.52)] h-[calc(100dvh-2rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.04),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.06),transparent_30%)]" />
                     {/* Header Section */}
-                    <header className="shrink-0 mb-8">
+                    <header className="relative shrink-0 mb-6 px-6 pt-6 sm:px-8 sm:pt-8">
                         <div className="flex flex-col mb-8">
                             <span className="text-gray-500 text-[10px] sm:text-[11px] font-black tracking-widest uppercase mb-1 opacity-70">
                                 WATCHLIST FEED
                             </span>
-                            <h1 className="text-4xl font-black text-white tracking-tight mb-2">
+                            <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">
                                 หน้าหลัก
                             </h1>
                         </div>
 
                         {/* Search & Actions Bar */}
                         <div className="relative z-10">
-                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0c] border border-[#1a1a1c] p-2 pl-4 pr-3.5 rounded-[22px] min-h-[64px] shadow-2xl">
+                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0d] border border-white/6 p-2 pl-4 pr-3.5 rounded-[24px] min-h-[68px] shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
 
                                 {/* Left Section: Trash or Back or Empty */}
                                 <div className="flex items-center gap-3">
@@ -525,8 +526,8 @@ const TodayNews = () => {
                                             onClick={() => setIsAIFilterOpen(!isAIFilterOpen)}
                                             className={`flex items-center gap-2 px-4.5 py-2.5 rounded-full font-bold border transition-all text-xs
                                                 ${isAIFilterOpen
-                                                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/50'
-                                                    : 'bg-[#0c0c0c] border-[#1a1a1c] text-gray-200 hover:text-white hover:bg-white/5'}`}
+                                                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/50 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]'
+                                                    : 'bg-[#121214] border-white/6 text-gray-200 hover:text-white hover:bg-white/5'}`}
                                         >
                                             <LuSparkles className={`text-[15px] ${isAIFilterOpen ? 'animate-pulse' : 'text-blue-400'}`} />
                                             <span>AI Filter</span>
@@ -538,7 +539,7 @@ const TodayNews = () => {
                                         <button
                                             onClick={() => startBulkAnalysis()}
                                             disabled={isStreaming}
-                                            className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all shadow-xl active:scale-95 bg-blue-600 text-white hover:bg-blue-500 shadow-blue-600/30 text-xs"
+                                            className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all shadow-xl active:scale-95 bg-linear-to-r from-blue-600 to-indigo-500 text-white hover:from-blue-500 hover:to-indigo-400 shadow-blue-600/30 text-xs"
                                         >
                                             <LuRefreshCw className={`text-[15px] ${isStreaming ? 'animate-spin' : ''}`} />
                                             <span>ฟีดข้อมูล</span>
@@ -688,7 +689,7 @@ const TodayNews = () => {
                         </div>
                     )}
 
-                    <div className="flex-1 overflow-y-auto pr-2 scrollbar-hide">
+                    <div className="relative flex-1 overflow-y-auto px-6 pr-4 pb-8 sm:px-8 scrollbar-hide">
                         {/* News Stream Grid */}
                         <div className={`
                         ${layoutMode === 'grid'
@@ -840,15 +841,13 @@ const TodayNews = () => {
                     .scrollbar-hide::-webkit-scrollbar { display: none; }
                     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
                 `}</style>
-                </main>
-                <div className="hidden xl:block">
+                </section>
+                <aside className="hidden xl:flex w-[340px] shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] overflow-hidden rounded-[22px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
                     <PostList
                         activeId={selectedPostList?.id}
                         onSelect={(list) => setSelectedPostList(list)}
                     />
-                </div>
-
-
+                </aside>
             </div>
         </div>
     );
