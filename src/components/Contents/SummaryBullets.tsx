@@ -1,11 +1,11 @@
 ﻿import { useMemo, useRef, useState, type ReactNode } from "react";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
+import { isAxiosError } from "axios";
 import api from "../../api/axiosInstance";
 import { toast } from "react-hot-toast";
 import {
     LuBookmark,
-    LuCirclePlay,
     LuCopy,
     LuExternalLink,
     LuFileText,
@@ -15,77 +15,11 @@ import {
     LuX,
 } from "react-icons/lu";
 import { FiBarChart } from "react-icons/fi";
+import type { ContentResultItem, ContentSearchRequest, ContentSearchResponse, SearchMode } from "../../interface/searchContent";
+import { HiOutlineArrowPathRoundedSquare, HiOutlineChartBar, HiOutlineChatBubbleLeft, HiOutlineHeart } from "react-icons/hi2";
+
 
 dayjs.extend(relativeTime);
-
-type ContentSearchRequest = {
-    query: string;
-    max_results?: number;
-    include_video_only?: boolean;
-};
-
-type ContentSearchSummary = {
-    title: string;
-    subtitle: string;
-    date_range: string;
-    main_summary: string;
-    bullet_points: string[];
-    foro_note: string | null;
-    confidence_score: number | null;
-};
-
-type ContentResultItem = {
-    id: number | null;
-    ref_code: string;
-    title: string;
-    username: string;
-    content: string;
-    url: string | null;
-    tweet_id: string | null;
-    tweet_profile_pic: string | null;
-    created_at: string | null;
-    has_video: boolean;
-    media_urls?: string[] | null;
-    media_type?: string | null;
-    view_count: number;
-    like_count: number;
-    retweet_count: number;
-    reply_count: number;
-};
-
-type EvidenceClaim = {
-    claim: string;
-    supporting_sources: string[];
-    confidence: number;
-};
-
-type EvidencePack = {
-    key_claims: EvidenceClaim[];
-    conflicting_claims: string[];
-    gaps: string[];
-};
-
-type FactSheet = {
-    verified_facts: string[];
-    reported_claims: string[];
-    named_entities: string[];
-    source_count: number;
-};
-
-type ContentSearchResponse = {
-    success: boolean;
-    query: string;
-    intent: string;
-    total_results: number;
-    summary: ContentSearchSummary | null;
-    results: ContentResultItem[];
-    evidence_pack: EvidencePack | null;
-    fact_sheet: FactSheet | null;
-    search_plan: Record<string, any> | null;
-    timings: Record<string, number> | null;
-};
-
-type SearchMode = "search" | "save";
 
 const DEFAULT_QUERY = "";
 const DEFAULT_LIMIT = 15;
@@ -127,6 +61,109 @@ function SummaryBadge({ children }: { children: ReactNode }) {
     );
 }
 
+function LoadingLine({ className }: { className: string }) {
+    return <div className={`rounded-full bg-white/5 ${className}`} />;
+}
+
+function LoadingPill({ className }: { className: string }) {
+    return <div className={`rounded-full bg-white/5 ${className}`} />;
+}
+
+function SummaryLoadingSkeleton() {
+    return (
+        <div className="relative mt-8 overflow-hidden rounded-4xl border border-white/8 bg-[#101114] p-5 shadow-[0_24px_80px_rgba(0,0,0,0.35)] sm:p-6">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(45,142,255,0.14),transparent_34%),radial-gradient(circle_at_85%_18%,rgba(74,222,128,0.12),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0.03),transparent_35%)]" />
+            <div className="absolute inset-0 -translate-x-full animate-[shimmer_2.2s_infinite] bg-linear-to-r from-transparent via-white/6 to-transparent" />
+
+            <div className="relative">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-start gap-4">
+                        <div className="grid h-12 w-12 place-items-center rounded-2xl border border-[#2d8eff]/25 bg-[#2d8eff]/12">
+                            <div className="h-6 w-6 rounded-lg bg-[#2d8eff]/30 animate-pulse" />
+                        </div>
+                        <div className="space-y-2 pt-1">
+                            <LoadingLine className="h-3.5 w-36" />
+                            <LoadingLine className="h-2.5 w-52" />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <LoadingPill className="h-7 w-20" />
+                        <div className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5">
+                            <div className="h-4 w-4 rounded bg-white/10 animate-pulse" />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-8 grid gap-5 xl:grid-cols-[1.35fr_0.95fr]">
+                    <div className="rounded-[26px] border border-white/8 bg-white/3 p-5 sm:p-6">
+                        <div className="flex items-center gap-2">
+                            <LoadingPill className="h-2.5 w-2.5" />
+                            <LoadingLine className="h-2.5 w-24" />
+                        </div>
+                        <div className="mt-5 space-y-3">
+                            <LoadingLine className="h-6 w-11/12" />
+                            <LoadingLine className="h-6 w-10/12" />
+                            <LoadingLine className="h-6 w-9/12" />
+                        </div>
+
+                        <div className="mt-6 grid gap-3">
+                            {Array.from({ length: 3 }).map((_, idx) => (
+                                <div
+                                    key={idx}
+                                    className="flex items-start gap-3 rounded-2xl border border-white/5 bg-black/10 p-3.5"
+                                >
+                                    <div className="mt-2 h-2.5 w-2.5 shrink-0 rounded-full bg-[#3fa0ff]/70 shadow-[0_0_16px_rgba(63,160,255,0.35)]" />
+                                    <div className="min-w-0 flex-1 space-y-2">
+                                        <LoadingLine className="h-4 w-full" />
+                                        <LoadingLine className="h-4 w-11/12" />
+                                    </div>
+                                    <LoadingPill className="h-6 w-12 shrink-0" />
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="mt-6 flex flex-wrap items-center gap-2">
+                            <LoadingLine className="h-9 w-28" />
+                            <LoadingLine className="h-9 w-20" />
+                            <LoadingLine className="h-9 w-24" />
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="rounded-[26px] border border-white/8 bg-white/3 p-5 sm:p-6">
+                            <div className="flex items-center justify-between gap-3">
+                                <LoadingLine className="h-2.5 w-24" />
+                                <LoadingLine className="h-2.5 w-14" />
+                            </div>
+                            <div className="mt-4 space-y-3">
+                                <LoadingLine className="h-4 w-full" />
+                                <LoadingLine className="h-4 w-10/12" />
+                                <LoadingLine className="h-4 w-9/12" />
+                            </div>
+                        </div>
+
+                        <div className="rounded-[26px] border border-white/8 bg-white/3 p-5 sm:p-6">
+                            <div className="flex items-center justify-between gap-3">
+                                <LoadingLine className="h-2.5 w-20" />
+                                <LoadingPill className="h-7 w-16" />
+                            </div>
+                            <div className="mt-4 grid grid-cols-2 gap-3">
+                                {Array.from({ length: 4 }).map((_, idx) => (
+                                    <div key={idx} className="rounded-2xl border border-white/5 bg-black/10 p-3">
+                                        <LoadingLine className="h-3.5 w-16" />
+                                        <LoadingLine className="mt-2 h-5 w-20" />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function ResultCard({
     card,
     onSaveSearch,
@@ -135,6 +172,7 @@ function ResultCard({
     onSaveSearch: () => void;
 }) {
     const mediaUrl = card.media_urls?.[0] ?? null;
+    const isMediaCard = Boolean(mediaUrl);
     const mediaLabel =
         card.media_type?.toUpperCase() ||
         (card.has_video ? "VIDEO" : mediaUrl ? "PHOTO" : "TEXT");
@@ -181,25 +219,48 @@ function ResultCard({
                 </div>
             </div>
 
-            <div className="mt-4 grid gap-4 lg:grid-cols-[112px_minmax(0,1fr)] lg:gap-5">
-                {mediaUrl ? (
+            <div
+                className={[
+                    "mt-4 grid gap-4",
+                    isMediaCard
+                        ? "lg:grid-cols-[112px_minmax(0,1fr)] lg:gap-5"
+                        : "lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-5",
+                ].join(" ")}
+            >
+                {isMediaCard 
+                ? 
+                (
                     <div className="relative shrink-0">
                         <div className="aspect-square overflow-hidden rounded-[20px] border border-white/10 bg-[#111112] ring-1 ring-white/10">
                             <img
-                                src={mediaUrl}
+                                src={mediaUrl ?? undefined}
                                 alt={card.title}
                                 className="h-full w-full object-cover"
                             />
                         </div>
-                        <div className="absolute inset-x-2 bottom-2 flex items-center justify-between rounded-full bg-black/72 px-2 py-1 text-[10px] font-semibold text-white backdrop-blur">
-                            <span className="inline-flex items-center gap-1">
-                                <LuCirclePlay className="h-3 w-3" />
-                                {mediaLabel}
+                    </div>
+                ) : (
+                    <div className="flex h-full min-h-32.5 flex-col justify-between rounded-[20px] border border-white/8 bg-white/3 p-4 sm:p-4.5">
+                        <div className="flex items-center justify-between gap-3">
+                            <span className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-500">
+                                Text card
                             </span>
-                            <span className="text-slate-300">{card.ref_code}</span>
+                            <SummaryBadge>{card.ref_code}</SummaryBadge>
+                        </div>
+
+                        <div className="mt-4 space-y-2">
+                            <div className="text-sm font-bold text-white">
+                                {card.title}
+                            </div>
+                            <div className="text-xs font-medium text-slate-400">
+                                {card.username}
+                            </div>
+                            <div className="text-xs font-medium text-slate-500">
+                                ไม่มีสื่อแนบ แสดงผลแบบแนวนอนเพื่ออ่านง่ายขึ้น
+                            </div>
                         </div>
                     </div>
-                ) : null}
+                )}
 
                 <div className="min-w-0">
                     <p className="line-clamp-4 text-[15px] font-semibold leading-7 text-slate-100 sm:text-[16px] sm:leading-7">
@@ -212,12 +273,21 @@ function ResultCard({
                 <div className="flex items-center justify-between gap-3 border-t border-white/8 pt-3 text-xs text-slate-400">
                     <div className="flex min-w-0 flex-wrap items-center gap-3 sm:gap-4">
                         <span className="inline-flex items-center gap-1">
-                            <FiBarChart className="h-3.5 w-3.5" />
+                            <HiOutlineChartBar className="text-sm opacity-60" />
                             {formatNumber(card.view_count)}
                         </span>
-                        <span>◦ {formatNumber(card.reply_count)}</span>
-                        <span>♥ {formatNumber(card.like_count)}</span>
-                        <span>↻ {formatNumber(card.retweet_count)}</span>
+                        <span  className="inline-flex items-center gap-1"> 
+                            <HiOutlineChatBubbleLeft className="text-sm opacity-60" />
+                            {formatNumber(card.reply_count)}
+                        </span>
+                        <span  className="inline-flex items-center gap-1">
+                            <HiOutlineHeart className="text-sm opacity-60" />
+                            {formatNumber(card.like_count)}
+                        </span>
+                        <span  className="inline-flex items-center gap-1">
+                            <HiOutlineArrowPathRoundedSquare className="text-sm opacity-60" />
+                            {formatNumber(card.retweet_count)}
+                        </span>
                     </div>
 
                     <button
@@ -229,7 +299,6 @@ function ResultCard({
                     </button>
                 </div>
             </div>
-
         </article>
     );
 }
@@ -243,13 +312,15 @@ export default function SummaryBullets() {
     const [error, setError] = useState<string | null>(null);
     const resultRefs = useRef<Record<string, HTMLDivElement | null>>({});
     const summary = searchResponse?.summary ?? null;
-    const results = searchResponse?.results ?? [];
     const evidencePack = searchResponse?.evidence_pack ?? null;
     const factSheet = searchResponse?.fact_sheet ?? null;
+    const hasSummaryContent = Boolean(summary);
+    const showSummaryPanel = isLoading || Boolean(error) || hasSummaryContent;
 
     const visibleResults = useMemo(() => {
-        return results.filter((item) => (includeVideoOnly ? item.has_video : true));
-    }, [includeVideoOnly, results]);
+        const baseResults = searchResponse?.results ?? [];
+        return baseResults.filter((item) => (includeVideoOnly ? item.has_video : true));
+    }, [includeVideoOnly, searchResponse]);
 
     const runSearch = async (mode: SearchMode, overrides?: Partial<ContentSearchRequest>) => {
         const nextQuery = (overrides?.query ?? query).trim();
@@ -280,12 +351,15 @@ export default function SummaryBullets() {
             if (mode === "save") {
                 toast.success("บันทึกคอนเทนต์เรียบร้อยแล้ว");
             }
-        } catch (err: any) {
-            const message =
-                err?.response?.data?.detail ||
-                err?.response?.data?.message ||
-                err?.message ||
-                "ค้นหาคอนเทนต์ไม่สำเร็จ";
+        } catch (err: unknown) {
+            const message = isAxiosError(err)
+                ? err.response?.data?.detail ||
+                  err.response?.data?.message ||
+                  err.message ||
+                  "ค้นหาคอนเทนต์ไม่สำเร็จ"
+                : err instanceof Error
+                    ? err.message
+                    : "ค้นหาคอนเทนต์ไม่สำเร็จ";
             setError(message);
             toast.error(message);
         } finally {
@@ -421,193 +495,186 @@ export default function SummaryBullets() {
             </section>
 
             <section className="mx-auto max-w-6xl px-4 pb-12 sm:px-6 lg:px-8">
-                <div className="rounded-4xl border border-white/5 bg-[#171718] px-5 py-6 shadow-[0_32px_100px_rgba(0,0,0,0.5)] sm:px-8 sm:py-8">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#2d8eff] text-white shadow-[0_0_30px_rgba(45,142,255,0.3)]">
-                                <LuFileText className="h-6 w-6" />
-                            </div>
+                {showSummaryPanel ? (
+                    <div className="rounded-4xl border border-white/5 bg-[#171718] px-5 py-6 shadow-[0_32px_100px_rgba(0,0,0,0.5)] sm:px-8 sm:py-8">
+                        {hasSummaryContent ? (
+                            <div className="flex flex-wrap items-start justify-between gap-4">
+                                <div className="flex items-start gap-4">
+                                    <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#2d8eff] text-white shadow-[0_0_30px_rgba(45,142,255,0.3)]">
+                                        <LuFileText className="h-6 w-6" />
+                                    </div>
 
-                            <div>
-                                <div className="text-sm font-black tracking-wider text-[#2d8eff]">
-                                    FORO SUMMARY
+                                    <div>
+                                        <div className="text-sm font-black tracking-wider text-[#2d8eff]">
+                                            FORO SUMMARY
+                                        </div>
+                                        <div className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
+                                            {searchResponse?.intent ? `${searchResponse.intent} digest` : "Editorial digest from search"}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
-                                    {searchResponse?.intent ? `${searchResponse.intent} digest` : "Editorial digest from search"}
-                                </div>
-                            </div>
-                        </div>
 
-                        <div className="flex items-center gap-2">
-                            {searchResponse?.total_results !== undefined ? (
-                                <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">
-                                    {searchResponse.total_results} results
-                                </span>
-                            ) : null}
-                            <button
-                                type="button"
-                                onClick={() => void runSearch("search")}
-                                className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
-                                title="Refresh"
-                            >
-                                <LuCopy className="h-4 w-4" />
-                            </button>
-                        </div>
-                    </div>
-
-                    {isLoading ? (
-                        <div className="mt-8 grid gap-4 lg:grid-cols-2">
-                            {Array.from({ length: 4 }).map((_, idx) => (
-                                <div
-                                    key={idx}
-                                    className="h-65 rounded-3xl border border-white/10 bg-white/5 animate-pulse"
-                                />
-                            ))}
-                        </div>
-                    ) : error ? (
-                        <div className="mt-8 rounded-3xl border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
-                            {error}
-                        </div>
-                    ) : summary ? (
-                        <>
-                            <div className="mt-8">
-                                <h2 className="text-[22px] font-extrabold leading-tight text-white sm:text-2xl">
-                                    {summary.title}
-                                </h2>
-                                <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
-                                    {summary.subtitle}
-                                </p>
-                                <p className="mt-1 text-sm text-slate-500">
-                                    {summary.date_range}
-                                </p>
-                                <p className="mt-6 text-base font-medium leading-relaxed text-slate-200 sm:text-lg">
-                                    {summary.main_summary}
-                                </p>
-
-                                <ul className="mt-8 space-y-5">
-                                    {summary.bullet_points.map((text, index) => {
-                                        const refCodes = extractRefCodes(text);
-                                        return (
-                                            <li key={`${index}-${text}`} className="flex items-start gap-3.5">
-                                                <span className="mt-2.5 h-2 w-2 shrink-0 rounded-full bg-[#3fa0ff] shadow-[0_0_12px_rgba(63,160,255,0.5)]" />
-                                                <div className="flex flex-wrap items-baseline gap-2.5">
-                                                    <p className="text-base font-bold leading-relaxed text-slate-200">
-                                                        {text}
-                                                    </p>
-                                                    {refCodes.map((code) => (
-                                                        <button
-                                                            key={code}
-                                                            type="button"
-                                                            onClick={() => scrollToResult(code)}
-                                                            className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-slate-300 transition hover:border-[#3fa0ff]/40 hover:text-white"
-                                                        >
-                                                            {code}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            </div>
-
-                            <div className="mt-10 border-t border-white/5 pt-6">
-                                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                    <div className="flex items-center gap-2.5 text-xs font-bold text-slate-500">
-                                        <span className="flex h-5 w-5 items-center justify-center rounded-full border border-sky-400/40 text-[10px] shadow-[0_0_10px_rgba(56,189,248,0.1)]">
-                                            ✓
+                                <div className="flex items-center gap-2">
+                                    {searchResponse?.total_results !== undefined ? (
+                                        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-bold text-slate-300">
+                                            {searchResponse.total_results} results
                                         </span>
-                                        {summary.foro_note || "สรุปโดย FORO อ้างอิงจากผลการค้นหา"}
-                                    </div>
-
-                                    <div className="inline-flex items-center gap-2 rounded-full bg-[#0d2a1d] px-4 py-2 text-[13px] font-bold text-[#4ade80] ring-1 ring-[#4ade80]/20">
-                                        <FiBarChart className="h-3.5 w-3.5" />
-                                        อัตราความมั่นยำ (Confidence){" "}
-                                        {summary.confidence_score !== null
-                                            ? `${Math.round(summary.confidence_score * 100)}%`
-                                            : "N/A"}
-                                    </div>
+                                    ) : null}
+                                    <button
+                                        type="button"
+                                        onClick={() => void runSearch("search")}
+                                        className="grid h-10 w-10 place-items-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:bg-white/10 hover:text-white"
+                                        title="Refresh"
+                                    >
+                                        <LuCopy className="h-4 w-4" />
+                                    </button>
                                 </div>
                             </div>
+                        ) : null}
 
-                            {evidencePack || factSheet ? (
-                                <div className="mt-8 grid gap-4 lg:grid-cols-2">
-                                    {evidencePack ? (
-                                        <div className="rounded-3xl border border-white/8 bg-[#111112] p-5">
-                                            <div className="text-xs font-black tracking-[0.2em] text-slate-500">
-                                                EVIDENCE PACK
-                                            </div>
-                                            <div className="mt-4 space-y-4 text-sm text-slate-300">
-                                                <div>
-                                                    <div className="mb-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                                        Key claims
-                                                    </div>
-                                                    <div className="space-y-3">
-                                                        {evidencePack.key_claims.slice(0, 3).map((claim) => (
-                                                            <div key={claim.claim} className="rounded-2xl border border-white/5 bg-white/3 px-4 py-3">
-                                                                <div className="font-semibold text-slate-100">{claim.claim}</div>
-                                                                <div className="mt-1 text-xs text-slate-500">
-                                                                    Confidence {Math.round(claim.confidence * 100)}%
-                                                                </div>
-                                                            </div>
+                        {isLoading ? (
+                            <SummaryLoadingSkeleton />
+                        ) : error ? (
+                            <div className="mt-8 rounded-3xl border border-rose-500/20 bg-rose-500/10 px-5 py-4 text-sm text-rose-200">
+                                {error}
+                            </div>
+                        ) : summary ? (
+                            <>
+                                <div className="mt-8">
+                                    <h2 className="text-[22px] font-extrabold leading-tight text-white sm:text-2xl">
+                                        {summary.title}
+                                    </h2>
+                                    <p className="mt-2 text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">
+                                        {summary.subtitle}
+                                    </p>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        {summary.date_range}
+                                    </p>
+                                    <p className="mt-6 text-base font-medium leading-relaxed text-slate-200 sm:text-lg">
+                                        {summary.main_summary}
+                                    </p>
+
+                                    <ul className="mt-8 space-y-5">
+                                        {summary.bullet_points.map((text, index) => {
+                                            const refCodes = extractRefCodes(text);
+                                            return (
+                                                <li key={`${index}-${text}`} className="flex items-start gap-3.5">
+                                                    <span className="mt-2.5 h-2 w-2 shrink-0 rounded-full bg-[#3fa0ff] shadow-[0_0_12px_rgba(63,160,255,0.5)]" />
+                                                    <div className="flex flex-wrap items-baseline gap-2.5">
+                                                        <p className="text-base font-bold leading-relaxed text-slate-200">
+                                                            {text}
+                                                        </p>
+                                                        {refCodes.map((code) => (
+                                                            <button
+                                                                key={code}
+                                                                type="button"
+                                                                onClick={() => scrollToResult(code)}
+                                                                className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-[10px] font-bold text-slate-300 transition hover:border-[#3fa0ff]/40 hover:text-white"
+                                                            >
+                                                                {code}
+                                                            </button>
                                                         ))}
                                                     </div>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+
+                                <div className="mt-10 border-t border-white/5 pt-6">
+                                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div className="flex items-center gap-2.5 text-xs font-bold text-slate-500">
+                                            <span className="flex h-5 w-5 items-center justify-center rounded-full border border-sky-400/40 text-[10px] shadow-[0_0_10px_rgba(56,189,248,0.1)]">
+                                                ✓
+                                            </span>
+                                            {summary.foro_note || "สรุปโดย FORO อ้างอิงจากผลการค้นหา"}
+                                        </div>
+
+                                        <div className="inline-flex items-center gap-2 rounded-full bg-[#0d2a1d] px-4 py-2 text-[13px] font-bold text-[#4ade80] ring-1 ring-[#4ade80]/20">
+                                            <FiBarChart className="h-3.5 w-3.5" />
+                                            อัตราความมั่นยำ (Confidence){" "}
+                                            {summary.confidence_score !== null
+                                                ? `${Math.round(summary.confidence_score * 100)}%`
+                                                : "N/A"}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {evidencePack || factSheet ? (
+                                    <div className="mt-8 grid gap-4 lg:grid-cols-2">
+                                        {evidencePack ? (
+                                            <div className="rounded-3xl border border-white/8 bg-[#111112] p-5">
+                                                <div className="text-xs font-black tracking-[0.2em] text-slate-500">
+                                                    EVIDENCE PACK
                                                 </div>
-                                                {evidencePack.gaps.length > 0 ? (
+                                                <div className="mt-4 space-y-4 text-sm text-slate-300">
                                                     <div>
                                                         <div className="mb-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                                            Gaps
+                                                            Key claims
+                                                        </div>
+                                                        <div className="space-y-3">
+                                                            {evidencePack.key_claims.slice(0, 3).map((claim) => (
+                                                                <div key={claim.claim} className="rounded-2xl border border-white/5 bg-white/3 px-4 py-3">
+                                                                    <div className="font-semibold text-slate-100">{claim.claim}</div>
+                                                                    <div className="mt-1 text-xs text-slate-500">
+                                                                        Confidence {Math.round(claim.confidence * 100)}%
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                    {evidencePack.gaps.length > 0 ? (
+                                                        <div>
+                                                            <div className="mb-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                                                Gaps
+                                                            </div>
+                                                            <ul className="space-y-2">
+                                                                {evidencePack.gaps.slice(0, 3).map((gap) => (
+                                                                    <li key={gap} className="rounded-xl border border-white/5 bg-white/3 px-3 py-2">
+                                                                        {gap}
+                                                                    </li>
+                                                                ))}
+                                                            </ul>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        ) : null}
+
+                                        {factSheet ? (
+                                            <div className="rounded-3xl border border-white/8 bg-[#111112] p-5">
+                                                <div className="text-xs font-black tracking-[0.2em] text-slate-500">
+                                                    FACT SHEET
+                                                </div>
+                                                <div className="mt-4 space-y-4 text-sm text-slate-300">
+                                                    <div>
+                                                        <div className="mb-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
+                                                            Verified facts
                                                         </div>
                                                         <ul className="space-y-2">
-                                                            {evidencePack.gaps.slice(0, 3).map((gap) => (
-                                                                <li key={gap} className="rounded-xl border border-white/5 bg-white/3 px-3 py-2">
-                                                                    {gap}
+                                                            {factSheet.verified_facts.slice(0, 3).map((fact) => (
+                                                                <li key={fact} className="rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-3 py-2">
+                                                                    {fact}
                                                                 </li>
                                                             ))}
                                                         </ul>
                                                     </div>
-                                                ) : null}
-                                            </div>
-                                        </div>
-                                    ) : null}
-
-                                    {factSheet ? (
-                                        <div className="rounded-3xl border border-white/8 bg-[#111112] p-5">
-                                            <div className="text-xs font-black tracking-[0.2em] text-slate-500">
-                                                FACT SHEET
-                                            </div>
-                                            <div className="mt-4 space-y-4 text-sm text-slate-300">
-                                                <div>
-                                                    <div className="mb-2 text-[11px] font-black uppercase tracking-widest text-slate-500">
-                                                        Verified facts
-                                                    </div>
-                                                    <ul className="space-y-2">
-                                                        {factSheet.verified_facts.slice(0, 3).map((fact) => (
-                                                            <li key={fact} className="rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-3 py-2">
-                                                                {fact}
-                                                            </li>
+                                                    <div className="flex flex-wrap gap-2">
+                                                        {factSheet.named_entities.slice(0, 5).map((entity) => (
+                                                            <span key={entity} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
+                                                                {entity}
+                                                            </span>
                                                         ))}
-                                                    </ul>
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    {factSheet.named_entities.slice(0, 5).map((entity) => (
-                                                        <span key={entity} className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs text-slate-300">
-                                                            {entity}
-                                                        </span>
-                                                    ))}
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    ) : null}
-                                </div>
-                            ) : null}
-                        </>
-                    ) : (
-                        <div className="mt-8 rounded-3xl border border-white/10 bg-white/5 px-5 py-10 text-center text-slate-400">
-                            ยังไม่มีผลลัพธ์ ลองค้นหาด้วยคำใหม่ หรือกด Quick Search เพื่อดึงข้อมูลตัวอย่างจาก backend
-                        </div>
-                    )}
-                </div>
+                                        ) : null}
+                                    </div>
+                                ) : null}
+                            </>
+                        ) : null}
+                    </div>
+                ) : null}
 
                 <div className="mt-8 grid gap-4 lg:grid-cols-2">
                     {searchResponse && visibleResults.length > 0 ? (
