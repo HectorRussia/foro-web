@@ -16,6 +16,7 @@ import PublicRoute from './components/auth/PublicRoute';
 import { Analytics } from "@vercel/analytics/react"
 import PostListPage from './pages/PostListPage';
 import Contents from './pages/Contents';
+import Bookmark from './pages/Bookmark';
 
 
 function App() {
@@ -42,7 +43,7 @@ function App() {
           <Route path="/user-following" element={<UserFollow />} />
           <Route path="/category-management" element={<Category />} />
           <Route path="/category-news/:id" element={<CategoryNews />} />
-
+          <Route path="/bookmark" element={<Bookmark />} />  
           {/*add more route*/}
 
           {/*For King*/}

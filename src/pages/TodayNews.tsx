@@ -493,7 +493,7 @@ const TodayNews = () => {
 
                         {/* Search & Actions Bar */}
                         <div className="relative z-10">
-                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0d] border border-white/6 p-2 pl-4 pr-3.5 rounded-[24px] min-h-[68px] shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0d] border border-white/6 p-2 pl-4 pr-3.5 ounded-3xl min-h-17 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
 
                                 {/* Left Section: Trash or Back or Empty */}
                                 <div className="flex items-center gap-3">
@@ -713,7 +713,7 @@ const TodayNews = () => {
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: [0.25, 0.55, 0.25], scale: [0.98, 1.02, 0.98] }}
                                         transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[1000px] h-[450px] pointer-events-none rounded-[100%]"
+                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-250 h-112.5 pointer-events-none rounded-[100%]"
                                         style={{
                                             background: 'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.28) 0%, rgba(37, 99, 235, 0.12) 40%, transparent 60%)',
                                             filter: 'blur(80px)'
@@ -797,7 +797,7 @@ const TodayNews = () => {
                                 <button
                                     onClick={() => startBulkAnalysis(nextCursor)}
 
-                                    className="group relative flex items-center justify-center gap-4 px-12 py-5 rounded-4xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 w-full md:w-[400px] overflow-hidden shadow-2xl shadow-amber-500/5 active:scale-95"
+                                    className="group relative flex items-center justify-center gap-4 px-12 py-5 rounded-4xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 w-full md:w-100 overflow-hidden shadow-2xl shadow-amber-500/5 active:scale-95"
                                     title={`Next Signal: ${nextCursor}`}
                                 >
                                     <div className="absolute inset-0 bg-linear-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
@@ -816,7 +816,7 @@ const TodayNews = () => {
                     {/* Processing Progress Status */}
                     {isStreaming && progress.total > 0 && (
                         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 px-8 py-4 bg-[#0a1622]/90 backdrop-blur-2xl border border-white/10 rounded-[30px] shadow-2xl flex items-center gap-6 z-50 animate-in slide-in-from-bottom-10">
-                            <div className="flex flex-col min-w-[100px]">
+                            <div className="flex flex-col min-w-25">
                                 <span className="text-[11px] font-black text-cyan-400 uppercase tracking-widest mb-1">Processing</span>
                                 <span className="text-sm font-bold text-gray-200">{progress.current} / {progress.total}</span>
                             </div>
@@ -842,7 +842,7 @@ const TodayNews = () => {
                     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
                 `}</style>
                 </section>
-                <aside className="hidden xl:flex w-[340px] shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] overflow-hidden rounded-[22px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
+                <aside className="hidden xl:flex w-85 shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] overflow-hidden rounded-[22px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
                     <PostList
                         activeId={selectedPostList?.id}
                         onSelect={(list) => setSelectedPostList(list)}

@@ -14,8 +14,10 @@ import {
     HiOutlinePencilSquare
 } from "react-icons/hi2";
 import { IoIosMore } from 'react-icons/io';
+import { toast } from 'react-hot-toast';
 import type { NewsItem } from '../interface/news';
 import type { Category } from '../interface/category';
+import { createBookmark, removeBookmarkByNewsId, checkBookmark } from '../api/bookmark';
 
 dayjs.extend(relativeTime);
 dayjs.locale('th');
@@ -31,7 +33,41 @@ interface DashboardCardProps {
 
 const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategory, onDelete }: DashboardCardProps) => {
     const [showMenu, setShowMenu] = useState(false);
+    const [isBookmarked, setIsBookmarked] = useState(false);
+    const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+        const check = async () => {
+            try {
+                const res = await checkBookmark(post.id);
+                if (!cancelled) setIsBookmarked(res.is_bookmarked);
+            } catch { /* ignore */ }
+        };
+        check();
+        return () => { cancelled = true; };
+    }, [post.id]);
+
+    const handleToggleBookmark = async () => {
+        if (isBookmarkLoading) return;
+        setIsBookmarkLoading(true);
+        try {
+            if (isBookmarked) {
+                await removeBookmarkByNewsId(post.id);
+                setIsBookmarked(false);
+                toast.success('ลบ Bookmark แล้ว');
+            } else {
+                await createBookmark(post.id);
+                setIsBookmarked(true);
+                toast.success('Bookmark แล้ว');
+            }
+        } catch {
+            toast.error('เกิดข้อผิดพลาดในการ Bookmark');
+        } finally {
+            setIsBookmarkLoading(false);
+        }
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -105,8 +141,15 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                             : dayjs(post.tweet_created_at || post.created_at).format('D MMM')}
                     </div>
 
-                    <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-all">
-                        <HiOutlineBookmark className="text-lg" />
+                    <button
+                        onClick={handleToggleBookmark}
+                        disabled={isBookmarkLoading}
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-all ${
+                            isBookmarked ? 'text-yellow-400' : 'text-gray-500 hover:text-white'
+                        } ${isBookmarkLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        title={isBookmarked ? 'ลบ Bookmark' : 'Bookmark'}
+                    >
+                        <HiOutlineBookmark className={`text-lg ${isBookmarked ? 'fill-yellow-400' : ''}`} />
                     </button>
 
                     <div className="relative" ref={menuRef}>

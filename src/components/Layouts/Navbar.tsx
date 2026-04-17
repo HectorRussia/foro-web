@@ -13,7 +13,7 @@ export const NAV_ITEMS = [
     { id: 1, icon: <FaReadme />, label: "อ่านข่าว", path: "/dashboard" },
     { id: 2, icon: <HiMiniUsers />, label: "กลุ่มเป้าหมาย", path: "/user-target" },
     // { id: 3, icon: <RiUserFollowFill />, label: "คนที่คุณติดตาม", path: "/user-following" },
-    { id: 4, icon: <PiBookmarkSimple />, label: "Bookmarks", path: "/category-management" },
+    { id: 4, icon: <PiBookmarkSimple />, label: "Bookmarks", path: "/bookmark" },
     // { id: 6, icon: <TbAlpha />, label: "AdvanceSearch", path: "/advance-search", requiredRole: "king" },
 ]
 

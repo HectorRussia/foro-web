@@ -17,6 +17,7 @@ import {
 import { FiBarChart } from "react-icons/fi";
 import type { ContentResultItem, ContentSearchRequest, ContentSearchResponse, SearchMode } from "../../interface/searchContent";
 import { HiOutlineArrowPathRoundedSquare, HiOutlineChartBar, HiOutlineChatBubbleLeft, HiOutlineHeart } from "react-icons/hi2";
+import { createContentSearchBookmark, removeBookmarkByNewsId } from "../../api/bookmark";
 
 
 dayjs.extend(relativeTime);
@@ -167,10 +168,54 @@ function SummaryLoadingSkeleton() {
 function ResultCard({
     card,
     onSaveSearch,
+    searchQuery,
 }: {
     card: ContentResultItem;
     onSaveSearch: () => void;
+    searchQuery: string;
 }) {
+    const [isBookmarked, setIsBookmarked] = useState(false);
+    const [bookmarkNewsId, setBookmarkNewsId] = useState<number | null>(card.id ?? null);
+    const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+
+    const handleToggleBookmark = async () => {
+        if (isBookmarkLoading) return;
+        setIsBookmarkLoading(true);
+        try {
+            if (isBookmarked && bookmarkNewsId) {
+                await removeBookmarkByNewsId(bookmarkNewsId);
+                setIsBookmarked(false);
+                toast.success("ลบ Bookmark แล้ว");
+            } else {
+                const res = await createContentSearchBookmark({
+                    title: card.title,
+                    username: card.username,
+                    content: card.content,
+                    url: card.url || "",
+                    tweet_id: card.tweet_id || "",
+                    tweet_profile_pic: card.tweet_profile_pic || "",
+                    tweet_created_at: card.created_at || new Date().toISOString(),
+                    has_video: card.has_video,
+                    media_urls: card.media_urls ?? null,
+                    media_type: card.media_type ?? null,
+                    retweet_count: card.retweet_count,
+                    reply_count: card.reply_count,
+                    like_count: card.like_count,
+                    view_count: card.view_count,
+                    source_type: "x_search",
+                    ref_code: card.ref_code,
+                    search_query: searchQuery,
+                });
+                setIsBookmarked(true);
+                setBookmarkNewsId(res.news_id);
+                toast.success("Bookmark แล้ว");
+            }
+        } catch {
+            toast.error("เกิดข้อผิดพลาดในการ Bookmark");
+        } finally {
+            setIsBookmarkLoading(false);
+        }
+    };
     const mediaUrl = card.media_urls?.[0] ?? null;
     const isMediaCard = Boolean(mediaUrl);
     const mediaLabel =
@@ -205,8 +250,15 @@ function ResultCard({
                     <span className="rounded-full border border-white/10 bg-white/5 px-2.5 py-1 text-[10px] font-bold text-slate-300">
                         {formatRelativeTime(card.created_at)}
                     </span>
-                    <button className="grid h-6 w-6 place-items-center rounded-full transition hover:bg-white/5 hover:text-white">
-                        <LuBookmark className="h-3.5 w-3.5" />
+                    <button
+                        onClick={handleToggleBookmark}
+                        disabled={isBookmarkLoading}
+                        className={`grid h-6 w-6 place-items-center rounded-full transition hover:bg-white/5 ${
+                            isBookmarked ? "text-yellow-400" : "hover:text-white"
+                        } ${isBookmarkLoading ? "opacity-50 cursor-not-allowed" : ""}`}
+                        title={isBookmarked ? "ลบ Bookmark" : "Bookmark"}
+                    >
+                        <LuBookmark className={`h-3.5 w-3.5 ${isBookmarked ? "fill-yellow-400" : ""}`} />
                     </button>
                     <a
                         href={card.url || "#"}
@@ -688,6 +740,7 @@ export default function SummaryBullets() {
                                 <ResultCard
                                     card={card}
                                     onSaveSearch={handleSaveSearch}
+                                    searchQuery={query}
                                 />
                             </div>
                         ))
