@@ -28,6 +28,17 @@ const TABS: { label: string; value: TabType; icon: React.ReactNode }[] = [
 
 const PAGE_LIMIT = 12;
 
+function parseMediaUrls(raw: string[] | string | null | undefined): string[] {
+    if (!raw) return [];
+    if (Array.isArray(raw)) return raw;
+    try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch {
+        return [];
+    }
+}
+
 function formatNumber(num: number = 0) {
     if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
     if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
@@ -70,7 +81,7 @@ function BookmarkCard({
               .replace(/\s+/g, '')
         : dayjs(displayTime).format('D MMM');
 
-    const mediaUrl = item.media_urls?.[0] ?? null;
+    const mediaUrl = parseMediaUrls(item.media_urls as string[] | string | null)[0] ?? null;
 
     return (
         <article className="group relative flex h-full flex-col overflow-hidden rounded-[30px] border border-white/6 transition-all hover:border-blue-500/20"
@@ -143,7 +154,7 @@ function BookmarkCard({
                 <div className="relative z-10 mb-4 grid gap-4 lg:grid-cols-[112px_minmax(0,1fr)] lg:gap-5">
                     <div className="shrink-0">
                         <div className="aspect-square overflow-hidden rounded-[20px] border border-white/10 bg-[#111112] ring-1 ring-white/10">
-                            <img src={"https://pbs.twimg.com/amplify_video_thumb/2044819054352125952/img/OWCVkaI57YhZ1wIc.jpg"} alt="" className="h-full w-full object-cover" />
+                            <img src={mediaUrl} alt="" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
                         </div>
                     </div>
                     <p className="line-clamp-4 text-[15px] font-medium leading-relaxed tracking-tight text-white" style={{ fontFamily: 'var(--font-card)', fontWeight: 500 }}>
