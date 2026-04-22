@@ -9,7 +9,7 @@ import {
     HiOutlineArrowUturnLeft
 } from "react-icons/hi2";
 import { RiLoader4Line } from "react-icons/ri";
-import { LuSparkles, LuRefreshCw } from "react-icons/lu";
+import { LuSparkles, LuRefreshCw, LuFilter } from "react-icons/lu";
 import { AnimatePresence, motion } from 'framer-motion';
 import PostList from '../components/PostList';
 import { type NewsItem, type NewsResult } from '../interface/news';
@@ -20,6 +20,7 @@ import { toast } from 'react-hot-toast';
 import { type Category } from '../interface/category';
 import { type PostListWithMembers } from '../components/PostList';
 import HomeCanvas from '../components/Canvas/HomeCanvas';
+import { getPresets, createPreset, deletePreset, type PresetSearch } from '../api/preset';
 
 
 
@@ -48,6 +49,18 @@ const TodayNews = () => {
     const [aiFilteredIds, setAiFilteredIds] = useState<(string | number)[] | null>(null);
     const [aiSummary, setAiSummary] = useState<string | null>(null);
     const aiFilterRef = useRef<HTMLDivElement>(null);
+
+    // Preset State
+    const [foroPresets, setForoPresets] = useState<PresetSearch[]>([]);
+    const [selectedPresetId, setSelectedPresetId] = useState<number | null>(null);
+    const [homePresets, setHomePresets] = useState<Set<number>>(() => {
+        try {
+            const stored = localStorage.getItem('foro_home_presets');
+            return stored ? new Set(JSON.parse(stored)) : new Set();
+        } catch { return new Set(); }
+    });
+    const [isLoadingPresets, setIsLoadingPresets] = useState(false);
+    const [isSavingPreset, setIsSavingPreset] = useState(false);
 
     // Search Parameters
     const [newsResults, setNewsResults] = useState<NewsResult[]>([]);
@@ -260,6 +273,82 @@ const TodayNews = () => {
         setStatusMessage('หยุดการประมวลผลแล้ว');
     };
 
+    const loadForoPresets = async () => {
+        setIsLoadingPresets(true);
+        try {
+            const presets = await getPresets('forofilter');
+            setForoPresets(presets);
+        } catch (error) {
+            console.error('Failed to load presets:', error);
+        } finally {
+            setIsLoadingPresets(false);
+        }
+    };
+
+    const handleSelectPreset = (preset: PresetSearch) => {
+        setSelectedPresetId(preset.id);
+        setAiPrompt(preset.name);
+    };
+
+    const handleSavePreset = async () => {
+        if (!aiPrompt.trim()) {
+            toast.error('กรุณาพิมพ์ prompt ก่อนบันทึก');
+            return;
+        }
+        setIsSavingPreset(true);
+        try {
+            const newPreset = await createPreset(aiPrompt.trim(), 'forofilter');
+            setForoPresets(prev => [newPreset, ...prev]);
+            setSelectedPresetId(newPreset.id);
+            toast.success('บันทึก preset สำเร็จ');
+        } catch (error: any) {
+            toast.error(error?.response?.data?.detail || 'บันทึก preset ไม่สำเร็จ');
+        } finally {
+            setIsSavingPreset(false);
+        }
+    };
+
+    const handleDeletePreset = async () => {
+        if (!selectedPresetId) return;
+        try {
+            await deletePreset(selectedPresetId);
+            setForoPresets(prev => prev.filter(p => p.id !== selectedPresetId));
+            setHomePresets(prev => {
+                const next = new Set(prev);
+                next.delete(selectedPresetId);
+                localStorage.setItem('foro_home_presets', JSON.stringify([...next]));
+                return next;
+            });
+            setSelectedPresetId(null);
+            setAiPrompt('');
+            toast.success('ลบ preset สำเร็จ');
+        } catch (error) {
+            console.error('Failed to delete preset:', error);
+            toast.error('ลบ preset ไม่สำเร็จ');
+        }
+    };
+
+    const toggleHomePreset = (id: number) => {
+        setHomePresets(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) {
+                next.delete(id);
+            } else if (next.size >= 3) {
+                toast.error('เลือกโชว์บน Home ได้สูงสุด 3 preset');
+                return prev;
+            } else {
+                next.add(id);
+            }
+            localStorage.setItem('foro_home_presets', JSON.stringify([...next]));
+            return next;
+        });
+    };
+
+    const openForoFilter = () => {
+        setIsAIFilterOpen(true);
+        loadForoPresets();
+    };
+
     const handleDeleteIndividual = async (id: number) => {
         try {
             const { deleteNews } = await import('../api/news');
@@ -283,8 +372,9 @@ const TodayNews = () => {
         }
     };
 
-    const handleAIFilter = async () => {
-        if (!aiPrompt.trim()) {
+    const handleAIFilter = async (promptOverride?: string) => {
+        const prompt = promptOverride ?? aiPrompt;
+        if (!prompt.trim()) {
             toast.error('กรุณาพิมพ์ข้อมูลที่ต้องการให้ AI วิเคราะห์');
             return;
         }
@@ -293,7 +383,7 @@ const TodayNews = () => {
 
         // Structure to send to backend exactly as requested
         const payload = {
-            prompt: aiPrompt,
+            prompt: prompt,
             news_items: newsResults.map(res => ({
                 id: res.id,
                 title: res.title,
@@ -520,17 +610,17 @@ const TodayNews = () => {
 
                                 {/* Right Section: Search/AI/Sync */}
                                 <div className="flex items-center gap-2.5">
-                                    {/* AI Filter Button */}
+                                    {/* FORO Filter Button */}
                                     <div className="relative" ref={aiFilterRef}>
                                         <button
-                                            onClick={() => setIsAIFilterOpen(!isAIFilterOpen)}
+                                            onClick={openForoFilter}
                                             className={`flex items-center gap-2 px-4.5 py-2.5 rounded-full font-bold border transition-all text-xs
                                                 ${isAIFilterOpen
                                                     ? 'bg-blue-600/20 text-blue-400 border-blue-500/50 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]'
                                                     : 'bg-[#121214] border-white/6 text-gray-200 hover:text-white hover:bg-white/5'}`}
                                         >
-                                            <LuSparkles className={`text-[15px] ${isAIFilterOpen ? 'animate-pulse' : 'text-blue-400'}`} />
-                                            <span>AI Filter</span>
+                                            <LuFilter className={`text-[15px] ${isAIFilterOpen ? 'text-blue-400' : 'text-blue-400'}`} />
+                                            <span>FORO Filter</span>
                                         </button>
                                     </div>
 
@@ -563,10 +653,36 @@ const TodayNews = () => {
                                     {statusMessage}
                                 </span>
                             </div> */}
+
+                            {/* Home Preset Quick Chips */}
+                            {foroPresets.filter(p => homePresets.has(p.id)).length > 0 && (
+                                <div className="flex items-center gap-2 mt-3 flex-wrap">
+                                    {foroPresets.filter(p => homePresets.has(p.id)).map(preset => {
+                                        const isActive = aiFilteredIds !== null && selectedPresetId === preset.id;
+                                        return (
+                                            <button
+                                                key={preset.id}
+                                                onClick={() => {
+                                                    setAiPrompt(preset.name);
+                                                    setSelectedPresetId(preset.id);
+                                                    handleAIFilter(preset.name);
+                                                }}
+                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border transition-all
+                                                    ${isActive
+                                                        ? 'bg-blue-600/20 text-blue-300 border-blue-500/40'
+                                                        : 'bg-white/4 text-gray-400 border-white/8 hover:bg-white/8 hover:text-white hover:border-white/15'}`}
+                                            >
+                                                <LuSparkles className="text-[10px] text-blue-400" />
+                                                <span>{preset.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     </header>
 
-                    {/* AI Filter Modal */}
+                    {/* FORO Filter Modal */}
                     <AnimatePresence>
                         {isAIFilterOpen && (
                             <>
@@ -576,61 +692,157 @@ const TodayNews = () => {
                                     animate={{ opacity: 1 }}
                                     exit={{ opacity: 0 }}
                                     onClick={() => setIsAIFilterOpen(false)}
-                                    className="fixed inset-0 bg-black/80 backdrop-blur-md z-100"
+                                    className="fixed inset-0 z-100 bg-black/85 backdrop-blur-md"
                                 />
 
                                 {/* Modal Container */}
-                                <div className="fixed inset-0 flex items-center justify-center z-101 p-4 pointer-events-none">
+                                <div className="fixed inset-0 z-101 flex items-center justify-center p-4 pointer-events-none sm:p-6">
                                     <motion.div
-                                        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                                        initial={{ opacity: 0, scale: 0.94, y: 18 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
-                                        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                                        exit={{ opacity: 0, scale: 0.94, y: 18 }}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="w-full max-w-lg bg-[#141416] border-t-[3px] border-t-blue-500 rounded-[28px] p-6 md:p-8 shadow-3xl pointer-events-auto relative overflow-hidden"
+                                        className="pointer-events-auto relative w-full max-w-140 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-4xl border border-white/8 border-t-2 border-t-blue-500/80 bg-[#121214]/95 p-4 shadow-[0_40px_120px_rgba(0,0,0,0.82)] backdrop-blur-2xl sm:p-6"
                                     >
-                                        <div className="flex flex-col gap-5">
+                                        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.16),transparent_42%)]" />
+                                        <div className="relative space-y-4 sm:space-y-5">
                                             {/* Header */}
-                                            <div className="space-y-4">
-                                                <div className="flex items-center gap-3.5">
-                                                    <div className="p-3 bg-[#1a1a1c] border border-white/5 rounded-xl">
-                                                        <LuSparkles className="text-xl text-blue-500 shadow-[0_0_12px_rgba(59,130,246,0.25)]" />
-                                                    </div>
-                                                    <div className="flex flex-col">
-                                                        <h2 className="text-xl font-black text-white tracking-tight leading-none mb-1">AI Smart Filter</h2>
-                                                        <p className="text-gray-500 text-[13px] font-bold opacity-80">บอก AI ว่าอยากหาอะไรในฟีดนี้</p>
-                                                    </div>
+                                            <div className="flex items-start gap-3 sm:gap-4">
+                                                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-blue-500/35 bg-[#12203b] text-blue-400 shadow-[0_10px_30px_rgba(37,99,235,0.18)]">
+                                                    <LuFilter className="text-[18px]" />
                                                 </div>
-                                                <p className="text-[11px] text-gray-400 font-bold opacity-60">
-                                                    เลือก preset ไปโชว์บนหน้าข่าววันนี้ได้สูงสุด 3 อัน
-                                                </p>
+                                                <div className="min-w-0 pt-0.5">
+                                                    <p className="text-[11px] font-black uppercase tracking-[0.28em] text-blue-400/70">ANALYSIS MODE</p>
+                                                    <h2 className="mt-1 text-[24px] font-black leading-none tracking-tight text-white sm:text-[28px]">FORO Filter</h2>
+                                                    <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">บอก FORO ว่าอยากให้ช่วยมองประเด็นนี้แบบไหน</p>
+                                                </div>
                                             </div>
 
-                                            {/* Input Area */}
-                                            <div className="relative group">
+                                            {/* Quick Mode Select */}
+                                            <section className="rounded-3xl border border-white/8 bg-white/3 p-4 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] sm:p-5">
+                                                <div className="mb-4">
+                                                    <p className="text-[15px] font-black tracking-tight text-white">เลือกโหมดเร็ว</p>
+                                                    <p className="mt-1 text-sm leading-relaxed text-slate-400">แตะเพื่อใช้ prompt ทันที แล้วเลือกตรง ๆ ได้เลยว่าอันไหนจะโชว์บนหน้า Home</p>
+                                                </div>
+
+                                                {isLoadingPresets ? (
+                                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                        {[1, 2, 3, 4].map(i => (
+                                                            <div key={i} className="h-28 rounded-[20px] border border-white/8 bg-white/5 animate-pulse" />
+                                                        ))}
+                                                    </div>
+                                                ) : foroPresets.length === 0 ? (
+                                                    <div className="rounded-[20px] border border-dashed border-white/10 bg-white/2 px-4 py-6 text-center">
+                                                        <p className="text-[13px] font-bold text-gray-500">ยังไม่มี preset</p>
+                                                        <p className="mt-1 text-[11px] text-gray-600">พิมพ์ prompt แล้วกด "บันทึก preset"</p>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                                            {foroPresets.map(preset => {
+                                                                const isActive = selectedPresetId === preset.id;
+                                                                const isHomePreset = homePresets.has(preset.id);
+
+                                                                return (
+                                                                    <div
+                                                                        key={preset.id}
+                                                                        role="button"
+                                                                        tabIndex={0}
+                                                                        onClick={() => handleSelectPreset(preset)}
+                                                                        onKeyDown={(e) => {
+                                                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                                                e.preventDefault();
+                                                                                handleSelectPreset(preset);
+                                                                            }
+                                                                        }}
+                                                                        className={`flex min-h-31.5 cursor-pointer flex-col rounded-[20px] border p-4 text-left transition-all outline-none
+                                                                            ${isActive
+                                                                                ? 'border-blue-500/40 bg-blue-500/10 shadow-[0_0_0_1px_rgba(37,99,235,0.08)_inset]'
+                                                                                : 'border-white/8 bg-white/3 hover:border-white/12 hover:bg-white/5'}`}
+                                                                    >
+                                                                        <span className="block text-[15px] font-bold leading-snug text-white line-clamp-2">
+                                                                            {preset.name}
+                                                                        </span>
+
+                                                                        <div className="mt-auto pt-4">
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    toggleHomePreset(preset.id);
+                                                                                }}
+                                                                                disabled={!isHomePreset && homePresets.size >= 3}
+                                                                                className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[10px] font-black transition-all
+                                                                                    ${isHomePreset
+                                                                                        ? 'border-blue-500/40 bg-blue-500/15 text-blue-200 shadow-[0_0_0_1px_rgba(59,130,246,0.12)_inset]'
+                                                                                        : 'border-white/10 bg-white/3 text-slate-400 hover:border-white/15 hover:bg-white/5 hover:text-white disabled:cursor-not-allowed disabled:border-white/8 disabled:bg-white/2 disabled:text-slate-600'}`}
+                                                                            >
+                                                                                {isHomePreset ? 'ซ่อนจาก Home' : 'โชว์บน Home'}
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+
+                                                        <p className="mt-3 text-[11px] text-slate-500">เลือกให้โชว์บนหน้า Home ได้สูงสุด 3 อัน</p>
+                                                    </>
+                                                )}
+
+                                                {/* Delete preset */}
+                                                {selectedPresetId && (
+                                                    <button
+                                                        onClick={handleDeletePreset}
+                                                        className="mt-3 flex items-center gap-1.5 rounded-full border border-rose-500/10 bg-rose-500/5 px-3 py-1.5 text-[10px] font-black text-rose-400/70 transition-all hover:border-rose-500/30 hover:text-rose-400"
+                                                    >
+                                                        <span className="text-sm leading-none">×</span>
+                                                        <span>ลบ preset นี้</span>
+                                                    </button>
+                                                )}
+                                            </section>
+
+                                            {/* Prompt Section */}
+                                            <section className="rounded-3xl border border-white/8 bg-white/3 p-4 shadow-[0_1px_0_rgba(255,255,255,0.03)_inset] sm:p-5">
+                                                <div className="mb-3">
+                                                    <p className="text-[15px] font-black tracking-tight text-white">Prompt</p>
+                                                    <p className="mt-1 text-sm leading-relaxed text-slate-400">จะให้สรุป จับมุม จัดอันดับ หรือหัก angle จากข่าวที่คัดมาก็ได้</p>
+                                                </div>
+
                                                 <textarea
-                                                    autoFocus
                                                     value={aiPrompt}
-                                                    onChange={(e) => setAiPrompt(e.target.value)}
-                                                    placeholder="เช่น AI ที่มี engagement สูง"
-                                                    className="w-full h-32 bg-[#0c0c0c] border border-white/5 rounded-xl p-5 text-sm text-white placeholder-gray-700 focus:outline-none focus:border-blue-500/20 transition-all resize-none shadow-inner"
+                                                    onChange={(e) => { setAiPrompt(e.target.value); setSelectedPresetId(null); }}
+                                                    placeholder="เช่น สรุปข่าวที่น่าเอาไปเล่าต่อ หรือหาโพสต์ไหนน่าทำคอนเทนต์"
+                                                    rows={4}
+                                                    className="min-h-33 w-full resize-none rounded-[20px] border border-blue-500/15 bg-[#0b111d] px-4 py-4 text-[14px] leading-6 text-white placeholder:text-slate-600 focus:border-blue-500/35 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all"
                                                 />
-                                            </div>
+
+                                                <div className="mt-3 flex items-center justify-between gap-3">
+                                                    <p className="text-xs leading-relaxed text-slate-500">บันทึก preset แล้วค่อยกดปุ่ม "โชว์บน Home" ที่การ์ดนั้นได้เลย</p>
+                                                    <button
+                                                        onClick={handleSavePreset}
+                                                        disabled={isSavingPreset || !aiPrompt.trim()}
+                                                        className="shrink-0 text-xs font-semibold text-blue-400/80 transition-all hover:text-blue-300 disabled:cursor-not-allowed disabled:text-slate-600"
+                                                    >
+                                                        {isSavingPreset ? 'กำลังบันทึก...' : '+ บันทึก preset'}
+                                                    </button>
+                                                </div>
+                                            </section>
 
                                             {/* Actions */}
                                             <div className="flex gap-3 pt-1">
                                                 <button
                                                     onClick={() => setIsAIFilterOpen(false)}
-                                                    className="flex-1 py-3.5 rounded-xl text-[13px] font-black text-white/60 bg-[#1c1c1e]/50 border border-white/5 hover:bg-white/5 hover:text-white transition-all uppercase tracking-widest"
+                                                    className="flex-1 rounded-2xl border border-white/8 bg-white/5 px-4 py-3 text-[14px] font-bold text-slate-300 transition-all hover:bg-white/7 hover:text-white"
                                                 >
                                                     ยกเลิก
                                                 </button>
                                                 <button
-                                                    onClick={handleAIFilter}
-                                                    disabled={isAIProcessing || newsResults.length === 0}
-                                                    className={`flex-1 py-3.5 rounded-xl text-[13px] font-black text-white transition-all uppercase tracking-widest shadow-2xl
-                                                        ${isAIProcessing || newsResults.length === 0
-                                                            ? 'bg-gray-800 text-gray-500 cursor-not-allowed'
-                                                            : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/30 active:scale-[0.98]'}`}
+                                                    onClick={() => handleAIFilter()}
+                                                    disabled={isAIProcessing || newsResults.length === 0 || !aiPrompt.trim()}
+                                                    className={`flex-1 rounded-2xl px-4 py-3 text-[14px] font-bold text-white transition-all shadow-[0_18px_40px_rgba(37,99,235,0.35)]
+                                                        ${isAIProcessing || newsResults.length === 0 || !aiPrompt.trim()
+                                                            ? 'cursor-not-allowed bg-slate-800 text-slate-500 shadow-none'
+                                                            : 'bg-linear-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 active:scale-[0.99]'}`}
                                                 >
                                                     {isAIProcessing ? 'กำลังวิเคราะห์...' : 'กรองฟีด'}
                                                 </button>

@@ -103,7 +103,7 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
                             onMouseLeave={() => setHoveredCategory(null)}
                             onClick={() => handleCategoryClick(cat.id)}
                             disabled={isRefreshing}
-                            className={`group relative flex flex-col items-center justify-center p-6 rounded-[32px] border transition-all duration-500 disabled:opacity-70 ${selectedCategory === cat.id
+                            className={`group relative flex flex-col items-center justify-center p-6 rounded-4xl border transition-all duration-500 disabled:opacity-70 ${selectedCategory === cat.id
                                 ? 'border-white/20 shadow-2xl'
                                 : 'bg-[#111112] border-white/5 hover:border-white/20'
                                 }`}
@@ -141,7 +141,7 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
                             {(selectedCategory === cat.id || hoveredCategory === cat.id) && (
                                 <motion.div
                                     layoutId="active-glow"
-                                    className="absolute inset-0 rounded-[32px] blur-2xl -z-10"
+                                    className="absolute inset-0 rounded-4xl blur-2xl -z-10"
                                     style={{ backgroundColor: `${cat.color}10` }}
                                     initial={{ opacity: 0 }}
                                     animate={{ opacity: 1 }}
@@ -154,7 +154,7 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
 
             {/* Random Users View */}
             {selectedCategory && (
-                <div className="max-w-4xl mx-auto min-h-[400px]">
+                <div className="max-w-4xl mx-auto min-h-100">
                     <div className="flex items-center justify-between mb-4 px-1">
                         <h3 className="text-[10px] font-black text-blue-400 uppercase tracking-widest flex items-center gap-2 underline underline-offset-4 decoration-blue-500/30">
                             <FaWandMagicSparkles className="animate-pulse" />

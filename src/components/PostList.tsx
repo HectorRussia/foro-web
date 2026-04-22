@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { HiOutlinePlus, HiOutlineTrash, HiOutlineShare, HiBars3, HiOutlineUsers } from 'react-icons/hi2';
+import { FaRegFileCode } from 'react-icons/fa6';
 import * as postListApi from '../api/postList';
 import type { PostList as IPostList, PostListUser } from '../api/postList';
 import api from '../api/axiosInstance';
@@ -39,9 +40,11 @@ const PostList = ({
     const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isCreating, setIsCreating] = useState(false);
+    const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
     const [newListName, setNewListName] = useState('');
     const [newListColor, setNewListColor] = useState(colors[0]);
     const [selectedListId, setSelectedListId] = useState<number | null>(null);
+    const actionMenuRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = async () => {
         try {
@@ -75,6 +78,30 @@ const PostList = ({
         fetchAllData();
     }, [refreshKey]);
 
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (actionMenuRef.current && !actionMenuRef.current.contains(event.target as Node)) {
+                setIsActionMenuOpen(false);
+            }
+        };
+
+        const handleEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') {
+                setIsActionMenuOpen(false);
+            }
+        };
+
+        if (isActionMenuOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('keydown', handleEscape);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscape);
+        };
+    }, [isActionMenuOpen]);
+
     const handleCreateList = async () => {
         if (!newListName.trim()) return;
         try {
@@ -82,11 +109,22 @@ const PostList = ({
             setNewListName('');
             setNewListColor(colors[0]);
             setIsCreating(false);
+            setIsActionMenuOpen(false);
             fetchAllData();
             toast.success('สร้างรายการสำเร็จ');
         } catch (error) {
             toast.error('ไม่สามารถสร้างรายการได้');
         }
+    };
+
+    const handleOpenCreateList = () => {
+        setIsActionMenuOpen(false);
+        setIsCreating(true);
+    };
+
+    const handleImportByCode = () => {
+        setIsActionMenuOpen(false);
+        toast('ฟีเจอร์นำเข้าด้วยรหัสยังไม่พร้อมใช้งาน');
     };
 
     const handleColorChange = async (listId: number, color: string) => {
@@ -140,29 +178,74 @@ const PostList = ({
     };
 
     return (
-        <div className={`flex flex-col h-full bg-[#0f0f10] ${showBorder ? 'border-l border-white/5' : ''} w-[340px] shrink-0 transition-all duration-500`}>
+        <div className={`flex flex-col h-full bg-[#0f0f10] ${showBorder ? 'border-l border-white/5' : ''} w-85 shrink-0 transition-all duration-500`}>
 
             {/* Header */}
-            <div className="px-6 pt-8 pb-5 flex items-center justify-between border-b border-white/6">
-                <div className="flex items-center gap-3">
-                    <div className="flex items-end gap-[3px] mb-1">
-                        <div className="w-[3px] h-4 bg-white/75 rounded-full" />
-                        <div className="w-[3px] h-6 bg-white rounded-full" />
-                        <div className="w-[3px] h-5 bg-white/70 rounded-full" />
-                        <div className="w-[3px] h-[20px] bg-white/45 rounded-full ml-0.5 transform rotate-18 origin-bottom" />
+            <div
+                ref={actionMenuRef}
+                className="relative border-b border-white/6 px-6 pt-8 pb-5"
+            >
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="flex items-end gap-0.75 mb-1">
+                            <div className="w-0.75 h-4 rounded-full bg-white/60" />
+                            <div className="w-0.75 h-6 rounded-full bg-white" />
+                            <div className="w-0.75 h-4.5 rounded-full bg-white/70" />
+                            <div className="w-0.75 h-3.5 rounded-full bg-white/45" />
+                        </div>
+                        <span className="font-black text-[12px] tracking-[0.18em] text-slate-400 uppercase">
+                            POST LIST
+                        </span>
                     </div>
-                    <span className="font-black text-xs tracking-[0.2em] text-gray-500 uppercase">POST LIST</span>
+
+                    <button
+                        type="button"
+                        aria-haspopup="menu"
+                        aria-expanded={isActionMenuOpen}
+                        onClick={() => setIsActionMenuOpen((prev) => !prev)}
+                        className="group flex h-9 w-9 items-center justify-center rounded-full text-gray-400 transition-all hover:bg-white/5 hover:text-white"
+                    >
+                        <HiOutlinePlus className="text-[22px] transition-transform duration-200 group-hover:rotate-90" />
+                    </button>
                 </div>
-                <button
-                    onClick={() => setIsCreating(true)}
-                    className="p-1.5 hover:bg-white/5 rounded-xl text-gray-400 group transition-all"
-                >
-                    <HiOutlinePlus className="text-xl group-hover:text-white" />
-                </button>
+
+                <AnimatePresence>
+                    {isActionMenuOpen && (
+                        <motion.div
+                            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                            transition={{ duration: 0.16, ease: 'easeOut' }}
+                            className="absolute right-6 top-[calc(100%+10px)] z-30 w-53.5 overflow-hidden rounded-[18px] border border-white/8 bg-[#111112]/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl"
+                        >
+                            <button
+                                type="button"
+                                onClick={handleOpenCreateList}
+                                className="flex w-full items-center gap-3 rounded-[14px] px-3 py-3 text-left transition-colors hover:bg-white/5"
+                            >
+                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white">
+                                    <HiOutlinePlus className="text-lg" />
+                                </span>
+                                <span className="text-sm font-bold text-white">สร้าง Post List</span>
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={handleImportByCode}
+                                className="flex w-full items-center gap-3 rounded-[14px] px-3 py-3 text-left transition-colors hover:bg-white/5"
+                            >
+                                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/5 text-white/90">
+                                    <FaRegFileCode className="text-[16px]" />
+                                </span>
+                                <span className="text-sm font-bold text-gray-300">นำเข้าด้วยรหัส</span>
+                            </button>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
             </div>
 
-            {/* Create Shortcut Button */}
-            <div className="px-5 py-5">
+            {/* Legacy shortcut hidden in favor of the dropdown menu */}
+            <div className="hidden px-5 py-5">
                 <button
                     onClick={() => setIsCreating(true)}
                     className="w-full flex items-center justify-center gap-2 py-3.5 rounded-[20px] bg-[#1a1a1c] border border-white/6 text-gray-300 hover:text-white hover:bg-[#242427] transition-all font-bold text-[13px] shadow-[0_10px_30px_rgba(0,0,0,0.2)]"
@@ -275,7 +358,7 @@ const PostList = ({
                                     }}
 
 
-                                    className={`group bg-[#121214] border transition-all duration-500 overflow-hidden ${isSelected ? 'border-white/10 rounded-[24px] shadow-[0_18px_60px_rgba(0,0,0,0.26)]' : 'border-white/6 rounded-[22px] hover:bg-[#17171a]'}`}
+                                    className={`group bg-[#121214] border transition-all duration-500 overflow-hidden ${isSelected ? 'border-white/10 rounded-3xl shadow-[0_18px_60px_rgba(0,0,0,0.26)]' : 'border-white/6 rounded-[22px] hover:bg-[#17171a]'}`}
                                 >
                                     <div className="p-3.5 flex items-center gap-4">
                                         <div
@@ -288,7 +371,7 @@ const PostList = ({
                                                     setSelectedListId(nextList ? nextList.id : null);
                                                 }
                                             }}
-                                            className="w-[58px] h-[58px] rounded-[18px] flex items-center justify-center shrink-0 shadow-lg relative transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
+                                            className="w-14.5 h-14.5 rounded-[18px] flex items-center justify-center shrink-0 shadow-lg relative transition-all duration-300 cursor-pointer hover:scale-105 active:scale-95"
                                             style={{
                                                 backgroundColor: list.color_list || colors[0],
                                                 boxShadow: isSelected ? `0 0 25px ${(list.color_list || colors[0])}40` : 'none'
@@ -408,7 +491,7 @@ const PostList = ({
                                                     <h5 className="text-[10px] font-black tracking-widest text-gray-200 uppercase mb-4 border-t border-white/6 pt-4">
                                                         Available accounts ({availableUsers.length})
                                                     </h5>
-                                                    <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                                                    <div className="space-y-4 max-h-75 overflow-y-auto pr-2 custom-scrollbar">
                                                         {availableUsers.map((user) => (
                                                             <div key={user.id} className="flex items-center justify-between group/user animate-in slide-in-from-right duration-300">
                                                                 <div className="flex items-center gap-3">
