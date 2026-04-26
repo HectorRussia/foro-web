@@ -1,13 +1,23 @@
 import api from './axiosInstance';
 import type { PaginatedNewsResponse, NewsAnalysisResponse } from '../interface/news';
 
-export const getNews = async (page = 1, limit = 10, days_range: number | null = null): Promise<PaginatedNewsResponse> => {
+export const getNews = async (
+    page = 1,
+    limit = 10,
+    days_range: number | null = null,
+    search?: string,
+    min_view_count?: number,
+    min_engagement?: number,
+): Promise<PaginatedNewsResponse> => {
     const response = await api.get<PaginatedNewsResponse>('/news', {
         params: {
             page,
             limit,
-            days_range
-        }
+            ...(days_range !== null && { days_range }),
+            ...(search ? { search } : {}),
+            ...(min_view_count !== undefined ? { min_view_count } : {}),
+            ...(min_engagement !== undefined ? { min_engagement } : {}),
+        },
     });
     return response.data;
 };
@@ -52,4 +62,4 @@ export const searchAndAnalyzeBulk = async (payload: any, signal?: AbortSignal): 
     const response = await api.post('/advanced-search/search-and-analyze-bulk', payload, { signal });
     return response.data;
 };
-
+

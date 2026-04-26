@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useInView } from 'react-intersection-observer';
 import { LuLayoutDashboard } from 'react-icons/lu';
@@ -10,6 +10,11 @@ import { createCategoryNews } from '../../api/categoryNews';
 import { getCategories } from '../../api/category';
 import { deleteNews, getNews } from '../../api/news';
 import { type Category } from '../../interface/category';
+
+type SortMode = 'views' | 'engagement' | null;
+
+const VIEW_THRESHOLD = 10_000;
+const ENGAGEMENT_THRESHOLD = 100;
 
 const LAYOUT_OPTIONS = [
     { id: 'grid', label: 'Grid', icon: <LuLayoutDashboard className="rotate-90" /> },
@@ -23,6 +28,26 @@ const Main = () => {
     const { ref, inView } = useInView({ rootMargin: '200px' });
     const mainRef = useRef<HTMLElement>(null);
 
+    // Search & Filter state
+    const [searchInput, setSearchInput] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [activeSort, setActiveSort] = useState<SortMode>(null);
+
+    // Debounce search (300ms)
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedSearch(searchInput.trim());
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchInput]);
+
+    const minViewCount = activeSort === 'views' ? VIEW_THRESHOLD : undefined;
+    const minEngagement = activeSort === 'engagement' ? ENGAGEMENT_THRESHOLD : undefined;
+
+    const toggleSort = useCallback((mode: SortMode) => {
+        setActiveSort((prev) => (prev === mode ? null : mode));
+    }, []);
+
     const {
         data,
         fetchNextPage,
@@ -30,8 +55,9 @@ const Main = () => {
         isFetchingNextPage,
         status,
     } = useInfiniteQuery({
-        queryKey: ['news'],
-        queryFn: ({ pageParam = 1 }) => getNews(pageParam, 10),
+        queryKey: ['news', debouncedSearch, activeSort],
+        queryFn: ({ pageParam = 1 }) =>
+            getNews(pageParam, 10, null, debouncedSearch || undefined, minViewCount, minEngagement),
         getNextPageParam: (lastPage) => {
             const currentPage = Number(lastPage.page);
             const totalPages = Number(lastPage.pages);
@@ -127,9 +153,19 @@ const Main = () => {
                     </div>
                     <input
                         type="text"
+                        value={searchInput}
+                        onChange={(e) => setSearchInput(e.target.value)}
                         placeholder="ค้นหาจากชื่อบัญชี เนื้อหา หรือคำสำคัญ..."
-                        className="w-full bg-[#111112] border border-white/5 rounded-2xl py-3.5 pl-11 pr-4 text-sm font-bold text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/30 focus:ring-4 focus:ring-blue-500/5 transition-all"
+                        className="w-full bg-[#111112] border border-white/5 rounded-2xl py-3.5 pl-11 pr-10 text-sm font-bold text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/30 focus:ring-4 focus:ring-blue-500/5 transition-all"
                     />
+                    {searchInput && (
+                        <button
+                            onClick={() => setSearchInput('')}
+                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-300 transition-colors"
+                        >
+                            <span className="text-lg leading-none">&times;</span>
+                        </button>
+                    )}
                 </div>
 
                 {/* Segmented Filters & Layout Wrapper */}
@@ -139,10 +175,26 @@ const Main = () => {
                     </div>
 
                     <div className="flex p-1 bg-[#111112] border border-white/5 rounded-xl shadow-xl">
-                        <button className="px-5 py-1.5 rounded-lg text-[11px] font-black bg-white/5 text-white shadow-lg transition-all uppercase tracking-wider">
+                        <button
+                            onClick={() => toggleSort('views')}
+                            className={`px-5 py-1.5 rounded-lg text-[11px] font-black transition-all uppercase tracking-wider ${
+                                activeSort === 'views'
+                                    ? 'bg-white/5 text-white shadow-lg'
+                                    : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title={`ยอดวิว ≥ ${VIEW_THRESHOLD.toLocaleString()}`}
+                        >
                             ยอดวิว
                         </button>
-                        <button className="px-5 py-1.5 rounded-lg text-[11px] font-black text-gray-500 hover:text-gray-300 transition-all uppercase tracking-wider">
+                        <button
+                            onClick={() => toggleSort('engagement')}
+                            className={`px-5 py-1.5 rounded-lg text-[11px] font-black transition-all uppercase tracking-wider ${
+                                activeSort === 'engagement'
+                                    ? 'bg-white/5 text-white shadow-lg'
+                                    : 'text-gray-500 hover:text-gray-300'
+                            }`}
+                            title={`Engagement ≥ ${ENGAGEMENT_THRESHOLD.toLocaleString()}`}
+                        >
                             เอ็นเกจเมนต์
                         </button>
                     </div>
