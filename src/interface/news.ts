@@ -14,6 +14,8 @@ export interface NewsItem {
     view_count?: number
     source?: string
     tweet_created_at?: string
+    media_urls?: string[]
+    media_type?: string | null
 }
 export interface PaginatedNewsResponse {
     items: NewsItem[];
@@ -47,6 +49,8 @@ export interface NewsResult {
     quote_count?: number
     view_count?: number
     tweet_created_at?: string
+    media_urls?: string[]
+    media_type?: string | null
 }
 
 export interface SSEEventData {
@@ -87,4 +91,4 @@ export interface AdvancedSearchBulkResponse {
     twitter_cursor?: string;
     twitter_has_next?: boolean;
     search_query?: string;
-}
+}

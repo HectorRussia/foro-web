@@ -112,7 +112,9 @@ const TodayNews = () => {
                     like_count: item.like_count || 0,
                     quote_count: item.quote_count || 0,
                     view_count: item.view_count || 0,
-                    tweet_profile_pic: item.tweet_profile_pic
+                    tweet_profile_pic: item.tweet_profile_pic,
+                    media_urls: item.media_urls ?? [],
+                    media_type: item.media_type ?? null
                 })).sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
                 setNewsResults(dbResults);
                 setHasStarted(true);
@@ -232,7 +234,9 @@ const TodayNews = () => {
                     reply_count: item.reply_count || 0,
                     like_count: item.like_count || 0,
                     quote_count: item.quote_count || 0,
-                    view_count: item.view_count || 0
+                    view_count: item.view_count || 0,
+                    media_urls: item.media_urls ?? [],
+                    media_type: item.media_type ?? null
                 }));
 
                 setNewsResults(prev => {
@@ -480,7 +484,9 @@ const TodayNews = () => {
         reply_count: res.reply_count,
         like_count: res.like_count,
         quote_count: res.quote_count,
-        view_count: res.view_count
+        view_count: res.view_count,
+        media_urls: res.media_urls,
+        media_type: res.media_type
     });
 
     const toggleFilter = (filter: string) => {
@@ -573,12 +579,12 @@ const TodayNews = () => {
                     {/* Header Section */}
                     <header className="relative shrink-0 mb-6 px-6 pt-6 sm:px-8 sm:pt-8">
                         <div className="flex flex-col mb-8">
-                            <span className="text-gray-500 text-[10px] sm:text-[11px] font-black tracking-widest uppercase mb-1 opacity-70">
-                                WATCHLIST FEED
-                            </span>
                             <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">
                                 หน้าหลัก
                             </h1>
+                            <span className="text-gray-500 text-[10px] sm:text-[11px] font-black tracking-widest uppercase mb-1 opacity-70">
+                                WATCHLIST FEED
+                            </span>
                         </div>
 
                         {/* Search & Actions Bar */}

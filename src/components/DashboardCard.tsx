@@ -18,6 +18,7 @@ import { toast } from 'react-hot-toast';
 import type { NewsItem } from '../interface/news';
 import type { Category } from '../interface/category';
 import { createBookmark, removeBookmarkByNewsId, checkBookmark } from '../api/bookmark';
+import MediaLightbox from './MediaLightbox';
 
 dayjs.extend(relativeTime);
 dayjs.locale('th');
@@ -35,7 +36,12 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
     const [showMenu, setShowMenu] = useState(false);
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
+    const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
     const menuRef = useRef<HTMLDivElement>(null);
+
+    const mediaUrls = post.media_urls ?? [];
+    const mediaType = post.media_type ?? null;
+    const hasMedia = mediaUrls.length > 0;
 
     useEffect(() => {
         let cancelled = false;
@@ -190,13 +196,59 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                 </div>
             )}
 
-            {/* Content Body */}
-            <div className={`text-white leading-relaxed tracking-tight wrap-break-word relative z-10
-                ${isCompact ? 'text-[13px] line-clamp-3 mb-4' : 'text-[15px] mb-5'}
-                grow
-            `} style={{ fontFamily: 'var(--font-card)', fontWeight: 500 }}>
-                {post.content}
+            {/* Content Body + Inline Media Thumbnail */}
+            <div className={`flex flex-row-reverse gap-3 relative z-10 ${isCompact ? 'mb-4' : 'mb-5'} grow`}>
+                <div className={`text-white leading-relaxed tracking-tight wrap-break-word
+                    ${isCompact ? 'text-[13px] line-clamp-3' : 'text-[15px]'}
+                    grow min-w-0
+                `} style={{ fontFamily: 'var(--font-card)', fontWeight: 500 }}>
+                    {post.content}
+                </div>
+
+                {/* Inline thumbnail */}
+                {hasMedia && (
+                    <div
+                        className="shrink-0 w-20 h-20 rounded-xl overflow-hidden cursor-pointer relative group/thumb"
+                        onClick={() => setLightboxIndex(0)}
+                    >
+                        <img
+                            src={mediaUrls[0]}
+                            alt="media"
+                            className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/20 transition-colors duration-200" />
+                        {/* Video play badge */}
+                        {(mediaType === 'video' || mediaType === 'animated_gif') && (
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 border border-white/20">
+                                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 ml-0.5 text-white">
+                                        <path d="M8 5v14l11-7z" />
+                                    </svg>
+                                </div>
+                            </div>
+                        )}
+                        {/* Count badge */}
+                        {mediaUrls.length > 1 && (
+                            <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/65 text-white text-[9px] font-black leading-none">
+                                1/{mediaUrls.length}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
+
+            {/* Media Lightbox */}
+            {lightboxIndex !== null && hasMedia && (
+                <MediaLightbox
+                    urls={mediaUrls}
+                    mediaType={mediaType}
+                    currentIndex={lightboxIndex}
+                    onClose={() => setLightboxIndex(null)}
+                    onPrev={() => setLightboxIndex(i => i !== null ? (i - 1 + mediaUrls.length) % mediaUrls.length : 0)}
+                    onNext={() => setLightboxIndex(i => i !== null ? (i + 1) % mediaUrls.length : 0)}
+                    tweetUrl={post.url}
+                />
+            )}
 
             {/* Action Footer */}
             <div className="flex items-center justify-between mt-auto pt-4.5 border-t border-white/5 relative z-10">
