@@ -8,12 +8,9 @@ import {
     HiOutlineArrowPathRoundedSquare,
     HiOutlineChatBubbleLeft,
     HiOutlineArrowTopRightOnSquare,
-    HiOutlinePlus,
-    HiOutlineTrash,
     HiOutlineBookmark,
     HiOutlinePencilSquare
 } from "react-icons/hi2";
-import { IoIosMore } from 'react-icons/io';
 import { toast } from 'react-hot-toast';
 import type { NewsItem } from '../interface/news';
 import type { Category } from '../interface/category';
@@ -32,7 +29,7 @@ interface DashboardCardProps {
     onDelete?: (newsId: number) => Promise<void>;
 }
 
-const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategory, onDelete }: DashboardCardProps) => {
+const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     const [showMenu, setShowMenu] = useState(false);
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
@@ -157,28 +154,6 @@ const DashboardCard = ({ post, variant = 'list', categories = [], onAddToCategor
                     >
                         <HiOutlineBookmark className={`text-lg ${isBookmarked ? 'fill-yellow-400' : ''}`} />
                     </button>
-
-                    <div className="relative" ref={menuRef}>
-                    <button onClick={() => setShowMenu(!showMenu)} className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-500 hover:text-white transition-all">
-                            <IoIosMore className="text-lg" />
-                        </button>
-                        {showMenu && (
-                            <div className="absolute right-0 top-full mt-2 w-56 bg-[#1a1a1c] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-20 animate-in fade-in zoom-in-95 duration-200">
-                                {onAddToCategory && categories.length > 0 && categories.map((category) => (
-                                    <button key={category.id} onClick={() => { onAddToCategory?.(category.id, post.id); setShowMenu(false); }} className="w-full text-left px-4 py-3 text-sm text-gray-300 hover:bg-white/5 hover:text-white transition-colors flex items-center gap-3">
-                                        <HiOutlinePlus className="text-lg text-gray-500" />
-                                        <span className="truncate font-bold">{category.name}</span>
-                                    </button>
-                                ))}
-                                {onDelete && (
-                                    <button onClick={() => { onDelete(post.id); setShowMenu(false); }} className="w-full text-left px-4 py-3 text-sm text-rose-500 hover:bg-rose-500/10 transition-colors flex items-center gap-3 border-t border-white/5">
-                                        <HiOutlineTrash className="text-lg" />
-                                        <span className="font-bold">ลบข่าวถาวร</span>
-                                    </button>
-                                )}
-                            </div>
-                        )}
-                    </div>
 
                     <a href={post.url} target="_blank" rel="noopener noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-500 hover:text-blue-400 transition-all">
                         <HiOutlineArrowTopRightOnSquare className="text-lg" />
