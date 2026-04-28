@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { FaRobot, FaMicrochip, FaBriefcase, FaChartLine, FaHandHoldingDollar, FaBitcoin, FaHeartPulse, FaPersonWalking, FaGlobe, FaBuildingColumns, FaWandMagicSparkles, FaUserPlus, FaTwitter, FaLightbulb, FaGavel } from 'react-icons/fa6';
+import { FaWandMagicSparkles, FaUserPlus, FaTwitter } from 'react-icons/fa6';
 import { HiCheckBadge } from 'react-icons/hi2';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Recommendation } from '../interface/userTarget';
@@ -15,23 +15,32 @@ export interface PresetUser extends Recommendation {
 export interface CategoryPreset {
     id: string;
     name: string;
-    icon: React.ReactNode;
-    color: string;
+    image: string;
+    accent: string;
 }
 
 const CATEGORIES: CategoryPreset[] = [
-    { id: 'tech', name: 'เทคโนโลยี', icon: <FaMicrochip />, color: '#3b82f6' },
-    { id: 'ai', name: 'AI', icon: <FaRobot />, color: '#a855f7' },
-    { id: 'business', name: 'ธุรกิจ', icon: <FaBriefcase />, color: '#eab308' },
-    { id: 'marketing', name: 'การตลาด', icon: <FaChartLine />, color: '#f43f5e' },
-    { id: 'finance', name: 'การเงิน', icon: <FaBuildingColumns />, color: '#10b981' },
-    { id: 'investment', name: 'การลงทุน', icon: <FaHandHoldingDollar />, color: '#0ea5e9' },
-    { id: 'crypto', name: 'คริปโต', icon: <FaBitcoin />, color: '#f59e0b' },
-    { id: 'health', name: 'สุขภาพ', icon: <FaHeartPulse />, color: '#ec4899' },
-    { id: 'lifestyle', name: 'ไลฟ์สไตล์', icon: <FaPersonWalking />, color: '#22c55e' },
-    { id: 'economy', name: 'เศรษฐกิจ', icon: <FaGlobe />, color: '#3b82f6' },
-    { id: 'politics', name: 'การเมือง', icon: <FaGavel />, color: '#64748b' },
-    { id: 'self_dev', name: 'การพัฒนาตัวเอง', icon: <FaLightbulb />, color: '#d946ef' },
+    { id: 'tech', name: 'เทคโนโลยี', image: '/images/categories/Tech.jpg_202604080519.jpeg', accent: '#3b82f6' },
+    { id: 'ai', name: 'AI', image: '/images/categories/AI.jpg_202604080519.jpeg', accent: '#a855f7' },
+    { id: 'business', name: 'ธุรกิจ', image: '/images/categories/Business.png_202604080519.jpeg', accent: '#eab308' },
+    { id: 'marketing', name: 'การตลาด', image: '/images/categories/Marketing.jpg_202604080519.jpeg', accent: '#f43f5e' },
+    { id: 'finance', name: 'การเงิน', image: '/images/categories/Finance.png_202604080519.jpeg', accent: '#10b981' },
+    { id: 'investment', name: 'การลงทุน', image: '/images/categories/Investment.png_202604080519.jpeg', accent: '#0ea5e9' },
+    { id: 'crypto', name: 'คริปโต', image: '/images/categories/Crypto.png_202604080519.jpeg', accent: '#f59e0b' },
+    { id: 'cyber_security', name: 'ความปลอดภัยไซเบอร์', image: '/images/categories/Cyber_Security.jpg_202604080519.jpeg', accent: '#38bdf8' },
+    { id: 'health', name: 'สุขภาพ', image: '/images/categories/Health.jpeg_202604080519.jpeg', accent: '#ec4899' },
+    { id: 'lifestyle', name: 'ไลฟ์สไตล์', image: '/images/categories/Lifestyle.jpg_202604080519.jpeg', accent: '#22c55e' },
+    { id: 'economy', name: 'เศรษฐกิจ', image: '/images/categories/Economy.jpg_202604080519.jpeg', accent: '#3b82f6' },
+    { id: 'politics', name: 'การเมือง', image: '/images/categories/Politics.jpeg_202604080519.jpeg', accent: '#64748b' },
+    { id: 'sports', name: 'กีฬา', image: '/images/categories/Sports.jpeg_202604080519.jpeg', accent: '#f97316' },
+    { id: 'entertainment', name: 'บันเทิง', image: '/images/categories/Entertainment.jpeg_202604080519.jpeg', accent: '#d946ef' },
+    { id: 'travel', name: 'ท่องเที่ยว', image: '/images/categories/Travel.jpg_202604080519.jpeg', accent: '#38bdf8' },
+    { id: 'food', name: 'อาหาร', image: '/images/categories/Food.jpg_202604080519.jpeg', accent: '#f59e0b' },
+    { id: 'environment', name: 'สิ่งแวดล้อม', image: '/images/categories/Environment.jpg_202604080525.jpeg', accent: '#22c55e' },
+    { id: 'education', name: 'การศึกษา', image: '/images/categories/Education.jpeg_202604080519.jpeg', accent: '#60a5fa' },
+    { id: 'analysis', name: 'บทวิเคราะห์', image: '/images/categories/Analysis.jpg_202604080519.jpeg', accent: '#eab308' },
+    { id: 'real_estate', name: 'อสังหาฯ', image: '/images/categories/Realestate.jpg_202604080519.jpeg', accent: '#94a3b8' },
+    { id: 'automotive', name: 'ยานยนต์', image: '/images/categories/Automotive.jpg_202604080519.jpeg', accent: '#f97316' },
 ];
 
 interface PresetUserTargetProps {
@@ -73,26 +82,17 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
     }, [selectedCategory]);
 
     return (
-        <div className="w-full mt-10">
-            <div className="mb-12 border-t border-white/5 pt-12 relative overflow-hidden">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-48 h-px bg-linear-to-r from-transparent via-blue-500/50 to-transparent" />
-                <motion.h2
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="text-[11px] font-black text-gray-400 mb-10 flex items-center justify-center gap-3 uppercase tracking-[0.25em] text-center opacity-60"
-                >
-                    DISCOVER BY CATEGORY
-                </motion.h2>
-
+        <div className="w-full mt-0">
+            <div className="mb-8 relative overflow-visible">
                 {/* Category Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 max-w-6xl mx-auto px-4">
+                <div className="grid w-full grid-cols-[repeat(auto-fill,minmax(145px,1fr))] gap-3">
                     {CATEGORIES.map((cat, idx) => (
                         <motion.button
                             key={cat.id}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            whileHover={{ y: -8 }}
-                            transition={{ 
+                            whileHover={{ y: -4 }}
+                            transition={{
                                 type: "spring",
                                 stiffness: 400,
                                 damping: 25,
@@ -103,49 +103,31 @@ const PresetUserTarget = ({ onFollow }: PresetUserTargetProps) => {
                             onMouseLeave={() => setHoveredCategory(null)}
                             onClick={() => handleCategoryClick(cat.id)}
                             disabled={isRefreshing}
-                            className={`group relative flex flex-col items-center justify-center p-6 rounded-4xl border transition-all duration-500 disabled:opacity-70 ${selectedCategory === cat.id
-                                ? 'border-white/20 shadow-2xl'
-                                : 'bg-[#111112] border-white/5 hover:border-white/20'
-                                }`}
+                            className="group relative isolate aspect-[3/4] min-h-[176px] overflow-hidden rounded-[7px] border bg-[#071020] text-left shadow-[0_16px_36px_rgba(0,0,0,0.28)] transition-all duration-300 disabled:opacity-70"
                             style={{
-                                backgroundColor: selectedCategory === cat.id || hoveredCategory === cat.id 
-                                    ? `${cat.color}15` // 15 = roughly 8% opacity in hex
-                                    : '#111112'
+                                borderColor: selectedCategory === cat.id || hoveredCategory === cat.id
+                                    ? `${cat.accent}cc`
+                                    : 'rgba(70,103,158,0.42)',
+                                boxShadow: selectedCategory === cat.id || hoveredCategory === cat.id
+                                    ? `0 18px 44px ${cat.accent}22`
+                                    : '0 16px 36px rgba(0,0,0,0.28)'
                             }}
                         >
-                            {/* Icon Container */}
-                            <div 
-                                className={`w-14 h-14 rounded-[22px] flex items-center justify-center mb-4 transition-all duration-500 text-2xl
-                                    ${selectedCategory === cat.id ? 'shadow-lg' : 'group-hover:scale-110'}`}
-                                style={{
-                                    backgroundColor: `${cat.color}20`, // 20 = 12% opacity
-                                    color: cat.color,
-                                    boxShadow: selectedCategory === cat.id || hoveredCategory === cat.id 
-                                        ? `0 0 20px ${cat.color}30` 
-                                        : 'none'
-                                }}
-                            >
-                                {cat.icon}
+                            <img
+                                src={cat.image}
+                                alt={cat.name}
+                                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                draggable={false}
+                            />
+                            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(3,8,18,0.72)_0%,rgba(3,8,18,0.18)_42%,rgba(3,8,18,0.54)_100%)]" />
+                            <div className="absolute inset-x-0 top-0 z-10 flex justify-center px-3 pt-3.5 text-center">
+                                <span className="max-w-[8.5rem] text-[15px] font-black leading-tight text-white drop-shadow-[0_2px_10px_rgba(0,0,0,0.85)]">
+                                    {cat.name}
+                                </span>
                             </div>
 
-                            <span className={`text-[12px] font-black uppercase tracking-widest transition-all duration-300 ${
-                                selectedCategory === cat.id || hoveredCategory === cat.id ? 'text-white' : 'text-gray-500'
-                            }`}
-                            style={{
-                                color: selectedCategory === cat.id || hoveredCategory === cat.id ? '#ffffff' : undefined
-                            }}>
-                                {cat.name}
-                            </span>
-
-                            {/* Active Glow */}
-                            {(selectedCategory === cat.id || hoveredCategory === cat.id) && (
-                                <motion.div
-                                    layoutId="active-glow"
-                                    className="absolute inset-0 rounded-4xl blur-2xl -z-10"
-                                    style={{ backgroundColor: `${cat.color}10` }}
-                                    initial={{ opacity: 0 }}
-                                    animate={{ opacity: 1 }}
-                                />
+                            {selectedCategory === cat.id && (
+                                <div className="absolute inset-0 rounded-[7px] ring-2 ring-white/50 ring-inset" />
                             )}
                         </motion.button>
                     ))}
