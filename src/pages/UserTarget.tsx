@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
-import { FaMagnifyingGlass, FaUserPlus, FaRobot, FaWandMagicSparkles, FaCopy, FaTrash } from 'react-icons/fa6';
+import { FaMagnifyingGlass, FaUserPlus, FaWandMagicSparkles, FaTrash } from 'react-icons/fa6';
 import { HiCheckBadge, HiOutlinePlus, HiXMark, HiArrowTopRightOnSquare, HiOutlineUsers, HiOutlineNewspaper } from 'react-icons/hi2';
 
 import Sidebar from '../components/Layouts/Sidebar';
@@ -35,6 +35,8 @@ const UserTarget = () => {
 
     // Post List state for options
     const [selectedUserForOptions, setSelectedUserForOptions] = useState<number | null>(null);
+    const [selectedRecommendationForList, setSelectedRecommendationForList] = useState<string | null>(null);
+    const [addingRecommendationToList, setAddingRecommendationToList] = useState<string | null>(null);
     const [postLists, setPostLists] = useState<(IPostList & { members: PostListUser[] })[]>([]);
     const [isFetchingLists, setIsFetchingLists] = useState(false);
     const [refreshSidebar, setRefreshSidebar] = useState(0);
@@ -42,6 +44,23 @@ const UserTarget = () => {
     const formatNumber = (num: number) => {
         return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
     }
+
+    const normalizeXAccount = (account: string) => account.replace(/^@/, '').trim().toLowerCase();
+
+    const getRecommendationAvatar = (rec: Recommendation) => {
+        return rec.profile_image_url_https || rec.profile_image || `https://unavatar.io/twitter/${normalizeXAccount(rec.x_account)}`;
+    };
+
+    const getRecommendationFollowerLabel = (rec: Recommendation) => {
+        if (typeof rec.followers_count === 'number') return `${formatNumber(rec.followers_count)} followers`;
+        if (rec.followers) return rec.followers.toLowerCase().includes('followers') ? rec.followers : `${rec.followers} followers`;
+        return 'FORO match';
+    };
+
+    const findFollowedUserByAccount = (account: string, list = followedUsers) => {
+        const normalized = normalizeXAccount(account);
+        return list.find(user => normalizeXAccount(user.x_account) === normalized) || null;
+    };
 
     const fetchUsers = async () => {
         if (!searchQuery.trim()) return;
@@ -62,7 +81,7 @@ const UserTarget = () => {
         }
     };
 
-    const handleFollow = async (name: string, x_account: string, profile_image: string) => {
+    const handleFollow = async (name: string, x_account: string, profile_image: string): Promise<FollowedUser | null> => {
         try {
             await api.post(`${BASE_URL}/follow/users/search`, {
                 query: activeTab === 'search' ? searchQuery : recommendQuery,
@@ -72,14 +91,17 @@ const UserTarget = () => {
             });
 
             toast.success(`Followed ${name} successfully`);
-            fetchFollowedUsers();
+            const refreshedUsers = await fetchFollowedUsers();
             setRefreshSidebar(prev => prev + 1);
+            return findFollowedUserByAccount(x_account, refreshedUsers);
 
         } catch (error: any) {
             if (error.response && error.response.status === 400) {
                 const detail = error.response.data.detail;
                 if (detail?.data?.message) {
                     toast.error(detail.data.message);
+                    const refreshedUsers = await fetchFollowedUsers();
+                    return findFollowedUserByAccount(x_account, refreshedUsers);
                 } else {
                     toast.error(`เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ`);
                 }
@@ -87,17 +109,20 @@ const UserTarget = () => {
                 toast.error(`ไม่สามารถติดตาม ${name} ได้`);
                 console.error("Follow error:", error);
             }
+            return null;
         }
     };
 
-    const fetchRecommendations = async () => {
-        if (!recommendQuery.trim()) return;
+    const fetchRecommendations = async (queryOverride?: string) => {
+        const query = (queryOverride ?? recommendQuery).trim();
+        if (!query) return;
 
         setIsRecommending(true);
+        setSelectedRecommendationForList(null);
         setRecommendations([]); // Clear for a fresh search
         try {
             const response = await api.post(`${BASE_URL}/follow/users/llm_recommend`, {
-                query: recommendQuery
+                query
             });
             if (response.data?.data?.recommendations) {
                 setRecommendations(response.data.data.recommendations.slice(0, 10));
@@ -113,20 +138,21 @@ const UserTarget = () => {
         }
     };
 
-    const fetchFollowedUsers = async () => {
+    const fetchFollowedUsers = async (): Promise<FollowedUser[]> => {
         setIsFetchingFollowed(true);
         try {
             const response = await api.get(`${BASE_URL}/follow`);
+            const nextUsers = Array.isArray(response.data)
+                ? response.data
+                : Array.isArray(response.data?.data)
+                    ? response.data.data
+                    : [];
 
-            if (Array.isArray(response.data)) {
-                setFollowedUsers(response.data);
-            } else if (Array.isArray(response.data?.data)) {
-                setFollowedUsers(response.data.data);
-            } else {
-                setFollowedUsers([]);
-            }
+            setFollowedUsers(nextUsers);
+            return nextUsers;
         } catch (error) {
             console.error("Error fetching followed users:", error);
+            return [];
         } finally {
             setIsFetchingFollowed(false);
         }
@@ -144,7 +170,7 @@ const UserTarget = () => {
         }
     };
 
-    const fetchPostLists = async () => {
+    const fetchPostLists = async (): Promise<(IPostList & { members: PostListUser[] })[]> => {
         try {
             setIsFetchingLists(true);
             const lists = await postListApi.getPostLists();
@@ -155,8 +181,10 @@ const UserTarget = () => {
                 })
             );
             setPostLists(listsWithMembers);
+            return listsWithMembers;
         } catch (error) {
             console.error('Failed to fetch post lists:', error);
+            return [];
         } finally {
             setIsFetchingLists(false);
         }
@@ -176,6 +204,68 @@ const UserTarget = () => {
         } catch (error) {
             console.error('Failed to toggle list membership:', error);
             toast.error('ไม่สามารถดำเนินการได้');
+        }
+    };
+
+    const handleCategorySearch = (categoryName: string) => {
+        setActiveTab('recommend');
+        setRecommendQuery(categoryName);
+        fetchRecommendations(categoryName);
+    };
+
+    const getListMembershipForRecommendation = (
+        rec: Recommendation,
+        list: IPostList & { members: PostListUser[] },
+        followedUser?: FollowedUser | null
+    ) => {
+        const normalized = normalizeXAccount(rec.x_account);
+        return list.members.some(member =>
+            (followedUser && member.follower_user_id === followedUser.id) ||
+            normalizeXAccount(member.follow_user_x_account) === normalized
+        );
+    };
+
+    const ensureRecommendationInWatchlist = async (rec: Recommendation) => {
+        const existing = findFollowedUserByAccount(rec.x_account);
+        if (existing) return existing;
+
+        const followed = await handleFollow(rec.name, rec.x_account, getRecommendationAvatar(rec));
+        if (followed) return followed;
+
+        const refreshedUsers = await fetchFollowedUsers();
+        return findFollowedUserByAccount(rec.x_account, refreshedUsers);
+    };
+
+    const handleAddRecommendationToList = async (
+        rec: Recommendation,
+        list: IPostList & { members: PostListUser[] }
+    ) => {
+        const actionKey = `${normalizeXAccount(rec.x_account)}-${list.id}`;
+        setAddingRecommendationToList(actionKey);
+
+        try {
+            const followedUser = await ensureRecommendationInWatchlist(rec);
+            if (!followedUser) {
+                toast.error('ต้องเพิ่มเข้า Watchlist ก่อนจึงจะเพิ่มเข้า Post List ได้');
+                return;
+            }
+
+            if (getListMembershipForRecommendation(rec, list, followedUser)) {
+                toast.success(`${rec.name} อยู่ใน ${list.name} แล้ว`);
+                setSelectedRecommendationForList(null);
+                return;
+            }
+
+            await postListApi.createPostListUser(list.id, followedUser.id);
+            await fetchPostLists();
+            setRefreshSidebar(prev => prev + 1);
+            setSelectedRecommendationForList(null);
+            toast.success(`เพิ่ม ${rec.name} เข้า ${list.name} แล้ว`);
+        } catch (error) {
+            console.error('Failed to add recommendation to list:', error);
+            toast.error('ไม่สามารถเพิ่มเข้า Post List ได้');
+        } finally {
+            setAddingRecommendationToList(null);
         }
     };
 
@@ -292,6 +382,20 @@ const UserTarget = () => {
                                     placeholder={activeTab === 'search' ? "กรอก X Username (เช่น elonmusk)..." : "เช่น นักวิเคราะห์ตลาดเกม, ครีเอเตอร์สาย AI, ผู้ก่อตั้งสตาร์ทอัพสุขภาพ"}
                                     className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-500 outline-none text-sm font-bold min-w-0"
                                 />
+                                {activeTab === 'recommend' && recommendQuery && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setRecommendQuery("");
+                                            setRecommendations([]);
+                                            setSelectedRecommendationForList(null);
+                                        }}
+                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition-all hover:bg-white/5 hover:text-white"
+                                        title="ล้างคำค้นหา"
+                                    >
+                                        <HiXMark className="text-base" />
+                                    </button>
+                                )}
                             </div>
                             {/* Submit Button */}
                             <button
@@ -405,90 +509,136 @@ const UserTarget = () => {
                                             <AILoader />
                                         </div>
                                     )}
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                        {recommendations.map((rec, idx) => (
-                                            <motion.div
-                                                key={`${rec.x_account}-${idx}`}
-                                                initial={{ opacity: 0, y: 20 }}
-                                                animate={{ opacity: 1, y: 0 }}
-                                                transition={{ delay: idx * 0.05 }}
-                                                whileHover={{ y: -4 }}
-                                                className="group flex flex-col p-6 rounded-[24px] transition-all duration-500 relative overflow-hidden h-full"
-                                                style={{
-                                                    backgroundColor: 'rgba(13, 17, 23, 0.4)',
-                                                    border: '1px solid rgba(255, 255, 255, 0.08)'
-                                                }}
-                                            >
-                                                {/* Top Right Glow */}
-                                                <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                                                    style={{
-                                                        background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.15), transparent 70%)'
-                                                    }}
-                                                />
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {recommendations.map((rec, idx) => {
+                                            const recKey = normalizeXAccount(rec.x_account);
+                                            const followedUser = findFollowedUserByAccount(rec.x_account);
+                                            const isListMenuOpen = selectedRecommendationForList === recKey;
 
-                                                {/* Hover Border Overlay (To avoid border jumping) */}
-                                                <div className="absolute inset-0 rounded-[24px] border border-transparent group-hover:border-[#0070f3]/50 transition-colors duration-500 pointer-events-none" />
+                                            return (
+                                                <motion.div
+                                                    key={`${rec.x_account}-${idx}`}
+                                                    initial={{ opacity: 0, y: 20 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: idx * 0.05 }}
+                                                    whileHover={{ y: -3 }}
+                                                    className="group relative flex min-h-[290px] flex-col overflow-visible rounded-[22px] border border-[#1d3555]/75 bg-[#0c121b] p-4 shadow-[0_18px_44px_rgba(0,0,0,0.28)] transition-all duration-300 hover:border-blue-500/60"
+                                                >
+                                                    <div className="flex items-start justify-between gap-4">
+                                                        <div className="rounded-full border border-blue-400/40 bg-blue-500/15 px-3 py-1 text-[10px] font-black text-blue-100">
+                                                            {recommendQuery || 'FORO'}
+                                                        </div>
 
-                                                <div className="flex items-center justify-between mb-5 relative z-10">
-                                                    <div className="bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 px-3 py-1 rounded-full flex items-center gap-1.5">
-                                                        <FaRobot className="text-[#8b5cf6] text-[10px]" />
-                                                        <span className="text-[9px] font-black text-[#8b5cf6] uppercase tracking-widest">AI Pick</span>
+                                                        <div className="relative">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation();
+                                                                    setSelectedRecommendationForList(isListMenuOpen ? null : recKey);
+                                                                }}
+                                                                className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/8 bg-white/6 text-gray-400 transition-all hover:border-blue-400/40 hover:bg-blue-500/15 hover:text-white"
+                                                                title="เพิ่มเข้า Post List"
+                                                            >
+                                                                <HiOutlinePlus className="text-base" />
+                                                            </button>
+
+                                                            <AnimatePresence>
+                                                                {isListMenuOpen && (
+                                                                    <motion.div
+                                                                        initial={{ opacity: 0, y: -6, scale: 0.96 }}
+                                                                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                                                                        exit={{ opacity: 0, y: -6, scale: 0.96 }}
+                                                                        transition={{ duration: 0.16, ease: 'easeOut' }}
+                                                                        className="absolute right-0 top-[calc(100%+8px)] z-40 w-48 overflow-hidden rounded-[12px] border border-white/10 bg-[#101011]/98 py-2 shadow-[0_18px_60px_rgba(0,0,0,0.5)] backdrop-blur-xl"
+                                                                    >
+                                                                        <div className="border-b border-white/7 px-3 pb-2 text-[9px] font-black uppercase tracking-widest text-blue-400">
+                                                                            Add to list
+                                                                        </div>
+
+                                                                        <div className="max-h-56 overflow-y-auto py-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                                                            {isFetchingLists ? (
+                                                                                <div className="px-3 py-4">
+                                                                                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                                                                                </div>
+                                                                            ) : postLists.length > 0 ? (
+                                                                                postLists.map((list) => {
+                                                                                    const isMember = getListMembershipForRecommendation(rec, list, followedUser);
+                                                                                    const actionKey = `${recKey}-${list.id}`;
+
+                                                                                    return (
+                                                                                        <button
+                                                                                            key={list.id}
+                                                                                            type="button"
+                                                                                            onClick={() => handleAddRecommendationToList(rec, list)}
+                                                                                            disabled={addingRecommendationToList === actionKey}
+                                                                                            className="flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[12px] font-bold text-gray-300 transition-all hover:bg-white/5 hover:text-white disabled:cursor-wait disabled:opacity-60"
+                                                                                        >
+                                                                                            <span className="truncate">{list.name}</span>
+                                                                                            {addingRecommendationToList === actionKey ? (
+                                                                                                <span className="h-3 w-3 animate-spin rounded-full border-2 border-white/20 border-t-white" />
+                                                                                            ) : isMember ? (
+                                                                                                <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                                                                                            ) : null}
+                                                                                        </button>
+                                                                                    );
+                                                                                })
+                                                                            ) : (
+                                                                                <div className="px-3 py-3 text-[12px] font-bold text-gray-500">
+                                                                                    ยังไม่มี Post List
+                                                                                </div>
+                                                                            )}
+                                                                        </div>
+                                                                    </motion.div>
+                                                                )}
+                                                            </AnimatePresence>
+                                                        </div>
                                                     </div>
-                                                    <div className="flex items-center gap-2">
-                                                        <button
-                                                            onClick={() => {
-                                                                navigator.clipboard.writeText(rec.x_account);
-                                                                toast.success(`คัดลอก @${rec.x_account} แล้ว`);
-                                                            }}
-                                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm group/btn"
-                                                            title="คัดลอกชื่อผู้ใช้"
-                                                        >
-                                                            <FaCopy className="text-sm group-hover/btn:scale-110 transition-transform" />
-                                                        </button>
-                                                        <button
-                                                            className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 border border-white/5 text-gray-500 hover:text-white transition-all shadow-sm"
-                                                            title="Options"
-                                                        >
-                                                            <HiOutlinePlus className="text-sm" />
-                                                        </button>
-                                                    </div>
-                                                </div>
 
-                                                {/* Header with Avatar */}
-                                                <div className="flex items-start gap-4 mb-5 relative z-10">
-                                                    <div className="relative group/avatar shrink-0">
+                                                    <div className="mt-4 flex items-start gap-3">
                                                         <img
-                                                            src={`https://unavatar.io/twitter/${rec.x_account}`}
+                                                            src={getRecommendationAvatar(rec)}
                                                             alt={rec.name}
-                                                            className="w-14 h-14 rounded-full border border-white/10 group-hover:border-[#0070f3]/30 object-cover transition-all"
+                                                            className="h-12 w-12 shrink-0 rounded-xl border border-white/10 bg-white/5 object-cover"
                                                             onError={(e) => {
-                                                                e.currentTarget.parentElement?.classList.add('hidden');
+                                                                e.currentTarget.src = `https://unavatar.io/twitter/${recKey}`;
                                                             }}
                                                         />
-                                                    </div>
-                                                    <div className="min-w-0 pt-1">
-                                                        <h3 className="text-base font-black text-white group-hover:text-blue-400 transition-colors truncate tracking-tight uppercase mb-0.5">
-                                                            {rec.name}
-                                                        </h3>
-                                                        <span className="text-gray-500 font-black text-sm tracking-tight truncate block opacity-70">@{rec.x_account}</span>
-                                                    </div>
-                                                </div>
 
-                                                <div className="mb-8 flex-1 relative z-10">
-                                                    <p className="text-gray-400 text-sm leading-relaxed italic line-clamp-4 group-hover:text-gray-300 transition-colors">
-                                                        "{rec.reason}"
+                                                        <div className="min-w-0 pt-0.5">
+                                                            <h3 className="truncate text-base font-black uppercase tracking-tight text-white">
+                                                                {rec.name}
+                                                            </h3>
+                                                            <p className="truncate text-sm font-bold text-blue-400">@{recKey}</p>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                        <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[10px] font-black text-gray-300">
+                                                            {getRecommendationFollowerLabel(rec)}
+                                                        </span>
+                                                        <span className="rounded-full border border-white/10 bg-white/6 px-2.5 py-1 text-[10px] font-black text-gray-300">
+                                                            Active this week
+                                                        </span>
+                                                    </div>
+
+                                                    <p className="mt-4 line-clamp-4 flex-1 text-[13px] font-semibold leading-relaxed text-gray-300">
+                                                        {rec.reason}
                                                     </p>
-                                                </div>
 
-                                                {/* Action Button */}
-                                                <button
-                                                    onClick={() => handleFollow(rec.name, rec.x_account, `https://unavatar.io/twitter/${rec.x_account}`)}
-                                                    className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-white/5 border border-white/5 text-gray-300 hover:text-white hover:bg-white/10 group-hover:border-[#0070f3]/30 transition-all font-bold text-xs uppercase tracking-widest mt-auto shadow-sm relative z-10"
-                                                >
-                                                    <span>+ เพิ่มเข้า Watchlist</span>
-                                                </button>
-                                            </motion.div>
-                                        ))}
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleFollow(rec.name, rec.x_account, getRecommendationAvatar(rec))}
+                                                        disabled={!!followedUser}
+                                                        className={`mt-8 flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-xs font-black transition-all active:scale-95 ${followedUser
+                                                            ? 'cursor-default border-blue-400/20 bg-blue-500/10 text-blue-200'
+                                                            : 'border-white/8 bg-white/6 text-white hover:border-blue-400/40 hover:bg-blue-600'
+                                                            }`}
+                                                    >
+                                                        <span>{followedUser ? 'อยู่ใน Watchlist แล้ว' : '+ เพิ่มเข้า Watchlist'}</span>
+                                                    </button>
+                                                </motion.div>
+                                            );
+                                        })}
                                     </div>
 
                                     {/* ── Additional Loader ── */}
@@ -529,7 +679,11 @@ const UserTarget = () => {
                                             animate={{ opacity: 1 }}
                                             className="mt-4"
                                         >
-                                            <PresetUserTarget onFollow={handleFollow} />
+                                            <PresetUserTarget
+                                                onSelectCategory={handleCategorySearch}
+                                                selectedCategoryName={recommendQuery}
+                                                isLoading={isRecommending}
+                                            />
                                         </motion.div>
                                     )}
                                 </motion.div>

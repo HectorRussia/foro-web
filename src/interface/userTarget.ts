@@ -37,6 +37,14 @@ export interface Recommendation {
     x_account: string;
     name: string;
     reason: string;
+    followers?: string;
+    followers_count?: number;
+    following?: string;
+    following_count?: number;
+    posts?: string;
+    statuses_count?: number;
+    profile_image?: string;
+    profile_image_url_https?: string;
 }
 
 export interface RecommendationResponse {
