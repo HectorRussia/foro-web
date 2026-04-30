@@ -1,0 +1,1037 @@
+// @ts-nocheck
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  Check, Globe2, Plus, X, ChevronLeft, ChevronRight,
+  Bot, Laptop, Code2, ShieldCheck, Gamepad2, Coins, Briefcase, TrendingUp,
+  Microscope, Newspaper, Building2, Stethoscope, Trophy, Tv, Shirt, Plane,
+  Utensils, Leaf, GraduationCap, MessageSquareText, Hotel, CarFront,
+  ExternalLink, Trash2
+} from 'lucide-react';
+
+const ICON_MAP = {
+  Bot, Laptop, Code2, ShieldCheck, Gamepad2, Coins, Briefcase, TrendingUp,
+  Microscope, Newspaper, Building2, Stethoscope, Trophy, Tv, Shirt, Plane,
+  Utensils, Leaf, GraduationCap, MessageSquareText, Hotel, CarFront
+};
+import { RSS_CATALOG, TOPIC_LABELS, type RssSource } from '../config/rssCatalog';
+import type { PostList } from '../types/domain';
+
+interface NewsSourcesTabProps {
+  subscribedSources: RssSource[];
+  onToggleSource: (source: RssSource) => void;
+  postLists?: PostList[];
+  onTogglePostList?: (
+    listId: string,
+    contributor: {
+      id: string;
+      username: string;
+      name: string;
+      profile_image_url: string;
+    },
+  ) => void;
+}
+
+const ALL_VIEW_TOPIC_PRIORITY = [
+  'news',
+  'politics',
+  'finance',
+  'business',
+  'tech',
+  'ai',
+  'science',
+  'health',
+  'environment',
+  'security',
+  'developer',
+  'crypto',
+  'gaming',
+  'entertainment',
+  'sports',
+  'lifestyle',
+  'travel',
+  'food',
+  'education',
+  'opinion',
+  'realestate',
+  'auto',
+] as const;
+
+const FEATURED_ALL_EN_SOURCE_IDS = [
+  'bbc',
+  'bloomberg',
+  'cnbc',
+  'npr-news',
+  'guardian-world',
+  'al-jazeera',
+  'abc-news',
+  'cbs-news',
+  'time',
+  'bangkok-post',
+  'fortune',
+  'marketwatch',
+  'techcrunch',
+  'verge',
+  'ars-technica',
+  'wired',
+  'mit-tech-review',
+  'openai-blog',
+  'techcrunch-ai',
+] as const;
+
+const FEATURED_ALL_TH_SOURCE_IDS = [
+  'thestandard',
+  'matichon',
+  'prachachat',
+  'brandinside',
+  'techsauce',
+  'beartai',
+] as const;
+
+const THAI_FILTER_KEY = 'thai';
+
+const TOPIC_PRIORITY_INDEX = new Map(
+  ALL_VIEW_TOPIC_PRIORITY.map((topic, index) => [topic, index]),
+);
+
+const FEATURED_EN_PRIORITY_INDEX = new Map(
+  FEATURED_ALL_EN_SOURCE_IDS.map((id, index) => [id, index]),
+);
+
+const FEATURED_TH_PRIORITY_INDEX = new Map(
+  FEATURED_ALL_TH_SOURCE_IDS.map((id, index) => [id, index]),
+);
+
+const sortSourcesForAllView = (sources: RssSource[], lang: 'en' | 'th') => {
+  const featuredPriorityIndex =
+    lang === 'th' ? FEATURED_TH_PRIORITY_INDEX : FEATURED_EN_PRIORITY_INDEX;
+
+  return [...sources].sort((left, right) => {
+    const leftFeatured = featuredPriorityIndex.has(left.id) ? 0 : 1;
+    const rightFeatured = featuredPriorityIndex.has(right.id) ? 0 : 1;
+    if (leftFeatured !== rightFeatured) return leftFeatured - rightFeatured;
+
+    if (leftFeatured === 0 && rightFeatured === 0) {
+      return (
+        (featuredPriorityIndex.get(left.id) ?? Number.MAX_SAFE_INTEGER) -
+        (featuredPriorityIndex.get(right.id) ?? Number.MAX_SAFE_INTEGER)
+      );
+    }
+
+    const leftTypePriority = left.type === 'news' ? 0 : 1;
+    const rightTypePriority = right.type === 'news' ? 0 : 1;
+    if (leftTypePriority !== rightTypePriority) return leftTypePriority - rightTypePriority;
+
+    const leftTopicPriority = TOPIC_PRIORITY_INDEX.get(left.topic) ?? Number.MAX_SAFE_INTEGER;
+    const rightTopicPriority = TOPIC_PRIORITY_INDEX.get(right.topic) ?? Number.MAX_SAFE_INTEGER;
+    if (leftTopicPriority !== rightTopicPriority) return leftTopicPriority - rightTopicPriority;
+
+    return left.name.localeCompare(right.name);
+  });
+};
+
+const SourceCard = ({
+  source,
+  isSubscribed,
+  onToggle,
+  postLists = [],
+  onTogglePostList,
+  compact = false,
+}: {
+  source: RssSource;
+  isSubscribed: boolean;
+  onToggle: () => void;
+  postLists?: PostList[];
+  onTogglePostList?: (
+    listId: string,
+    contributor: {
+      id: string;
+      username: string;
+      name: string;
+      profile_image_url: string;
+    },
+  ) => void;
+  compact?: boolean;
+}) => {
+  const [showMenu, setShowMenu] = useState(false);
+  const faviconUrl = `https://www.google.com/s2/favicons?domain=${new URL(source.siteUrl).hostname}&sz=128`;
+  const rssUsername = `rss:${source.id}`;
+  const memberPostLists = postLists.filter(
+    (list) =>
+      Array.isArray(list?.members) &&
+      list.members.some(
+        (member) => String(member || '').toLowerCase() === rssUsername.toLowerCase(),
+      ),
+  );
+  const postListCount = memberPostLists.length;
+  const isInAnyPostList = postListCount > 0;
+
+  if (compact) {
+    return (
+      <div
+        className="user-card user-list-item animate-fade-in"
+        style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '14px',
+          padding: '14px',
+          background: 'rgba(255,255,255,0.02)',
+          border: '1px solid var(--glass-border)',
+          borderRadius: '18px',
+          transition: 'all 0.2s',
+          position: 'relative',
+          zIndex: showMenu ? 50 : 1,
+          width: '100%',
+          minWidth: 0,
+          overflow: 'visible',
+        }}
+      >
+        <div className="user-card-top" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+          <img
+            src={faviconUrl}
+            alt={source.name}
+            style={{
+              width: '52px',
+              height: '52px',
+              borderRadius: '50%',
+              border: '1px solid var(--bg-700)',
+              flexShrink: 0,
+              objectFit: 'cover',
+              background: 'rgba(255,255,255,0.05)',
+            }}
+            onError={(e) => {
+              e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(source.name.charAt(0))}&background=1a1a2e&color=a5b4fc&bold=true&size=128`;
+            }}
+          />
+
+          <div className="user-card-info" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div
+              style={{
+                fontWeight: '800',
+                fontSize: '15px',
+                color: '#fff',
+                lineHeight: '1.25',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {source.name}
+            </div>
+            <div
+              style={{
+                color: 'var(--text-dim)',
+                fontSize: '12px',
+                fontWeight: '600',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              rss:{source.id}
+            </div>
+            <a
+              href={source.siteUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="user-card-profile-link"
+              style={{
+                color: 'var(--accent-secondary)',
+                fontSize: '11px',
+                fontWeight: '700',
+                textDecoration: 'none',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                width: 'fit-content',
+                marginTop: '2px',
+              }}
+            >
+              RSS Feed <ExternalLink size={10} />
+            </a>
+          </div>
+
+          <div className="user-card-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+            {onToggle && (
+              <button
+                onClick={onToggle}
+                className="user-card-icon-btn user-card-remove-btn"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  background: 'rgba(239, 68, 68, 0.1)',
+                  border: 'none',
+                  color: '#ef4444',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
+            <div style={{ position: 'relative' }}>
+              <button
+                onClick={() => setShowMenu((prev) => !prev)}
+                className="user-card-icon-btn"
+                style={{
+                  width: '34px',
+                  height: '34px',
+                  borderRadius: '10px',
+                  background: 'var(--bg-700)',
+                  border: '1px solid var(--glass-border)',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Plus
+                  size={16}
+                  style={{
+                    transform: showMenu ? 'rotate(45deg)' : 'none',
+                    transition: 'transform 0.2s',
+                  }}
+                />
+              </button>
+
+              {showMenu && (
+                <>
+                  <div
+                    style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+                    onClick={() => setShowMenu(false)}
+                  />
+                  <div
+                    className="discovery-menu"
+                    style={{
+                      display: 'block',
+                      position: 'absolute',
+                      top: '100%',
+                      right: 0,
+                      marginTop: '8px',
+                      zIndex: 100,
+                      minWidth: '180px',
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: '10px',
+                        fontWeight: '800',
+                        color: 'var(--text-muted)',
+                        padding: '8px 12px',
+                        borderBottom: '1px solid var(--glass-border)',
+                      }}
+                    >
+                      ADD TO POST LIST
+                    </div>
+                    <div style={{ maxHeight: '200px', overflowY: 'auto' }}>
+                      {postLists.map((list) => {
+                        const isMember =
+                          Array.isArray(list.members) &&
+                          list.members.some(
+                            (member) =>
+                              String(member || '').toLowerCase() === rssUsername.toLowerCase(),
+                          );
+                        return (
+                          <div
+                            key={list.id}
+                            onClick={() => {
+                              onTogglePostList?.(list.id, {
+                                id: `rss-${source.id}`,
+                                username: rssUsername,
+                                name: source.name,
+                                profile_image_url: faviconUrl,
+                              });
+                              setShowMenu(false);
+                            }}
+                            className={`discovery-menu-item ${isMember ? 'active' : ''}`}
+                          >
+                            <span
+                              style={{
+                                whiteSpace: 'nowrap',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                marginRight: '8px',
+                              }}
+                            >
+                              {list.name}
+                            </span>
+                            {isMember && <Trash2 size={12} />}
+                          </div>
+                        );
+                      })}
+                      {postLists.length === 0 && (
+                        <div
+                          style={{
+                            padding: '12px',
+                            fontSize: '12px',
+                            color: 'var(--text-dim)',
+                            textAlign: 'center',
+                          }}
+                        >
+                          ไม่มีรายการปลิสต์
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="user-card user-list-item animate-fade-in"
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '14px',
+        padding: '14px',
+        background: isSubscribed ? 'rgba(41, 151, 255, 0.04)' : 'rgba(255,255,255,0.02)',
+        border: `1px solid ${isSubscribed ? 'rgba(41, 151, 255, 0.2)' : 'var(--glass-border)'}`,
+        borderRadius: '18px',
+        transition: 'all 0.2s',
+        position: 'relative',
+        zIndex: showMenu ? 50 : 1,
+        width: '100%',
+        minWidth: 0,
+        overflow: 'visible',
+      }}
+    >
+      <div className="user-card-top" style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+        <img
+          src={faviconUrl}
+          alt={source.name}
+          style={{
+            width: '52px',
+            height: '52px',
+            borderRadius: '14px',
+            border: '1px solid var(--bg-700)',
+            flexShrink: 0,
+            objectFit: 'cover',
+            background: 'rgba(255,255,255,0.05)',
+          }}
+          onError={(e) => {
+            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(source.name.charAt(0))}&background=1a1a2e&color=a5b4fc&bold=true&size=128`;
+          }}
+        />
+
+        <div className="user-card-info" style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
+            <div
+              style={{
+                fontWeight: '800',
+                fontSize: '15px',
+                color: '#fff',
+                lineHeight: '1.25',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+              }}
+            >
+              {source.name}
+            </div>
+            {source.lang === 'en' && (
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: '800',
+                  color: 'rgba(251,191,36,0.85)',
+                  background: 'rgba(251,191,36,0.12)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  flexShrink: 0,
+                }}
+              >
+                EN→TH
+              </span>
+            )}
+            {source.lang === 'th' && (
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: '800',
+                  color: 'rgba(52,211,153,0.85)',
+                  background: 'rgba(52,211,153,0.12)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  flexShrink: 0,
+                }}
+              >
+                TH
+              </span>
+            )}
+            {source.type === 'community' && (
+              <span
+                style={{
+                  fontSize: '9px',
+                  fontWeight: '800',
+                  color: 'rgba(168,85,247,0.85)',
+                  background: 'rgba(168,85,247,0.12)',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  flexShrink: 0,
+                }}
+              >
+                Community
+              </span>
+            )}
+          </div>
+
+          <div style={{ color: 'var(--text-dim)', fontSize: '12px', fontWeight: '600', lineHeight: '1.45' }}>
+            {source.description}
+          </div>
+          <a
+            href={source.siteUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="user-card-profile-link"
+            style={{ color: 'var(--accent-secondary)', fontSize: '11px', fontWeight: '700', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '4px', width: 'fit-content', marginTop: '2px' }}
+          >
+            {new URL(source.siteUrl).hostname.replace('www.', '')} · {source.frequency}
+          </a>
+        </div>
+
+        <div className="user-card-actions news-source-card-actions" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexShrink: 0 }}>
+          <div className="news-source-card-menu-wrap" style={{ position: 'relative' }}>
+            <button
+              type="button"
+              onClick={() => setShowMenu((prev) => !prev)}
+              className="user-card-icon-btn news-source-card-icon-btn"
+              style={{
+                width: '34px',
+                height: '34px',
+                borderRadius: '10px',
+                background: isInAnyPostList ? 'rgba(41, 151, 255, 0.12)' : 'var(--bg-700)',
+                border: `1px solid ${isInAnyPostList ? 'rgba(41, 151, 255, 0.32)' : 'var(--glass-border)'}`,
+                color: isInAnyPostList ? '#8ec5ff' : '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              title="เพิ่มเข้า Post List"
+            >
+              <Plus
+                size={16}
+                style={{
+                  transform: showMenu ? 'rotate(45deg)' : 'none',
+                  transition: 'transform 0.2s',
+                }}
+              />
+              {isInAnyPostList && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-6px',
+                    right: '-6px',
+                    minWidth: '18px',
+                    height: '18px',
+                    padding: '0 5px',
+                    borderRadius: '999px',
+                    background: '#2997ff',
+                    color: '#fff',
+                    border: '2px solid rgba(17, 24, 39, 0.95)',
+                    fontSize: '10px',
+                    fontWeight: '800',
+                    lineHeight: '14px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  {postListCount}
+                </span>
+              )}
+            </button>
+
+            {showMenu && (
+              <>
+                <div
+                  style={{ position: 'fixed', inset: 0, zIndex: 90 }}
+                  onClick={() => setShowMenu(false)}
+                />
+                <div
+                  className="discovery-menu"
+                  style={{
+                    display: 'block',
+                    position: 'absolute',
+                    top: 'calc(100% + 8px)',
+                    right: 0,
+                    zIndex: 100,
+                    minWidth: '220px',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '10px',
+                      fontWeight: '800',
+                      color: 'var(--text-muted)',
+                      padding: '8px 12px',
+                      borderBottom: '1px solid var(--glass-border)',
+                    }}
+                  >
+                    ADD TO POST LIST
+                  </div>
+                  <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
+                    {postLists.map((list) => {
+                      const isMember =
+                        Array.isArray(list.members) &&
+                        list.members.some(
+                          (member) =>
+                            String(member || '').toLowerCase() === rssUsername.toLowerCase(),
+                        );
+
+                      return (
+                        <button
+                          key={list.id}
+                          type="button"
+                          className={`discovery-menu-item ${isMember ? 'active' : ''}`}
+                          onClick={() => {
+                            onTogglePostList?.(list.id, {
+                              id: `rss-${source.id}`,
+                              username: rssUsername,
+                              name: source.name,
+                              profile_image_url: faviconUrl,
+                            });
+                            setShowMenu(false);
+                          }}
+                        >
+                          <span
+                            style={{
+                              whiteSpace: 'nowrap',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              marginRight: '8px',
+                            }}
+                          >
+                            {list.name}
+                          </span>
+                          {isMember && <Check size={12} />}
+                        </button>
+                      );
+                    })}
+                    {postLists.length === 0 && (
+                      <div
+                        style={{
+                          padding: '12px',
+                          fontSize: '12px',
+                          color: 'var(--text-dim)',
+                          textAlign: 'center',
+                        }}
+                      >
+                        ยังไม่มี Post List
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <button
+        onClick={onToggle}
+        className={`expert-follow-btn ${isSubscribed ? 'added' : ''}`}
+        style={{
+          padding: '6px',
+          fontSize: '11px',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '6px',
+        }}
+      >
+        {isSubscribed ? 'อยู่ใน Watchlist แล้ว' : '+ เพิ่มเข้า Watchlist'}
+      </button>
+    </div>
+  );
+};
+
+const NewsSourcesTab = ({
+  subscribedSources,
+  onToggleSource,
+  postLists = [],
+  onTogglePostList,
+}: NewsSourcesTabProps) => {
+  const [activeTopic, setActiveTopic] = useState<string>('all');
+  const [showAllMobileTopics, setShowAllMobileTopics] = useState(false);
+  const [isCompactTopicLayout, setIsCompactTopicLayout] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth <= 768 : false,
+  );
+  const subscribedIds = useMemo(
+    () => new Set(subscribedSources.map((s) => s.id)),
+    [subscribedSources],
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const updateCompactTopicLayout = () => {
+      const nextIsCompactTopicLayout = window.innerWidth <= 768;
+      setIsCompactTopicLayout(nextIsCompactTopicLayout);
+      if (!nextIsCompactTopicLayout) {
+        setShowAllMobileTopics(false);
+      }
+    };
+
+    updateCompactTopicLayout();
+    window.addEventListener('resize', updateCompactTopicLayout);
+
+    return () => window.removeEventListener('resize', updateCompactTopicLayout);
+  }, []);
+
+  const filteredSources = useMemo(() => {
+    const allSources = Object.values(RSS_CATALOG).flat();
+    if (activeTopic === 'all') return allSources;
+    if (activeTopic === THAI_FILTER_KEY) return allSources.filter((s) => s.lang === 'th');
+    return allSources.filter((s) => s.topic === activeTopic);
+  }, [activeTopic]);
+
+  const thaiSourceCount = useMemo(
+    () => Object.values(RSS_CATALOG).flat().filter((source) => source.lang === 'th').length,
+    [],
+  );
+  const mobilePrimaryTopicKeys = useMemo(
+    () => ['all', THAI_FILTER_KEY, 'news', 'ai', 'tech', 'business', 'finance', 'crypto'],
+    [],
+  );
+  const mobileTopicKeys = useMemo(() => {
+    if (!isCompactTopicLayout || showAllMobileTopics) return null;
+    const keys = [...mobilePrimaryTopicKeys];
+    if (activeTopic !== 'all' && !keys.includes(activeTopic)) {
+      keys.push(activeTopic);
+    }
+    return new Set(keys);
+  }, [activeTopic, isCompactTopicLayout, mobilePrimaryTopicKeys, showAllMobileTopics]);
+
+  const enSources = useMemo(() => {
+    const sources = filteredSources.filter((s) => s.lang === 'en');
+    return activeTopic === 'all' ? sortSourcesForAllView(sources, 'en') : sources;
+  }, [activeTopic, filteredSources]);
+
+  const thSources = useMemo(() => {
+    const sources = filteredSources.filter((s) => s.lang === 'th');
+    return activeTopic === 'all' || activeTopic === THAI_FILTER_KEY
+      ? sortSourcesForAllView(sources, 'th')
+      : sources;
+  }, [activeTopic, filteredSources]);
+
+  const getTopicButtonStyle = (isActive: boolean) => ({
+    height: '28px',
+    padding: '0 8px',
+    fontSize: '12px',
+    fontWeight: '500',
+    borderRadius: '6px',
+    background: isActive ? '#fff' : 'transparent',
+    border: isActive ? '1px solid #fff' : '1px solid rgba(255,255,255,0.08)',
+    color: isActive ? '#000' : 'rgba(255,255,255,0.6)',
+    transition: 'all 0.1s ease',
+    cursor: 'pointer',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '5px',
+    userSelect: 'none',
+    boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.4)' : 'none',
+    whiteSpace: 'nowrap',
+    fontFamily: '"Inter", sans-serif',
+    letterSpacing: '-0.01em',
+    outline: 'none',
+    flexShrink: 0,
+  });
+
+  const iconContainerStyle = (isActive: boolean) => ({
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '14px',
+    height: '14px',
+    opacity: isActive ? 1 : 0.8,
+    pointerEvents: 'none' as const,
+  });
+
+  const labelStyle = {
+    display: 'inline-flex',
+    alignItems: 'center',
+    height: '14px',
+    lineHeight: '14px',
+    paddingTop: '0.5px',
+    pointerEvents: 'none' as const,
+  };
+
+  const getCountStyle = (isActive: boolean) => ({
+    fontSize: '10.5px',
+    fontWeight: '700',
+    marginLeft: '3.5px',
+    color: isActive ? '#000' : 'rgba(255,255,255,0.8)',
+    pointerEvents: 'none' as const,
+  });
+
+  const renderTopicButton = (key: string, label: string, Icon: React.ElementType, count: number) => (
+    <button
+      key={key}
+      onClick={() => setActiveTopic(key)}
+      style={getTopicButtonStyle(activeTopic === key)}
+      className="topic-btn-hover news-source-filter-btn"
+    >
+      <span style={iconContainerStyle(activeTopic === key)}>
+        <Icon size={12} strokeWidth={2.5} />
+      </span>
+      <span style={labelStyle}>{label}</span>
+      <span style={getCountStyle(activeTopic === key)}>{count}</span>
+    </button>
+  );
+
+  return (
+    <div className="animate-fade-in">
+      <div
+        className="news-source-filter-label"
+        style={{
+          fontSize: '11px',
+          fontWeight: '600',
+          color: 'rgba(255,255,255,0.4)',
+          textTransform: 'uppercase',
+          letterSpacing: '0.05em',
+          marginBottom: '12px',
+          fontFamily: '"Inter", sans-serif',
+        }}
+      >
+        กรองตามหมวด
+      </div>
+
+      <div
+        className="news-source-filter-row"
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '5px',
+          marginBottom: '24px',
+        }}
+      >
+        <button
+          onClick={() => setActiveTopic('all')}
+          style={getTopicButtonStyle(activeTopic === 'all')}
+          className="topic-btn-hover news-source-filter-btn"
+        >
+          <span style={labelStyle}>ทั้งหมด</span>
+        </button>
+
+        {renderTopicButton(THAI_FILTER_KEY, 'ข่าวไทย', Globe2, thaiSourceCount)}
+
+        {renderTopicButton('news', TOPIC_LABELS.news.label, ICON_MAP[TOPIC_LABELS.news.icon], TOPIC_LABELS.news.count)}
+
+        {Object.entries(TOPIC_LABELS)
+          .filter(([key]) => key !== 'news')
+          .map(([key, { label, icon, count }]) => {
+            if (mobileTopicKeys && !mobileTopicKeys.has(key)) return null;
+            const IconComponent = ICON_MAP[icon];
+            if (!IconComponent) return null;
+            return renderTopicButton(key, label, IconComponent, count);
+          })}
+
+        {isCompactTopicLayout && !showAllMobileTopics && (
+          <button
+            type="button"
+            onClick={() => setShowAllMobileTopics(true)}
+            className="news-source-filter-more-btn"
+          >
+            ดูหมวดเพิ่ม
+          </button>
+        )}
+
+        {isCompactTopicLayout && showAllMobileTopics && (
+          <button
+            type="button"
+            onClick={() => setShowAllMobileTopics(false)}
+            className="news-source-filter-more-btn is-open"
+          >
+            ย่อหมวด
+          </button>
+        )}
+      </div>
+
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        .topic-btn-hover:not(:active):hover {
+          background: rgba(255,255,255,0.12) !important;
+          border-color: rgba(255,255,255,0.2) !important;
+          color: #fff !important;
+        }
+        .topic-btn-hover:not(:active):hover span {
+          color: #fff !important;
+          opacity: 1 !important;
+        }
+      `}} />
+
+      {enSources.length > 0 && (
+        <>
+          <div className="news-source-section-header" style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
+            <Globe2 size={16} className="news-source-section-icon" style={{ color: 'rgba(255,255,255,0.4)' }} />
+            <span className="news-source-section-title" style={{ fontSize: '13px', fontWeight: '800', color: 'rgba(255,255,255,0.55)' }}>
+              แหล่งข่าวต่างประเทศ
+            </span>
+            <span className="news-source-section-note" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>
+              · FORO แปลและสรุปเป็นไทยให้
+            </span>
+            <div className="news-source-section-divider" style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+            <span className="news-source-section-count" style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', fontWeight: '700' }}>
+              {enSources.length} แหล่ง
+            </span>
+          </div>
+          <div
+            className="news-source-grid"
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))',
+              gap: '12px',
+              marginBottom: '8px',
+            }}
+          >
+            {enSources.map((source) => (
+              <SourceCard
+                key={source.id}
+                source={source}
+                isSubscribed={subscribedIds.has(source.id)}
+                onToggle={() => onToggleSource(source)}
+                postLists={postLists}
+                onTogglePostList={onTogglePostList}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {thSources.length > 0 && (
+        <>
+          <div
+            className="news-source-section-header"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '10px',
+              marginTop: '36px',
+              marginBottom: '16px',
+            }}
+          >
+            <span style={{ fontSize: '16px', display: 'flex', alignItems: 'center', lineHeight: 1 }}>🇹🇭</span>
+            <span style={{ fontSize: '13px', fontWeight: '800', color: 'rgba(255,255,255,0.55)' }}>
+              แหล่งข่าวไทย
+            </span>
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.25)' }}>
+              · รวมข่าวไทยไว้ในที่เดียว
+            </span>
+            <div style={{ flex: 1, height: '1px', background: 'var(--glass-border)' }} />
+            <span style={{ fontSize: '11px', color: 'rgba(255,255,255,0.2)', fontWeight: '700' }}>
+              {thSources.length} แหล่ง
+            </span>
+          </div>
+          <div className="news-source-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: '12px' }}>
+            {thSources.map((source) => (
+              <SourceCard
+                key={source.id}
+                source={source}
+                isSubscribed={subscribedIds.has(source.id)}
+                onToggle={() => onToggleSource(source)}
+                postLists={postLists}
+                onTogglePostList={onTogglePostList}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {subscribedSources.length > 0 && (
+        <div style={{ marginTop: '36px', paddingTop: '24px', borderTop: '1px solid var(--glass-border)' }}>
+          <div
+            style={{
+              fontSize: '11px',
+              fontWeight: '800',
+              color: 'rgba(255,255,255,0.3)',
+              marginBottom: '14px',
+              textTransform: 'uppercase',
+              letterSpacing: '0.05em',
+            }}
+          >
+            ▮ รายการใน Watchlist ({subscribedSources.length})
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {subscribedSources.map((source) => (
+              <div
+                key={source.id}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '7px',
+                  padding: '6px 12px',
+                  borderRadius: '9px',
+                  background: 'rgba(255,255,255,0.03)',
+                  border: '1px solid var(--glass-border)',
+                  fontSize: '11.5px',
+                  fontWeight: '600',
+                  color: 'rgba(255,255,255,0.55)',
+                }}
+              >
+                <img
+                  src={`https://www.google.com/s2/favicons?domain=${new URL(source.siteUrl).hostname}&sz=64`}
+                  alt=""
+                  style={{ width: '16px', height: '16px', borderRadius: '4px' }}
+                />
+                {source.name}
+                {source.lang === 'en' && (
+                  <span
+                    style={{
+                      fontSize: '8px',
+                      fontWeight: '800',
+                      color: 'rgba(251,191,36,0.7)',
+                      background: 'rgba(251,191,36,0.08)',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                    }}
+                  >
+                    EN→TH
+                  </span>
+                )}
+                {source.lang === 'th' && (
+                  <span
+                    style={{
+                      fontSize: '8px',
+                      fontWeight: '800',
+                      color: 'rgba(52,211,153,0.7)',
+                      background: 'rgba(52,211,153,0.08)',
+                      padding: '1px 5px',
+                      borderRadius: '3px',
+                    }}
+                  >
+                    TH
+                  </span>
+                )}
+                <span
+                  onClick={() => onToggleSource(source)}
+                  style={{
+                    color: 'rgba(255,255,255,0.15)',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    marginLeft: '2px',
+                  }}
+                >
+                  <X size={12} />
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export { SourceCard };
+export default NewsSourcesTab;

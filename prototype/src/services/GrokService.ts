@@ -1,0 +1,4988 @@
+// @ts-nocheck
+import { createXai } from '@ai-sdk/xai';
+import { generateObject, generateText, streamText } from 'ai';
+import { z } from 'zod';
+import {
+  MODEL_MULTI_AGENT,
+  MODEL_NEWS_FAST,
+  MODEL_REASONING_FAST,
+  MODEL_WRITER,
+} from '../config/aiModels';
+import { curateSearchResults, searchEverything, fetchTweetById } from './TwitterService';
+import { apiFetch, INTERNAL_TOKEN } from '../utils/apiFetch';
+import {
+  buildCacheKey,
+  getCachedValue,
+  setCachedValue,
+  dedupeByNormalizedText,
+  normalizeCacheText,
+  textSimilarity,
+  TAVILY_CACHE_TTL_MS,
+  QUERY_CACHE_TTL_MS,
+  SUMMARY_CACHE_TTL_MS,
+  EXECUTIVE_SUMMARY_CACHE_TTL_MS,
+  CONTENT_BRIEF_CACHE_TTL_MS,
+  FACT_CACHE_TTL_MS,
+  X_VIDEO_ANALYSIS_CACHE_TTL_MS,
+} from '../lib/cache';
+import {
+  buildAdaptiveWritingDirectives,
+  hasPublisherAttributionOveruse,
+  hasSourceLedNarrative,
+  hasWeakDataDumpOpening,
+} from './contentQualityGuards.js';
+import { isExplicitlyLocalSearchQuery } from '../utils/searchQueryPlanning.js';
+
+const grok = createXai({
+  apiKey: 'local-proxy',
+  baseURL: '/api/xai/v1',
+  headers: {
+    'x-internal-token': INTERNAL_TOKEN,
+  },
+});
+
+const responseCache = new Map();
+
+// Strip characters commonly used for prompt injection from third-party content
+// before embedding into AI prompts (tweets, web search results, etc.)
+const sanitizeForPrompt = (text = '', maxLen = 500) =>
+  String(text || '')
+    .replace(/`/g, "'")          // backticks → single quote
+    .replace(/\[INST\]/gi, '')   // common injection markers
+    .replace(/<<SYS>>/gi, '')
+    .replace(/\[\/INST\]/gi, '')
+    .trim()
+    .slice(0, maxLen);
+
+const normalizeExecutiveSummaryOutput = (text = '') =>
+  cleanGeneratedContent(text)
+    .replace(/\s+•\s+/g, '\n- ')
+    .replace(/(?:^|\n)•\s*/g, '\n- ')
+    .replace(/(?:^|\n)-\s*/g, '\n- ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const PROPER_NAME_PRESERVATION_RULES = `
+Proper-name rules:
+- Keep person, company, product, organization, and place names exactly as they appear in the source when they are written in Latin script.
+- Do not translate, localize, or invent Thai spellings for names unless the source already provides that Thai spelling.
+- Never guess that one name is another name. For example, if the source says "Andrej Karpathy", do not rewrite it as "Andrew" or any other variant.
+- If you are not fully sure about a Thai transliteration, keep the original Latin-script name instead.
+`.trim();
+
+const SUMMARY_RULES = `
+คุณคือผู้เชี่ยวชาญการวิเคราะห์และสรุปเนื้อหา (Content Curator & Analyst) ที่เปลี่ยนข้อมูลจากทั้งข่าวทางการและโพสต์โซเชียลฯ ให้เป็นภาษาไทยที่ "สั้น กระชับ คม"
+
+กฎที่ต้องปฏิบัติตาม:
+- รักษาความแม่นยำของข้อมูล (Fact) ห้ามบิดเบือน แต่ให้ตัดทอนเฉพาะส่วนที่ไม่สำคัญออกเพื่อความกระชับ
+- **ห้ามแปลคำต่อคำ (Literal) หรือแปลตรงตัวจนเสียความหมายภาษาไทย** (เช่น 'Patchwork' -> 'ความลักลั่น', 'Booking' -> 'ว่าจ้าง/เชิญมาแสดง')
+- ปรับสำนวนให้เหมาะสมกับบริบท (ข่าวใช้ภาษาทางการ/โซเชียลใช้ภาษาที่กระชับแต่ไม่เป็นทางการเกินไป)
+- **ห้ามใช้ตัวอักษรภาษาอื่นที่อยู่นอกเหนือจากภาษาไทยและอังกฤษ (เช่น ห้ามใช้ 読, 中 หรือตัวอักษรจีน/ญี่ปุ่น) ปนในสรุปภาษาไทยเด็ดขาด**
+- แปลศัพท์เทคนิคให้คนทั่วไปอ่านเข้าใจง่ายที่สุด (เช่น 'Underwater mortgages' -> 'ภาวะหนี้ท่วมบ้าน')
+- ห้ามระบุชื่อบัญชี (@username) ของบุคคลทั่วไป ยกเว้นบุคคลที่มีชื่อเสียง
+- ห้ามใส่จุดฟูลสต็อป (.) ปิดท้ายประโยคภาษาไทย
+- ห้ามเอ่ยชื่อ Twitter หรือ X
+- เขียนสรุป 1-2 ประโยคที่ได้ใจความที่สุด
+`.trim();
+
+const cleanMarkdown = (text = '') =>
+  text
+    .replace(/^#\s*(Introduction|Intro|Overview).*\n?/gim, '')
+    .replace(/^#\s*(Conclusion|Summary).*$/gim, '## Summary')
+    .trim();
+
+const stripEmojiLikeSymbols = (text = '') =>
+  text.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\uFE0F\u200D]/gu, '');
+
+const stripDisallowedThaiOutputScripts = (text = '') =>
+  String(text || '')
+    .replace(/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]+/gu, '')
+    .replace(/\(\s*\)/g, '')
+    .replace(/\[\s*\]/g, '')
+    .replace(/[ ]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .trim();
+
+const cleanGeneratedContent = (text = '', { allowEmoji = false } = {}) =>
+  cleanMarkdown(allowEmoji ? text : stripEmojiLikeSymbols(text))
+    .replace(/—/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/ {2,}/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const ARTICLE_TRANSLATION_CHUNK_TARGET = 2800;
+const ARTICLE_TRANSLATION_CHUNK_MAX = 4000;
+
+const ARTICLE_TRANSLATION_CLEANUP_RULES = [
+  [/\bph[oó]ng\b/gi, 'ปล่อย'],
+  [/\bst(?:ring|ream) ข้อความทั้งหมดนี้\b/gi, 'ชุดข้อความทั้งหมดนี้'],
+  [/\bผลไม้ที่ต่ำที่สุด\b/g, 'งานที่ง่ายที่สุด'],
+  [/\bเข้าเป้าอะตรา[^\s]*/g, 'เข้าเป้าตามแผน'],
+  [/\bเข้าวงโคจรของภารกิจด้วยความแม่นยำมากกว่า\b/g, 'ทำผลงานได้แม่นยำมากกว่า'],
+  [/\bagent ของตัวเอง\b/g, 'เอเจนต์ของตัวเอง'],
+  [/\bthird-party harnesses\b/g, 'เครื่องมือภายนอก'],
+  [/\busage patterns\b/g, 'รูปแบบการใช้งาน'],
+];
+
+const cleanupTranslatedArticleText = (text = '') =>
+  ARTICLE_TRANSLATION_CLEANUP_RULES.reduce((current, [pattern, replacement]) => current.replace(pattern, replacement), String(text || ''))
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const splitArticleIntoTranslationChunks = (text = '') => {
+  const normalized = String(text || '').replace(/\r/g, '').trim();
+  if (!normalized) return [];
+  if (normalized.length <= ARTICLE_TRANSLATION_CHUNK_MAX) return [normalized];
+
+  const paragraphs = normalized
+    .split(/\n{2,}/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  if (!paragraphs.length) return [normalized];
+
+  const chunks = [];
+  let current = '';
+
+  const flush = () => {
+    if (current.trim()) chunks.push(current.trim());
+    current = '';
+  };
+
+  for (const paragraph of paragraphs) {
+    if (paragraph.length > ARTICLE_TRANSLATION_CHUNK_MAX) {
+      flush();
+      let pos = 0;
+      while (pos < paragraph.length) {
+        const remaining = paragraph.length - pos;
+        if (remaining <= ARTICLE_TRANSLATION_CHUNK_MAX) {
+          chunks.push(paragraph.slice(pos).trim());
+          break;
+        }
+        const window = paragraph.slice(pos, pos + ARTICLE_TRANSLATION_CHUNK_TARGET);
+        let cutAt = -1;
+        for (const marker of ['. ', '? ', '! ', '.\n', '?\n', '!\n']) {
+          const idx = window.lastIndexOf(marker);
+          if (idx > cutAt) cutAt = idx + marker.length;
+        }
+        if (cutAt < ARTICLE_TRANSLATION_CHUNK_TARGET * 0.4) cutAt = ARTICLE_TRANSLATION_CHUNK_TARGET;
+        chunks.push(paragraph.slice(pos, pos + cutAt).trim());
+        pos += cutAt;
+      }
+      continue;
+    }
+
+    const candidate = current ? `${current}\n\n${paragraph}` : paragraph;
+    if (candidate.length > ARTICLE_TRANSLATION_CHUNK_MAX || (current && candidate.length > ARTICLE_TRANSLATION_CHUNK_TARGET)) {
+      flush();
+      current = paragraph;
+    } else {
+      current = candidate;
+    }
+  }
+
+  flush();
+  return chunks.filter(Boolean);
+};
+
+const dedupeSources = (sources = []) => {
+  const byUrl = new Map();
+
+  for (const source of sources) {
+    if (!source?.url) continue;
+    if (!isCitableSourceUrl(source.url)) continue;
+    if (!byUrl.has(source.url)) {
+      byUrl.set(source.url, {
+        title: source.title || source.url,
+        url: source.url,
+      });
+    }
+  }
+
+  return Array.from(byUrl.values());
+};
+
+const SOURCE_TRUST_TIERS = {
+  highest: [
+    'reuters.com',
+    'apnews.com',
+    'bloomberg.com',
+    'ft.com',
+    'wsj.com',
+    'nytimes.com',
+    'theguardian.com',
+    'bbc.com',
+    'bbc.co.uk',
+    'cnn.com',
+    'cnbc.com',
+    'forbes.com',
+    'businessinsider.com',
+    'theverge.com',
+    'techcrunch.com',
+    'ign.com',
+    'gamespot.com',
+    'polygon.com',
+    'eurogamer.net',
+    'gematsu.com',
+    'nintendo.com',
+    'sony.com',
+    'playstation.com',
+    'xbox.com',
+    'microsoft.com',
+    'steampowered.com',
+    'ea.com',
+    'ubisoft.com',
+    'capcom.com',
+    'sega.com',
+  ],
+  medium: ['yahoo.com', 'finance.yahoo.com', 'investing.com', 'usnews.com'],
+  low: ['reddit.com', 'youtube.com', 'youtu.be', 'cookpad.com', 'eventbanana.com', 'facebook.com', 'instagram.com', 'tiktok.com', 'x.com', 'twitter.com'],
+};
+
+const getHostname = (url = '') => {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+  } catch {
+    return '';
+  }
+};
+
+const matchesDomainTier = (hostname = '', domains = []) =>
+  domains.some((domain) => hostname === domain || hostname.endsWith(`.${domain}`));
+
+const tokenizeTopicText = (value = '', minLength = 4, limit = 12) =>
+  Array.from(new Set(normalizeCacheText(value).toLowerCase().match(new RegExp(`[a-z0-9\\u0E00-\\u0E7F]{${minLength},}`, 'g')) || [])).slice(0, limit);
+
+const extractUrlSlugTokens = (url = '', limit = 12) => {
+  try {
+    const pathname = new URL(url).pathname
+      .replace(/[-_/]+/g, ' ')
+      .replace(/\b\d{4}\b/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return tokenizeTopicText(pathname, 4, limit);
+  } catch {
+    return [];
+  }
+};
+
+const getPrimaryLeadTokens = ({ primaryLeadUrl = '', primaryLeadTitle = '' } = {}) => {
+  const titleTokens = tokenizeTopicText(primaryLeadTitle, 4, 12);
+  const slugTokens = extractUrlSlugTokens(primaryLeadUrl, 12);
+  return Array.from(new Set([...titleTokens, ...slugTokens])).slice(0, 12);
+};
+
+const buildStrictPrimarySourceContext = (label, response, sourceUrl, primaryLeadTitle = '') => {
+  if (!response) return '';
+
+  const primaryTokens = getPrimaryLeadTokens({ primaryLeadUrl: sourceUrl, primaryLeadTitle });
+  const primaryHostname = getHostname(sourceUrl);
+  const strictResults = (Array.isArray(response.results) ? response.results : [])
+    .filter((result) => {
+      const hostname = getHostname(result?.url || '');
+      const normalizedTitle = normalizeCacheText(result?.title || '').toLowerCase();
+      const sharedTitleTokens = primaryTokens.filter((token) => normalizedTitle.includes(token)).length;
+      const isExactLead = result?.url === sourceUrl;
+      const isLeadDomain = hostname === primaryHostname;
+      const isTrusted = matchesDomainTier(hostname, SOURCE_TRUST_TIERS.highest);
+      return isExactLead || isLeadDomain || (isTrusted && sharedTitleTokens >= 3);
+    })
+    .slice(0, 3);
+
+  return [
+    `[${label} SOURCE URL]\n${sourceUrl}`,
+    strictResults.length
+      ? `[${label} VERIFIED SNIPPETS]\n${strictResults
+        .map((result, index) => {
+          const snippet = sanitizeForPrompt(result.raw_content || result.content || '', 500);
+          return `${index + 1}. ${result.title || result.url} - ${snippet} (${result.url})`;
+        })
+        .join('\n')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+};
+
+const scoreSourceQuality = (source = {}, { primaryLeadUrl = '', researchQuery = '', input = '' } = {}) => {
+  const hostname = getHostname(source?.url || '');
+  const title = normalizeCacheText(source?.title || '').toLowerCase();
+  const combinedText = `${title} ${hostname}`;
+  const primaryHostname = getHostname(primaryLeadUrl);
+  const queryTokens = tokenizeTopicText(`${researchQuery} ${input}`, 3, 12);
+  const isXSource = isXPostUrl(source?.url || '');
+
+  let score = 0;
+
+  if (!hostname) score -= 20;
+  if (primaryHostname && hostname === primaryHostname) score += 80;
+
+  if (matchesDomainTier(hostname, SOURCE_TRUST_TIERS.highest)) score += 40;
+  else if (matchesDomainTier(hostname, SOURCE_TRUST_TIERS.medium)) score += 18;
+  else if (matchesDomainTier(hostname, SOURCE_TRUST_TIERS.low)) score -= isXSource ? 8 : 25;
+
+  const tokenHits = queryTokens.filter((token) => combinedText.includes(token)).length;
+  score += tokenHits * 4;
+  if (isXSource && tokenHits >= 2) score += 16;
+  if (isXSource && /^@[\w_]+/.test(source?.title || '')) score += 8;
+
+  if (/official|press release|statement|reuters/i.test(combinedText)) score += 10;
+  if (/recipe|ice break|icebreak|event|walkthrough|guide/i.test(combinedText)) score -= 25;
+
+  return score;
+};
+
+const rankAndFilterSources = (sources = [], options = {}) => {
+  const scored = dedupeSources(sources)
+    .map((source) => ({
+      ...source,
+      _score: scoreSourceQuality(source, options),
+      _hostname: getHostname(source.url),
+    }))
+    .filter((source) => source._score >= 8);
+
+  const hasHighTrustLead = scored.some((source) => matchesDomainTier(source._hostname, SOURCE_TRUST_TIERS.highest));
+  const filtered = hasHighTrustLead
+    ? scored.filter((source) => matchesDomainTier(source._hostname, SOURCE_TRUST_TIERS.highest) || source._score >= 40)
+    : scored;
+
+  return filtered
+    .sort((a, b) => b._score - a._score)
+    .map((entry) => {
+      const source = { ...entry };
+      delete source._score;
+      delete source._hostname;
+      return source;
+    })
+    .slice(0, 6);
+};
+
+const getPrimaryLeadAwareSources = (sources = [], { primaryLeadUrl = '', primaryLeadTitle = '' } = {}) => {
+  if (!primaryLeadUrl) return rankAndFilterSources(sources, {});
+
+  const primaryHostname = getHostname(primaryLeadUrl);
+  const normalizedPrimaryTitle = normalizeCacheText(primaryLeadTitle).toLowerCase();
+  const primaryTokens = getPrimaryLeadTokens({ primaryLeadUrl, primaryLeadTitle });
+
+  const filtered = dedupeSources(sources)
+    .map((source) => {
+      const hostname = getHostname(source.url);
+      const normalizedTitle = normalizeCacheText(source.title || '').toLowerCase();
+      const sharedTitleTokens = primaryTokens.filter((token) => normalizedTitle.includes(token)).length;
+      const isExactLead = source.url === primaryLeadUrl;
+      const isLeadDomain = hostname === primaryHostname;
+      const isTrustedSyndication = matchesDomainTier(hostname, SOURCE_TRUST_TIERS.highest);
+      const keep = isExactLead || isLeadDomain || (isTrustedSyndication && sharedTitleTokens >= 3);
+
+      return {
+        source,
+        keep,
+        score: scoreSourceQuality(source, { primaryLeadUrl, researchQuery: normalizedPrimaryTitle, input: normalizedPrimaryTitle }) + sharedTitleTokens * 8,
+      };
+    })
+    .filter((entry) => entry.keep)
+    .sort((a, b) => b.score - a.score)
+    .map((entry) => entry.source);
+
+  return filtered.slice(0, 6);
+};
+
+const strengthenPrimaryLeadFactSheet = (factSheet = {}, primaryLeadUrl = '') => {
+  const safeFallback = {
+    verified_facts: [],
+    reported_claims: [],
+    open_questions: [],
+    community_signal: '',
+    must_not_claim: [],
+    named_entities: [],
+  };
+  const next = {
+    ...safeFallback,
+    ...factSheet,
+  };
+
+  const riskyInferencePattern = /(ผลกระทบต่อผู้บริโภค|ความปลอดภัยผู้บริโภค|การส่งมอบ|การจัดส่ง|ขาดแคลน|ของปลอม|ตรวจรหัส|เช็กรหัส|batch code|แรงจูงใจ|เจตนา|ป้องกันการโจมตีซ้ำ|ไม่มีร่องรอย|ติดตามได้ทั้งหมด|บน x|ใน x|ผู้ใช้บน x|ชาวเน็ต|โซเชียลสงสัย|เป็นแคมเปญ)/i;
+  next.verified_facts = dedupeByNormalizedText(next.verified_facts.filter((fact) => !riskyInferencePattern.test(fact)));
+  next.reported_claims = dedupeByNormalizedText(next.reported_claims.filter((claim) => !riskyInferencePattern.test(claim))).slice(0, 4);
+  next.community_signal = '';
+  next.must_not_claim = dedupeByNormalizedText([
+    ...next.must_not_claim,
+    'ห้ามสรุปผลกระทบต่อผู้บริโภคหรือการส่งมอบ ถ้าต้นทางไม่ได้ระบุชัด',
+    'ห้ามเดาแรงจูงใจ มาตรการภายใน หรือรายละเอียดแวดล้อมที่ต้นทางไม่ได้ยืนยัน',
+    primaryLeadUrl ? `ห้ามเขียนเกินกว่าสิ่งที่ยืนยันได้จาก ${primaryLeadUrl}` : 'ห้ามเขียนเกินกว่าสิ่งที่ยืนยันได้จากต้นทาง',
+  ]);
+  next.open_questions = dedupeByNormalizedText(next.open_questions).slice(0, 5);
+  next.named_entities = dedupeByNormalizedText(next.named_entities).slice(0, 8);
+
+  return next;
+};
+
+const buildTweetUrl = (tweet) => {
+  if (!tweet?.id) return null;
+  const username = tweet.author?.username || 'i';
+  return `https://x.com/${username}/status/${tweet.id}`;
+};
+
+const RECENT_EXPERT_ACTIVITY_DAYS = 7;
+const EXPERT_CONTEXT_FETCH_TIMEOUT_MS = 7000;
+const EXPERT_ACTIVITY_VERIFY_TIMEOUT_MS = 5500;
+const EXPERT_ACTIVE_MAX_DAYS = 7;
+const EXPERT_ACTIVITY_VERIFY_BATCH_SIZE = 10;
+const EXPERT_ACTIVITY_VERIFY_LIMIT = 10;
+const EXPERT_ACTIVITY_VERIFY_FALLBACK_BATCH_SIZE = 8;
+const EXPERT_MIN_FOLLOWERS = 10000;
+const EXPERT_MIN_TOPIC_SIGNAL = 4;
+const EXPERT_MIN_ENGAGEMENT_SIGNAL = 10;
+const EXPERT_MODEL_DISCOVERY_TIMEOUT_MS = 8000;
+const EXPERT_MODEL_RERANK_TIMEOUT_MS = 4000;
+
+const withTimeoutFallback = async (promise, fallbackValue, timeoutMs) => {
+  let timeoutId;
+
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((resolve) => {
+        timeoutId = setTimeout(() => resolve(fallbackValue), timeoutMs);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
+const buildRecentExpertActivityMap = async (usernames = []) => {
+  const normalizedUsernames = Array.from(
+    new Set(
+      (usernames || [])
+        .map((username) => String(username || '').replace(/^@/, '').trim().toLowerCase())
+        .filter(Boolean),
+    ),
+  );
+
+  if (normalizedUsernames.length === 0) return new Map();
+
+  const sinceDate = new Date(Date.now() - RECENT_EXPERT_ACTIVITY_DAYS * 86_400_000)
+    .toISOString()
+    .split('T')[0];
+
+  try {
+    const activityMap = new Map();
+    const fetchActivityTweets = async (batchSize) => {
+      const batches = [];
+      for (let index = 0; index < normalizedUsernames.length; index += batchSize) {
+        batches.push(normalizedUsernames.slice(index, index + batchSize));
+      }
+      const batchResponses = await Promise.all(
+        batches.map((batch) => {
+          const query = `(${batch.map((username) => `from:${username}`).join(' OR ')}) since:${sinceDate}`;
+          return searchEverything(query, '', false, 'Latest', false).catch((error) => {
+            console.warn('[GrokService] Could not verify expert recency batch:', error);
+            return { data: [] };
+          });
+        }),
+      );
+      return batchResponses.flatMap((response) => (Array.isArray(response?.data) ? response.data : []));
+    };
+
+    let tweets = await fetchActivityTweets(EXPERT_ACTIVITY_VERIFY_BATCH_SIZE);
+    const activeUsernames = new Set(tweets.map((tweet) => String(tweet?.author?.username || '').replace(/^@/, '').trim().toLowerCase()).filter(Boolean));
+
+    if (activeUsernames.size < 6 && normalizedUsernames.length > EXPERT_ACTIVITY_VERIFY_FALLBACK_BATCH_SIZE) {
+      tweets = await fetchActivityTweets(EXPERT_ACTIVITY_VERIFY_FALLBACK_BATCH_SIZE);
+    }
+
+    for (const tweet of tweets) {
+      const username = String(tweet?.author?.username || '').replace(/^@/, '').trim().toLowerCase();
+      if (!username) continue;
+
+      const createdAtMs = tweet?.created_at ? new Date(tweet.created_at).getTime() : NaN;
+      const ageDays = Number.isFinite(createdAtMs)
+        ? Math.max(0, (Date.now() - createdAtMs) / 86_400_000)
+        : RECENT_EXPERT_ACTIVITY_DAYS + 999;
+      const rawEngagement =
+        Number(tweet.likeCount || tweet.like_count || 0) +
+        Number(tweet.retweetCount || tweet.retweet_count || 0) * 2 +
+        Number(tweet.replyCount || tweet.reply_count || 0) * 1.5;
+      const followers = Number(tweet?.author?.followers || tweet?.author?.fastFollowersCount || 0);
+      const existing = activityMap.get(username);
+
+      if (!existing) {
+        activityMap.set(username, {
+          name: tweet?.author?.name || tweet?.author?.username || username,
+          lastSeenDays: ageDays,
+          tweetCount: 1,
+          engagementSignal: rawEngagement,
+          followers,
+          isVerified: Boolean(tweet?.author?.isVerified || tweet?.author?.isBlueVerified),
+          profile_image_url: tweet?.author?.profile_image_url || tweet?.author?.profilePicture || '',
+        });
+        continue;
+      }
+
+      existing.tweetCount += 1;
+      existing.name = existing.name || tweet?.author?.name || tweet?.author?.username || username;
+      existing.engagementSignal += rawEngagement;
+      existing.followers = Math.max(existing.followers || 0, followers);
+      existing.isVerified = existing.isVerified || Boolean(tweet?.author?.isVerified || tweet?.author?.isBlueVerified);
+      existing.profile_image_url = existing.profile_image_url || tweet?.author?.profile_image_url || tweet?.author?.profilePicture || '';
+      existing.lastSeenDays = Math.min(existing.lastSeenDays, ageDays);
+    }
+
+    return activityMap;
+  } catch (error) {
+    console.warn('[GrokService] Could not verify expert recency:', error);
+    return new Map();
+  }
+};
+
+const formatExpertActivityLabel = (lastSeenDays) => {
+  if (!Number.isFinite(lastSeenDays)) return '';
+  if (lastSeenDays <= 7) return 'Active this week';
+  return '';
+};
+
+const hashExpertIdentity = (value = '') =>
+  Array.from(String(value || '')).reduce((acc, char) => ((acc * 31) + char.charCodeAt(0)) >>> 0, 0);
+
+const inferExpertStrength = (expert = {}) => {
+  const text = [
+    expert.name,
+    expert.username,
+    expert.description,
+    ...(Array.isArray(expert.sourceTitles) ? expert.sourceTitles : []),
+  ]
+    .map((value) => String(value || '').toLowerCase())
+    .join(' ');
+
+  if (/openai|anthropic|deepmind|google ai|google deepmind|llm|gpt|language model|multimodal|prompt|machine learning|artificial intelligence/.test(text)) {
+    return 'ความเคลื่อนไหวของ AI จากคนหรือองค์กรที่อยู่ใกล้ตัวเทคโนโลยีจริง';
+  }
+  if (/economist|economics|macro|macroeconom|policy|fed|central bank|inflation|labor|employment|recession/.test(text)) {
+    return 'ภาพใหญ่เศรษฐกิจ นโยบายการเงิน และสัญญาณมหภาค';
+  }
+  if (/chart|data|daily shot|soberlook|research|survey|indicator|dashboard|stat/.test(text)) {
+    return 'การสรุปข้อมูลและกราฟที่ช่วยเห็นภาพรวมเร็ว';
+  }
+  if (/journalist|editor|reporter|news|times|post|wire|herald|journal|variety|deadline|reporter/.test(text)) {
+    return 'การคัดประเด็นสำคัญและความเคลื่อนไหวของข่าวสายนี้';
+  }
+  if (/invest|fund|portfolio|market|asset|equity|stocks|bond|trading/.test(text)) {
+    return 'มุมมองตลาด การลงทุน และการตีความสัญญาณที่กระทบสินทรัพย์';
+  }
+  if (/founder|ceo|operator|builder|startup|product|company|business/.test(text)) {
+    return 'มุมมองจากคนทำงานในสนามจริงและการตัดสินใจระดับธุรกิจ';
+  }
+  if (/professor|author|academic|researcher|think tank/.test(text)) {
+    return 'กรอบคิดเชิงวิเคราะห์ที่ช่วยมองประเด็นลึกกว่าข่าวรายวัน';
+  }
+
+  return '';
+};
+
+const buildNaturalExpertReasoning = (categoryQuery, expert = {}) => {
+  const topic = String(categoryQuery || '').trim() || '?????????';
+  const identity = `${expert.name || ''} ${expert.username || ''}`.toLowerCase();
+  const displayName = String(expert?.name || expert?.username || '\u0e1a\u0e31\u0e0d\u0e0a\u0e35\u0e19\u0e35\u0e49').trim();
+  const description = String(expert?.description || '').replace(/\s+/g, ' ').trim();
+  const buildBioSummary = () => {
+    if (!description) return '';
+    const firstSentence = description.split(/(?<=[.!?])\s+/)[0]?.trim() || description;
+    const cleaned = firstSentence.replace(/^["'??]+|["'??]+$/g, '').replace(/[.]+$/g, '').trim();
+    if (!cleaned) return '';
+    const username = String(expert?.username || '').replace(/^@/, '').trim();
+    const prefixes = [displayName, username ? `@${username}` : '', username]
+      .filter(Boolean)
+      .map((value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    if (!prefixes.length) return cleaned;
+    return cleaned.replace(new RegExp(`^(?:${prefixes.join('|')})\\s*[:：\\-–]\\s*`, 'i'), '').trim();
+  };
+  const bioSummary = buildBioSummary();
+
+  if (/variety|deadline|hollywood reporter|thr|discussingfilm/.test(identity)) {
+    return `${displayName} : \u0e2a\u0e37\u0e48\u0e2d\u0e1a\u0e31\u0e19\u0e40\u0e17\u0e34\u0e07\u0e17\u0e35\u0e48\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e02\u0e48\u0e32\u0e27\u0e2b\u0e19\u0e31\u0e07 \u0e0b\u0e35\u0e23\u0e35\u0e2a\u0e4c \u0e41\u0e25\u0e30\u0e14\u0e35\u0e25\u0e2a\u0e33\u0e04\u0e31\u0e0d\u0e43\u0e19\u0e27\u0e07\u0e01\u0e32\u0e23\u0e41\u0e1a\u0e1a\u0e23\u0e27\u0e14\u0e40\u0e23\u0e47\u0e27`;
+  }
+  if (/rottentomatoes/.test(identity)) {
+    return `${displayName} : \u0e41\u0e2b\u0e25\u0e48\u0e07\u0e23\u0e27\u0e21\u0e01\u0e23\u0e30\u0e41\u0e2a\u0e23\u0e35\u0e27\u0e34\u0e27\u0e41\u0e25\u0e30\u0e40\u0e2a\u0e35\u0e22\u0e07\u0e15\u0e2d\u0e1a\u0e23\u0e31\u0e1a\u0e02\u0e2d\u0e07\u0e2b\u0e19\u0e31\u0e07\u0e01\u0e31\u0e1a\u0e0b\u0e35\u0e23\u0e35\u0e2a\u0e4c\u0e17\u0e35\u0e48\u0e04\u0e19\u0e14\u0e39\u0e08\u0e31\u0e1a\u0e15\u0e32`;
+  }
+  if (/netflix/.test(identity)) {
+    return `${displayName} : \u0e1a\u0e31\u0e0d\u0e0a\u0e35\u0e08\u0e32\u0e01\u0e41\u0e1e\u0e25\u0e15\u0e1f\u0e2d\u0e23\u0e4c\u0e21\u0e17\u0e35\u0e48\u0e43\u0e0a\u0e49\u0e15\u0e32\u0e21\u0e04\u0e2d\u0e19\u0e40\u0e17\u0e19\u0e15\u0e4c\u0e43\u0e2b\u0e21\u0e48\u0e41\u0e25\u0e30\u0e41\u0e04\u0e21\u0e40\u0e1b\u0e0d\u0e40\u0e1b\u0e34\u0e14\u0e15\u0e31\u0e27\u0e44\u0e14\u0e49\u0e15\u0e23\u0e07\u0e17\u0e35\u0e48\u0e2a\u0e38\u0e14`;
+  }
+  if (/openai/.test(identity)) {
+    return `${displayName} : \u0e17\u0e35\u0e21\u0e17\u0e35\u0e48\u0e02\u0e22\u0e31\u0e1a\u0e1c\u0e25\u0e34\u0e15\u0e20\u0e31\u0e13\u0e11\u0e4c AI \u0e23\u0e30\u0e14\u0e31\u0e1a\u0e41\u0e19\u0e27\u0e2b\u0e19\u0e49\u0e32\u0e41\u0e25\u0e30\u0e21\u0e31\u0e01\u0e1b\u0e23\u0e30\u0e01\u0e32\u0e28\u0e2d\u0e31\u0e1b\u0e40\u0e14\u0e15\u0e2a\u0e33\u0e04\u0e31\u0e0d\u0e08\u0e32\u0e01\u0e15\u0e49\u0e19\u0e17\u0e32\u0e07`;
+  }
+  if (/demishassabis|demis hassabis/.test(identity)) {
+    return `${displayName} : \u0e1c\u0e39\u0e49\u0e1a\u0e23\u0e34\u0e2b\u0e32\u0e23\u0e41\u0e25\u0e30\u0e19\u0e31\u0e01\u0e27\u0e34\u0e08\u0e31\u0e22 AI \u0e17\u0e35\u0e48\u0e40\u0e0a\u0e37\u0e48\u0e2d\u0e21\u0e21\u0e38\u0e21\u0e27\u0e34\u0e08\u0e31\u0e22\u0e01\u0e31\u0e1a\u0e17\u0e34\u0e28\u0e17\u0e32\u0e07\u0e01\u0e32\u0e23\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19\u0e08\u0e23\u0e34\u0e07\u0e44\u0e14\u0e49\u0e0a\u0e31\u0e14`;
+  }
+  if (/karpathy|andrej karpathy/.test(identity)) {
+    return `${displayName} : \u0e27\u0e34\u0e28\u0e27\u0e01\u0e23 AI \u0e17\u0e35\u0e48\u0e2d\u0e18\u0e34\u0e1a\u0e32\u0e22\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07\u0e42\u0e21\u0e40\u0e14\u0e25 \u0e42\u0e04\u0e49\u0e14 \u0e41\u0e25\u0e30\u0e01\u0e32\u0e23\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19\u0e44\u0e14\u0e49\u0e40\u0e02\u0e49\u0e32\u0e43\u0e08\u0e07\u0e48\u0e32\u0e22`;
+  }
+  if (/andrewyng|andrew ng/.test(identity)) {
+    return `${displayName} : \u0e19\u0e31\u0e01\u0e01\u0e32\u0e23\u0e28\u0e36\u0e01\u0e29\u0e32\u0e14\u0e49\u0e32\u0e19 AI \u0e17\u0e35\u0e48\u0e40\u0e25\u0e48\u0e32\u0e40\u0e23\u0e37\u0e48\u0e2d\u0e07\u0e40\u0e17\u0e04\u0e42\u0e19\u0e42\u0e25\u0e22\u0e35\u0e43\u0e2b\u0e49\u0e15\u0e48\u0e2d\u0e22\u0e2d\u0e14\u0e2a\u0e39\u0e48\u0e01\u0e32\u0e23\u0e43\u0e0a\u0e49\u0e07\u0e32\u0e19\u0e08\u0e23\u0e34\u0e07\u0e44\u0e14\u0e49\u0e07\u0e48\u0e32\u0e22`;
+  }
+  if (bioSummary) {
+    return bioSummary;
+  }
+
+  if (/บันเทิง|entertainment|film|movie|music|celebrity/i.test(topic)) {
+    if (/variety|deadline|hollywood reporter|thr|discussingfilm/.test(identity)) {
+      return 'เหมาะไว้ตามข่าวหนัง ซีรีส์ และดีลในวงการบันเทิงที่ขยับเร็ว';
+    }
+    if (/rottentomatoes/.test(identity)) {
+      return 'ช่วยจับกระแสรีวิวและเสียงตอบรับของหนังกับซีรีส์ได้เร็ว';
+    }
+    if (/netflix/.test(identity)) {
+      return 'ใช้ตามความเคลื่อนไหวของคอนเทนต์ใหม่และแคมเปญจากแพลตฟอร์มใหญ่';
+    }
+  }
+
+  if (/เศรษฐกิจ|economy|economics|macro/i.test(topic)) {
+    if (/elerianm|mohamed a\\. el-erian/.test(identity)) {
+      return 'เหมาะไว้ตามภาพใหญ่ของเศรษฐกิจโลก ดอกเบี้ย และแรงกดดันจากฝั่งนโยบายการเงิน';
+    }
+    if (/claudia_sahm|claudia sahm/.test(identity)) {
+      return 'ช่วยมองข้อมูลแรงงานและสัญญาณเศรษฐกิจถดถอยแบบเข้าใจง่ายและเอาไปใช้ต่อได้';
+    }
+    if (/noahpinion|noah smith/.test(identity)) {
+      return 'เด่นเรื่องอธิบายเศรษฐกิจและนโยบายให้เห็นเหตุผลเบื้องหลังมากกว่าพาดหัวข่าว';
+    }
+    if (/lhsummers|lawrence h\\. summers/.test(identity)) {
+      return 'มีมุมมองจากระดับนโยบายและมหภาค เหมาะเวลาต้องตามประเด็นเงินเฟ้อและทิศทางเศรษฐกิจ';
+    }
+    if (/paulkrugman|paul krugman/.test(identity)) {
+      return 'เหมาะสำหรับตามบทวิเคราะห์เศรษฐกิจมหภาคที่มีจุดยืนชัดและโยงกับนโยบายสาธารณะ';
+    }
+    if (/soberlook|the daily shot/.test(identity)) {
+      return 'เด่นเรื่องสรุปตลาดและเศรษฐกิจด้วยกราฟ ทำให้เห็นภาพรวมเร็วโดยไม่ต้องไล่อ่านยาว';
+    }
+  }
+
+  if (/AI|artificial intelligence|machine learning|llm|gpt/i.test(topic)) {
+    if (/openai/.test(identity)) {
+      return 'เหมาะไว้ตามทิศทาง AI จากทีมที่ปล่อยงานจริงและขยับผลิตภัณฑ์ของวงการอยู่ตลอด';
+    }
+    if (/demishassabis|demis hassabis/.test(identity)) {
+      return 'น่าติดตามถ้าคุณอยากเห็นมุมของคนสร้าง AI ระดับแนวหน้า ทั้งฝั่งวิจัยและการพาเทคโนโลยีไปใช้จริง';
+    }
+    if (/karpathy|andrej karpathy/.test(identity)) {
+      return 'อธิบายเรื่องโมเดลและการใช้งาน AI ได้เห็นภาพ เหมาะกับคนที่อยากตามให้ทันแบบเข้าใจจริง';
+    }
+    if (/andrewyng|andrew ng/.test(identity)) {
+      return 'ช่วยเชื่อมเรื่อง AI จากมุมเทคนิคไปสู่การใช้งานจริงได้ดี อ่านแล้วเห็นภาพว่าจะเอาไปต่อยอดยังไง';
+    }
+  }
+
+  const strength = inferExpertStrength(expert);
+  const genericTemplates = [
+    strength
+      ? `เด่นเรื่อง${strength} เลยเหมาะกับการตามต่อ`
+      : `ใช้เป็นบัญชีหลักไว้ตาม${topic}ได้`,
+    strength
+      ? `ถ้าอยากอัปเดต${strength} บัญชีนี้ตามง่าย`
+      : `ช่วยให้ตาม${topic}ได้ทันโดยไม่ต้องไล่หลายแหล่ง`,
+    strength
+      ? `มุมของเขามีน้ำหนักในเรื่อง${strength} มากกว่าบัญชีทั่วไป`
+      : `เหมาะไว้เก็บในลิสต์สำหรับตาม${topic}แบบต่อเนื่อง`,
+    strength
+      ? `จุดเด่นคือ${strength} อ่านแล้วได้อะไรกลับไปชัด`
+      : `ถ้าอยากได้มุมที่ใช้งานได้จริงในสาย${topic} บัญชีนี้โอเค`,
+  ];
+
+  const templateIndex = hashExpertIdentity(`${topic}:${identity}`) % genericTemplates.length;
+  return genericTemplates[templateIndex];
+};
+
+const sanitizeExpertReasoning = (reasoning = '', categoryQuery = '', expert = {}) => {
+  const text = String(reasoning || '').trim().replace(/^["'“”]+|["'“”]+$/g, '').replace(/\s+/g, ' ');
+  if (!text) return buildNaturalExpertReasoning(categoryQuery, expert);
+  if (/แอคทีฟ|engagement|สัญญาณ|โพสต์สม่ำเสมอ|\bactive\b|\bsignal\b|\brecency\b/i.test(text)) {
+    return buildNaturalExpertReasoning(categoryQuery, expert);
+  }
+  if (/จุดเด่นคือการพูดเรื่อง|แบบมีสาระ|ไม่ไหลไปตามหัวข้อที่กำลังดัง|พูดเรื่อง .* อย่างเดียว/i.test(text)) {
+    return buildNaturalExpertReasoning(categoryQuery, expert);
+  }
+  if (/[\u0400-\u04ff\u3040-\u30ff]/.test(text)) {
+    return buildNaturalExpertReasoning(categoryQuery, expert);
+  }
+  if (text.length > 90 || /(ช่วยให้เห็นภาพรวม|บัญชีนี้ช่วยได้ดี|ถ้าคุณอยากตาม|คุณอยาก|เห็นภาพรวมชัดขึ้น)/i.test(text)) {
+    return buildNaturalExpertReasoning(categoryQuery, expert);
+  }
+  return text;
+};
+
+const isLowQualityExpertAuthor = (author = {}) => {
+  const profileText = [
+    author.username,
+    author.name,
+    author.description,
+  ].map((value) => String(value || '').toLowerCase()).join(' ');
+  const username = String(author.username || '').toLowerCase();
+
+  return /retweets?|rt\b|giveaway|promo|follow\s*back|f4f|airdrop|signals?|alerts?|deals?|coupon|casino|betting|nsfw/.test(profileText)
+    || /(?:^|_)(fan|stan|updates?|updateacc|archive|pics|clips|memes?|fyp|central|daily)(?:_|$)/.test(username)
+    || /\d{5,}/.test(username);
+};
+
+const hasExpertQualitySignal = (activity = {}) => {
+  const followers = Number(activity.followers || 0);
+  const engagementSignal = Number(activity.engagementSignal || 0);
+  const lastSeenDays = Number(activity.lastSeenDays);
+  const isVerified = Boolean(activity.isVerified);
+
+  if (!Number.isFinite(lastSeenDays) || lastSeenDays > EXPERT_ACTIVE_MAX_DAYS) return false;
+  if (followers < EXPERT_MIN_FOLLOWERS && !isVerified) return false;
+
+  return (
+    engagementSignal >= EXPERT_MIN_ENGAGEMENT_SIGNAL ||
+    followers >= 50000 ||
+    isVerified
+  );
+};
+
+export const tavilySearch = async (query, isLatest = false, options = {}) => {
+  const normalizedQuery = normalizeCacheText(query);
+  if (!normalizedQuery) return { results: [], answer: '' };
+
+  const searchOptions = {
+    max_results: options.max_results ?? 5,
+    include_answer: options.include_answer ?? true,
+    search_depth: options.search_depth ?? 'advanced',
+    include_raw_content: options.include_raw_content ?? false,
+    topic: options.topic,
+  };
+
+  const cacheKey = buildCacheKey('tavily', { normalizedQuery, isLatest, searchOptions });
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  try {
+    const response = await apiFetch('/api/tavily/search', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        query: normalizedQuery,
+        search_depth: searchOptions.search_depth,
+        include_answer: searchOptions.include_answer,
+        max_results: searchOptions.max_results,
+        include_raw_content: searchOptions.include_raw_content,
+        topic: searchOptions.topic,
+        time_range: isLatest ? 'day' : undefined,
+      }),
+      abortSignal: options.signal,
+    });
+
+    if (!response.ok) return { results: [], answer: '' };
+    const result = await response.json();
+    return setCachedValue(responseCache, cacheKey, result, TAVILY_CACHE_TTL_MS);
+  } catch (err) {
+    console.warn('[GrokService] Tavily fetch failed:', err);
+    return { results: [], answer: '' };
+  }
+};
+const isMajorXAccount = (tweet) => {
+  const followers = tweet.author?.followers || tweet.author?.fastFollowersCount || 0;
+  const likes = tweet.like_count || tweet.likeCount || 0;
+  return followers > 10000 || likes > 500 || tweet.author?.isVerified || tweet.author?.isBlueVerified;
+};
+
+const _extractSourcesFromTweets = (tweets, limit = 4) => {
+  const validSources = (tweets || [])
+    .filter(t => isMajorXAccount(t))
+    .slice(0, limit)
+    .map((tweet) => {
+      const url = buildTweetUrl(tweet);
+      if (!url) return null;
+      const text = (tweet.text || '').replace(/\s+/g, ' ').trim();
+      const clipped = text.length > 90 ? `${text.slice(0, 87)}...` : text;
+      return {
+        title: clipped
+          ? `@${tweet.author?.username || 'unknown'}: ${clipped}`
+          : `@${tweet.author?.username || 'unknown'} on X`,
+        url,
+      };
+    })
+    .filter(Boolean);
+
+  return dedupeSources(validSources);
+};
+
+const toTweetEvidence = (tweets, limit = 6) =>
+  (tweets || [])
+    .slice(0, limit)
+    .map((tweet, index) => {
+      const url = buildTweetUrl(tweet);
+      const username = tweet.author?.username || 'unknown';
+      const text = (tweet.text || '').replace(/\s+/g, ' ').trim();
+      const clipped = text.length > 280 ? `${text.slice(0, 277)}...` : text;
+      return `[X${index + 1}] @${username}: ${clipped}${url ? ` (${url})` : ''}`;
+    })
+    .join('\n');
+
+const normalizeLength = (value) => {
+  const raw = String(value || '').trim().toLowerCase();
+
+  if (raw === 'short' || raw.includes('short')) return 'short';
+  if (raw === 'long' || raw.includes('long')) return 'long';
+
+  return 'medium';
+};
+
+const getLengthInstruction = (value) => {
+  switch (normalizeLength(value)) {
+    case 'short':
+      return 'เขียนให้กระชับ: 1 ย่อหน้าสั้นๆ หรือ 3-4 บรรทัดสั้นๆ ปกติไม่เกิน 150 คำ';
+    case 'long':
+      return 'เขียนแบบเจาะลึก: บทความยาว ปกติ 700-900+ คำ พร้อมรายละเอียดที่ลึกซึ้งและบทสรุปที่ชัดเจน';
+    case 'medium':
+    default:
+      return 'เขียนแบบความยาวปานกลาง: ปกติ 350-500 คำ พร้อมรายละเอียดที่เพียงพอให้เนื้อหาดูสมบูรณ์';
+  }
+};
+
+const CONTENT_FORMAT_PROFILES = {
+  'โพสต์โซเชียล': {
+    label: 'social post',
+    allowHeadings: false,
+    allowCta: false,
+    boldHeadline: false,
+    structure: 'ความยาวยืดหยุ่นตามเนื้อหา — ย่อหน้าเดียว, 2-3 ย่อหน้า, หรือเปิดด้วยบรรทัดนำก็ได้ ถ้าเรื่องสั้นมากไม่ต้องฝืนแตก ห้ามขึ้นต้นด้วย "ในยุคที่...", "ปฏิเสธไม่ได้ว่า...", "เชื่อหรือไม่...", หรือประโยค context-setting ที่ไม่จำเป็น ประโยคแรกต้องเป็นประเด็นหลักทันที',
+    goals: 'เขียนเหมือนคนไทยที่เข้าใจเรื่องกำลังเล่าให้ฟัง ไม่ใช่ AI กำลัง summarize ข่าว เปิดตรงประเด็น เนื้อหาเดินหน้าด้วยข้อมูลที่เฉพาะเจาะจง ไม่ใช่ adjective ทั่วๆ ไป หลีกเลี่ยงโครงสร้างประโยคซ้ำๆ และประโยคปิดที่ฝืนให้ดูคม',
+    skill: 'ทดสอบด้วยคำถาม: "คนที่ scroll ผ่านจะหยุดอ่านไหม?" — ถ้าประโยคแรกไม่ตอบ yes ให้เขียนใหม่ ตัวเลขและชื่อเฉพาะ เป็น hook ที่ดีกว่าคำโฆษณา ความ specific เสมอดีกว่าความ general',
+  },
+  'สคริปต์วิดีโอสั้น': {
+    label: 'short-form video script',
+    allowHeadings: false,
+    allowCta: false,
+    boldHeadline: true,
+    structure: 'เริ่มด้วย **[Hook Line]** หนึ่งบรรทัด จากนั้นแบ่งเป็น 3 ส่วนชัดเจน:\n[HOOK — 3-5 วิ]: ประโยคเดียวที่ทำให้คนไม่เลื่อนผ่าน\n[เนื้อหาหลัก]: เล่าเป็นก้อนๆ ประโยคละ 8-12 คำ มีจังหวะหายใจ\n[ปิดจบ]: ข้อสรุปหรือ insight สั้นๆ ที่จำได้\nไม่ใช้ markdown heading ระหว่างส่วน',
+    goals: 'อ่านออกเสียงแล้วต้องฟังเป็นธรรมชาติ ไม่ใช่อ่านบทความ ใช้คำลงท้ายพูด (ครับ/นะ/น้า) สร้างจังหวะ hook 3 วินาทีแรกต้องดึงให้หยุดได้จริง ทดสอบโดยอ่านออกเสียง — ถ้าสะดุด แสดงว่าต้องแก้',
+    skill: 'เขียนเพื่อหู ไม่ใช่ตา — ประโยคที่ดูดีบนกระดาษแต่พูดแล้วงุ่มง่ามต้องตัดออก ความเงียบ (line break) คือ pause ที่ช่วยเน้น ใช้มันเป็นเครื่องมือ',
+  },
+  'บทความ SEO / บล็อก': {
+    label: 'blog article',
+    allowHeadings: true,
+    allowCta: false,
+    boldHeadline: false,
+    structure: 'บรรทัดแรกเป็น # H1 ที่บอกว่าบทความนี้เกี่ยวกับอะไรและผู้อ่านได้อะไร ย่อหน้านำ (lede) สรุปประเด็นสำคัญก่อนขยายความ (inverted pyramid) ใช้ ## subheading เฉพาะเมื่อเนื้อหาต่างจุดประสงค์กันชัดเจน แต่ละ section ต้องมีน้ำหนักพอที่จะยืนเองได้ ไม่ใช่ subheading + 2 ประโยค',
+    goals: 'ผู้อ่านอ่านจบแล้วรู้สึกว่าได้ความรู้จริงๆ และไม่เสียเวลา — information density สูง ไม่มี padding ข้อมูลแม่นยำและอ้างอิงได้ ภาษาเป็นทางการแต่ไม่แข็ง อธิบายสิ่งที่ซับซ้อนให้เข้าใจง่ายโดยไม่ลดความถูกต้อง',
+    skill: 'H1 ที่ดีต้องมี keyword และ benefit ในประโยคเดียว lede ที่ดีทำให้คนอยากอ่านต่อ ย่อหน้าที่ดีมี topic sentence ชัดเจน ไม่เกิน 5-6 บรรทัด ปิดด้วย takeaway ที่จำได้ ไม่ใช่ "สรุปดังกล่าว"',
+  },
+  'โพสต์ให้ความรู้ (Thread)': {
+    label: 'thread',
+    allowHeadings: false,
+    allowCta: false,
+    boldHeadline: false,
+    structure: 'เปิดด้วย hook ที่บอกว่าจะเรียนรู้อะไร หรือเข้าประเด็นทันทีก็ได้ถ้าข้อมูลแข็งแรงพอ แบ่งเป็นช่วงความคิดที่แต่ละช่วงสมบูรณ์ในตัวเอง แต่ต่อเนื่องกัน ใช้ตัวเลขนำหน้าแต่ละช่วง (1/, 2/ หรือ •) ได้ถ้าช่วยให้ติดตามง่ายขึ้น ไม่บังคับ',
+    goals: 'แต่ละช่วงต้องให้ข้อมูลหรือ insight ที่มีคุณค่าในตัวเอง ไม่ใช่แค่ teaser ให้อ่านต่อ ผู้อ่านค่อยๆ เข้าใจประเด็นที่ซับซ้อนผ่านข้อมูลจริง ไม่ใช่ผ่าน assertion หลีกเลี่ยงน้ำเสียงสอน หรือ "lesson #X คือ..." ที่ฟังดู template',
+    skill: 'Thread ที่ดีอ่านแล้วรู้สึกว่าคนเขียนเข้าใจเรื่องจริงๆ ไม่ใช่แค่รวบรวมข้อมูล ทดสอบด้วยการอ่านแต่ละช่วงแยก: ถ้าแต่ละช่วงยังมีคุณค่าในตัวเอง thread นั้น work',
+  },
+};
+
+const TONE_GUIDES = {
+  'ให้ข้อมูล/ปกติ': `น้ำเสียงบรรณาธิการ — เขียนเหมือนนักข่าวที่เข้าใจเรื่องกำลังสรุปให้ฟัง ไม่ใช่ AI ที่กำลังรวบรวมข้อมูล
+เทคนิคหลัก:
+- เปิดด้วยข้อเท็จจริงที่สำคัญที่สุดทันที ไม่มีอารัมภบทหรือ context-setting ที่ไม่จำเป็น
+- ใช้ประโยคกระชับ เรียงข้อมูลจากสำคัญมากไปน้อย (inverted pyramid)
+- ตัวเลขและชื่อเฉพาะทำให้น่าเชื่อถือกว่าคำคุณศัพท์ เช่น "3.2 ล้านบาท" ดีกว่า "จำนวนมาก"
+- ใช้ "ครับ" ได้ตามธรรมชาติ แต่ไม่จำเป็นต้องใช้ทุกย่อหน้า
+- คำเชื่อมที่ดีมาจากเนื้อหา ไม่ใช่สูตร เช่น ห้าม "นั่นหมายความว่า..." "ซึ่งทำให้เราเห็นว่า..."
+- ปิดด้วยบริบทหรือผลที่ตามมาที่ผู้อ่านอยากรู้ ไม่ใช่ summary ซ้ำๆ หรือ CTA`,
+
+  'กระตือรือร้น/ไวรัล': `น้ำเสียงมีพลัง ดึงดูด — ความเร่งด่วนต้องมาจากข้อเท็จจริง ไม่ใช่คำโฆษณา
+เทคนิคหลัก:
+- ประโยคเปิดต้องทำให้คนหยุดเลื่อน feed ได้จริง: ใช้ตัวเลขที่น่าตกใจ, contrast ที่ชัดเจน, หรือคำถามที่คนสงสัยอยู่แล้ว
+- สลับประโยคสั้น-ยาวเพื่อสร้างจังหวะ — ประโยคสั้นตามหลังข้อมูลสำคัญให้น้ำหนัก
+- เลือกคำ "active voice" มากกว่า "passive" — "ทำลายสถิติ" ดีกว่า "สถิติถูกทำลาย"
+- ความเร่งด่วนจริงๆ มาจากข้อเท็จจริงในเรื่อง ไม่ใช่คำเช่น "ต้องรู้!", "ด่วน!", "แชร์ทันที!"
+- ห้ามเด็ดขาด: "นี่คือเหตุผลว่าทำไม...", "สิ่งที่คุณต้องรู้คือ...", "ไม่น่าเชื่อว่า...", "จับตาดูให้ดี"
+- ปิดด้วยประโยคที่ทิ้งค้างได้จริง — ข้อเท็จจริงที่น่าคิดต่อ ไม่ใช่ "คิดยังไงคอมเมนต์มาได้เลย"`,
+
+  'ทางการ/วิชาการ': `น้ำเสียงเป็นทางการ วิเคราะห์ อ้างอิงได้ — เหมาะกับผู้อ่านที่ต้องการความแม่นยำ
+เทคนิคหลัก:
+- สร้างข้อโต้แย้งเป็นลำดับ: premise → evidence → conclusion ในแต่ละย่อหน้า
+- ใช้ hedging ที่ถูกต้อง: "ข้อมูลชี้ให้เห็นว่า...", "จากหลักฐานที่มี..." เมื่อยังไม่ยืนยัน 100%
+- ระบุที่มาและบริบทของข้อมูล อย่าให้ตัวเลขลอยอยู่โดดๆ
+- หลีกเลี่ยงคำแสลง, คำย่อ, และการเขียนแบบพูด
+- อธิบายศัพท์เฉพาะทางเมื่อใช้ครั้งแรก อย่าสมมติว่าผู้อ่านรู้ทุกคำ
+- ย่อหน้าแต่ละย่อต้องมี topic sentence ที่ชัดเจน
+- งดแสดงความเห็นส่วนตัวที่ไม่มีหลักฐานรองรับ`,
+
+  'เป็นกันเอง/เพื่อนเล่าให้ฟัง': `น้ำเสียงอบอุ่น ใกล้ชิด — เหมือนเพื่อนที่เชี่ยวชาญกำลังเล่าให้ฟังในคาเฟ่ ไม่ใช่อ่านรายงาน
+เทคนิคหลัก:
+- เขียนเหมือนคุยกับคนรู้จัก ใช้ "เรา" หรือ "เราๆ" ได้ตามความเหมาะสม
+- ใช้ particle ตามธรรมชาติ: "นะ", "น้า", "อะ", "เนอะ" — เลือกตามบุคลิก อย่าใส่ทุกประโยค
+- เล่าเรื่องด้วย personal framing — "ที่น่าสนใจคือ..." แทน "ข้อมูลระบุว่า..."
+- ตั้งคำถามกับตัวเองแล้วตอบ ในแบบที่คนพูดจริงๆ ทำ
+- ถ้าต้องใช้ศัพท์วิชาการ อธิบายด้วยภาษาง่ายทันทีหลังจากนั้น
+- จบแบบธรรมชาติได้ — ไม่จำเป็นต้องมีข้อสรุปสวยงามหรือ moral of the story`,
+
+  'ตลก/มีอารมณ์ขัน': `น้ำเสียงเบาสมอง มีมุก — แต่ข้อมูลต้องถูกต้อง และตลกต้องมาจากความจริง ไม่ใช่การพยายามตลก
+เทคนิคหลัก:
+- Comedy timing ในงานเขียนมาจาก setup → unexpected punchline — สร้างความคาดหวังแล้วหักมุมด้วยข้อเท็จจริง
+- เรื่องจริงมักตลกกว่าเรื่องแต่ง: ตัวเลขที่ไม่น่าเชื่อ, contradiction ที่เกิดขึ้นจริง, irony ในข่าว
+- Deadpan delivery: เล่าเรื่องน่าขำด้วยน้ำเสียงจริงจัง ได้ผลมากกว่าพยายามตลกออกนอกหน้า
+- Self-aware humor ทำงานได้ดี เช่น "ใช่ครับ เรื่องจริง" หรือ "ไม่ได้ล้อเล่น"
+- ห้ามมุกที่ต้องอธิบาย ถ้าต้องบอก "แค่ล้อเล่นนะ" แสดงว่ามุกไม่ work
+- เล่นกับ contrast ระหว่างภาษาทางการกับภาษาพูดได้ผลดีในภาษาไทย`,
+
+  'ดุดัน/วิจารณ์เชิงลึก': `น้ำเสียงตรงไปตรงมา วิเคราะห์เชิงลึก ไม่มีน้ำตาล — แต่ต้องมีหลักฐานรองรับทุกจุด
+เทคนิคหลัก:
+- เปิดด้วย thesis ที่ชัดเจน: กำลังวิจารณ์อะไร เพราะอะไร
+- ใช้หลักฐานจาก fact sheet ขับเคลื่อนทุกข้อโต้แย้ง — ความดุดันที่ไม่มีข้อมูลคือแค่อารมณ์
+- ระบุ contradiction, conflict of interest, หรือ pattern ที่น่าสังเกต
+- ไม่ใช้ hedging ที่ไม่จำเป็น เช่น "อาจจะ..." เมื่อข้อมูลชัดเจนแล้ว
+- ภาษาควรคมและตรง ไม่ใช่ aggressive เพื่อดูดุ
+- ปิดด้วย implication ที่ชัดเจน: เรื่องนี้บอกอะไรกับเรา บทเรียนคืออะไร
+- ห้าม: วิจารณ์โดยไม่มีหลักฐาน, hyperbole เกินข้อเท็จจริง`,
+
+  'ฮาร์ดเซลล์/ขายของ': `น้ำเสียงโน้มน้าว มุ่งสู่ action — ทุกประโยคต้องทำงานเพื่อสร้าง desire หรือ remove objection
+เทคนิคหลัก:
+- เปิดด้วย pain point หรือ desire ที่ผู้อ่าน relate ได้จริง ไม่ใช่ "สินค้าของเราดีมาก"
+- Benefit-driven: บอกว่า "ได้อะไร" และ "ชีวิตเปลี่ยนยังไง" ไม่ใช่แค่ "มีอะไร"
+- ใช้ proof จาก fact sheet: ตัวเลขผลลัพธ์, การรับรอง, ข้อมูลจริง — เพิ่ม credibility ทันที
+- Scarcity และ urgency ใส่ได้เฉพาะเมื่อมีจริงในข้อมูล ห้ามสร้างขึ้นเอง
+- CTA ต้องชัดเจนและบอก next step เป็นรูปธรรม ไม่ใช่แค่ "สนใจติดต่อได้เลย"
+- ลำดับที่ proven: Hook → Problem → Solution → Proof → CTA
+- ห้าม superlatives ที่ไม่สามารถ back up ได้: "ดีที่สุด", "ไม่มีใครเทียบ"`,
+};
+
+const HYPE_PHRASES = [
+  'สะเทือนโลก',
+  'เปลี่ยนเกม',
+  'ครองโลก',
+  'ครองครึ่งโลกการเงิน',
+  'มหาศาล',
+  'massive',
+  'enormous',
+  'สุดยิ่งใหญ่',
+  'เดือดพล่าน',
+  'สัญญาณไฟเขียว',
+  'โลกจะไม่เหมือนเดิมอีกต่อไป',
+  'ไอคอนิก',
+  'ข้ามไปมา',
+  'หัวหอก',
+  'กระหาย',
+  'ปฏิวัติวงการ',
+  'พลิกโฉม',
+  'จับตามองให้ดี',
+];
+
+const buildFormatProfile = (format) =>
+  CONTENT_FORMAT_PROFILES[format] || CONTENT_FORMAT_PROFILES['โพสต์โซเชียล'];
+
+const _shouldPreferConversationalViralFlow = (tone = '', format = '') =>
+  tone === 'กระตือรือร้น/ไวรัล' && ['โพสต์โซเชียล', 'โพสต์ให้ความรู้ (Thread)'].includes(format);
+
+const normalizeThaiSpacing = (text = '') =>
+  text
+    .replace(/[\u200B-\u200D\uFEFF]/g, '') // NLP Post-Processing: Remove zero-width spaces
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/([!?])\1{2,}/g, '$1$1') // Reduce !!! to !! at most
+    .replace(/[ ]{2,}/g, ' ')
+    .trim();
+
+const normalizeDisallowedHeadings = (text = '') =>
+  text.replace(/^\s{0,3}#{1,6}\s+(.+)$/gm, '**$1**').replace(/\n{3,}/g, '\n\n').trim();
+
+const _stripEngagementBait = (text = '') =>
+  text
+    .replace(/(^|\n)(คุณคิดยังไง.*)$/gim, '')
+    .replace(/(^|\n)(แชร์ความเห็น.*)$/gim, '')
+    .replace(/(^|\n)(รีโพสต์.*)$/gim, '')
+    .replace(/(^|\n)(comment\s*มา.*)$/gim, '')
+    .replace(/(^|\n)(คอมเมนต์.*(หน่อย|กัน|สิ|นะ).*)$/gim, '')
+    .replace(/(^|\n)(.*คิดว่ายังไง.*comment.*)$/gim, '')
+    .replace(/(^|\n)(.*อยู่มั้ย.*คุยกัน.*)$/gim, '')
+    .replace(/(^|\n)(.*follow.*ไว้.*)$/gim, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+const _softenHypeLanguage = (text = '') => {
+  let nextText = text;
+
+  for (const phrase of HYPE_PHRASES) {
+    const escaped = phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    nextText = nextText.replace(
+      new RegExp(escaped, 'gi'),
+      phrase === 'massive' || phrase === 'enormous' ? 'มีนัยสำคัญ' : 'สำคัญ',
+    );
+  }
+
+  return nextText
+    .replace(/ว้าว!?/gi, '')
+    .replace(/!\?/g, '?')
+    .replace(/!!+/g, '!')
+    .trim();
+};
+
+const _shouldAllowHighEnergyLanguage = (customInstructions = '', tone = '') =>
+  /ไวรัล|viral|energetic|high energy/i.test(`${tone} ${customInstructions}`);
+
+const ARTIFICIAL_THAI_PATTERNS = [
+  // Original patterns
+  /นี่แหละที่ทำให้/i,
+  /เรียกว่าแทบ/i,
+  /สุดยอดจริง/i,
+  /แบบไม่ต้องกังวล/i,
+  /บอกเลยว่า/i,
+  /งานนี้มี/i,
+  // Generic AI openers
+  /^ในยุคที่/im,
+  /^ปฏิเสธไม่ได้ว่า/im,
+  /^เชื่อหรือไม่/im,
+  /^ไม่ว่าจะ.*ก็ตาม/im,
+  // Filler transitions
+  /นั่นหมายความว่า/i,
+  /ซึ่งทำให้เราเห็นว่า/i,
+  /จะเห็นได้ว่า/i,
+  /ที่สำคัญกว่านั้น/i,
+  /ทั้งนี้ทั้งนั้น/i,
+  /คงต้องบอกว่า/i,
+  /นับว่าเป็น/i,
+  // Weak intensifiers
+  /น่าจับตามอง/i,
+  /แบบจัดเต็ม/i,
+  /เรียกได้ว่า/i,
+  /มาดูกัน(?:ว่า|เลย|ดีกว่า)/i,
+  // Hollow summary phrases
+  /โดยรวมแล้ว.*ถือว่า/i,
+  /สรุปได้ว่า.*ไม่ธรรมดา/i,
+  /เรื่องนี้.*น่าสนใจ(?:มาก)?$/im,
+  // Fake curiosity hooks
+  /สิ่งที่หลายคนอาจไม่รู้/i,
+  /ความจริงที่น่าตกใจ/i,
+  /ทำไมถึงเป็นแบบนี้/i,
+];
+
+const countContentParagraphs = (text = '') =>
+  String(text || '')
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean).length;
+
+const countShortParagraphs = (text = '') =>
+  String(text || '')
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter((block) => block && block.length <= 120).length;
+
+const shouldForceNaturalRewrite = (text = '', { format = '', tone = '' } = {}) => {
+  const normalized = normalizeCacheText(text);
+  if (!normalized) return false;
+
+  const hasArtificialPhrase = ARTIFICIAL_THAI_PATTERNS.some((pattern) => pattern.test(normalized));
+  const hasPublisherOveruse = hasPublisherAttributionOveruse(normalized);
+  const hasSourceLedFlow = hasSourceLedNarrative(text);
+  const hasWeakOpening = hasWeakDataDumpOpening(text, { format, tone });
+  const paragraphCount = countContentParagraphs(text);
+  const shortParagraphCount = countShortParagraphs(text);
+  const looksOverSegmentedSocial =
+    (format === 'โพสต์โซเชียล' || format === 'โพสต์ให้ความรู้ (Thread)') &&
+    paragraphCount >= 4 &&
+    shortParagraphCount >= 3;
+  const suspiciousBoldHeadline = /^\s*\*\*[^*]+\*\*\s*\n\s*\n/.test(String(text || ''));
+  const tooManyExclamations = (normalized.match(/!/g) || []).length >= 2;
+  const shouldBeCalmer = tone === 'ให้ข้อมูล/ปกติ' || tone === 'ทางการ/วิชาการ';
+
+  return (
+    hasArtificialPhrase ||
+    hasPublisherOveruse ||
+    hasSourceLedFlow ||
+    hasWeakOpening ||
+    looksOverSegmentedSocial ||
+    suspiciousBoldHeadline ||
+    (shouldBeCalmer && tooManyExclamations)
+  );
+};
+
+const polishThaiContent = (text = '', { format, allowEmoji = false } = {}) => {
+  const profile = buildFormatProfile(format);
+  let nextText = stripDisallowedThaiOutputScripts(cleanGeneratedContent(text, { allowEmoji }));
+
+  if (!profile.allowHeadings) {
+    nextText = normalizeDisallowedHeadings(nextText);
+  }
+
+  nextText = nextText
+    .replace(/!\?/g, '?')
+    .replace(/!!+/g, '!!');
+
+  return normalizeThaiSpacing(nextText);
+};
+
+const CONTENT_BRIEF_SCHEMA = z.object({
+  mainAngle: z.string().min(10).max(240),
+  audience: z.string().min(3).max(120),
+  voiceNotes: z.array(z.string()).min(2).max(5),
+  openerStrategy: z.string().min(4).max(160).optional(),
+  mustIncludeFacts: z.array(z.string()).min(2).max(6),
+  caveats: z.array(z.string()).min(1).max(4),
+  structure: z.array(z.string()).min(2).max(6),
+  titleIdea: z.string().min(4).max(140),
+  ctaMode: z.enum(['none', 'soft', 'direct']),
+});
+
+const CONTENT_INTENT_SCHEMA = z.object({
+  primaryTopic: z.string().min(1).max(200),
+  researchHint: z.string().min(1).max(200),
+  framingAngle: z.string().min(1).max(240),
+  rewrittenInstructions: z.string().min(1).max(500),
+  explicitCtaAllowed: z.boolean(),
+  forbidInteractiveDetours: z.boolean(),
+  thaiPriority: z.boolean(),
+});
+
+const CONTENT_REVIEW_SCHEMA = z.object({
+  passed: z.boolean(),
+  groundingPassed: z.boolean(),
+  thaiNaturalnessPassed: z.boolean(),
+  sourceDisciplinePassed: z.boolean(),
+  reason: z.string().optional(),
+});
+
+const SHORT_FORMAT_SET = new Set(['โพสต์โซเชียล', 'สคริปต์วิดีโอสั้น']);
+
+const fallbackNormalizeContentIntent = ({ input = '', customInstructions = '' }) => {
+  const baseInput = normalizeCacheText(input);
+  const baseInstructions = normalizeCacheText(customInstructions);
+  const combinedInstructions = `${baseInput} ${baseInstructions}`.trim();
+  const explicitCtaAllowed = /cta|call to action|ชวนคอมเมนต์|ชวนแชร์|ชวนรีโพสต์|ฝากกด|ฝากติดตาม/i.test(combinedInstructions);
+  const explicitInteractiveRequest = /(quiz|challenge|poll|game|กิจกรรม|เกม|โพล)/i.test(combinedInstructions);
+
+  return {
+    primaryTopic: baseInput || 'User topic',
+    researchHint: baseInput || 'User topic',
+    framingAngle: baseInstructions || 'Follow the user request without inventing extra framing',
+    rewrittenInstructions: baseInstructions || 'Preserve the user request as written',
+    explicitCtaAllowed,
+    forbidInteractiveDetours: !explicitInteractiveRequest,
+    thaiPriority: true,
+  };
+};
+
+const isSimpleContentIntent = ({ input = '', customInstructions = '', sourceContext = '' } = {}) => {
+  const normalizedInput = normalizeCacheText(input);
+  const normalizedInstructions = normalizeCacheText(customInstructions);
+  const normalizedSource = normalizeCacheText(sourceContext);
+  const combined = `${normalizedInput} ${normalizedInstructions} ${normalizedSource}`;
+  const hasUrl = /https?:\/\//i.test(combined);
+  const hasComplexOperators = /(compare|vs\.?|versus|angle|framework|strategy|เชื่อมโยง|โยงกับ|เล่าแบบ|โทน|สไตล์|เหมือน|เทียบกับ)/i.test(combined);
+  const hasInteractiveAsk = /(quiz|challenge|poll|game|กิจกรรม|เกม|โพล|ชวน)/i.test(normalizedInstructions);
+  const totalLength = combined.length;
+
+  return Boolean(normalizedInput) && totalLength <= 220 && !hasUrl && !hasComplexOperators && !hasInteractiveAsk;
+};
+
+const shouldSkipReviewPass = ({ format = '', tone = '', intentProfile = null, customInstructions = '', factSheet = '' } = {}) => {
+  const normalizedInstructions = normalizeCacheText(customInstructions);
+  const hasOpenQuestions = /\[OPEN QUESTIONS\]\n- /i.test(factSheet);
+  const hasReportedClaims = /\[REPORTED CLAIMS\]\n- /i.test(factSheet);
+  const isShortFormat = SHORT_FORMAT_SET.has(format);
+  const isNonViralTone = tone !== 'กระตือรือร้น/ไวรัล';
+  const hasLowRiskInstructions = normalizedInstructions.length <= 40;
+  const noInteractiveRisk = intentProfile?.forbidInteractiveDetours !== false;
+
+  return isShortFormat && isNonViralTone && hasLowRiskInstructions && noInteractiveRisk && !hasOpenQuestions && !hasReportedClaims;
+};
+
+export const normalizeContentIntent = async ({ input = '', customInstructions = '', sourceContext = '' } = {}) => {
+  const cacheKey = buildCacheKey('content-intent', {
+    input: normalizeCacheText(input),
+    customInstructions: normalizeCacheText(customInstructions),
+    sourceContext: normalizeCacheText(sourceContext).slice(0, 240),
+  });
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  if (isSimpleContentIntent({ input, customInstructions, sourceContext })) {
+    return setCachedValue(responseCache, cacheKey, fallbackNormalizeContentIntent({ input, customInstructions }), CONTENT_BRIEF_CACHE_TTL_MS);
+  }
+
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: `You normalize user intent for a Thai content-generation workflow.
+Return JSON only.
+Rules:
+- Identify the real topic and the intended framing angle.
+- Treat examples and casual wording as examples, not special triggers.
+- Requests like "เชื่อมโยงกับ..." mean framing/comparison angle only unless the user explicitly asks for a game, quiz, challenge, poll, or activity.
+- Default to Thai-first writing quality.
+- CTA is allowed only when explicitly requested.
+- Preserve user intent, but remove ambiguous instructions that could cause off-topic detours.`,
+      prompt: `[USER INPUT]\n${input || 'None'}\n\n[CUSTOM INSTRUCTIONS]\n${customInstructions || 'None'}\n\n[SOURCE CONTEXT]\n${sourceContext || 'None'}`,
+      schema: CONTENT_INTENT_SCHEMA,
+      temperature: 0,
+    });
+
+    return setCachedValue(responseCache, cacheKey, object, CONTENT_BRIEF_CACHE_TTL_MS);
+  } catch (error) {
+    console.warn('[GrokService] Intent normalization fallback:', error);
+    return setCachedValue(responseCache, cacheKey, fallbackNormalizeContentIntent({ input, customInstructions }), CONTENT_BRIEF_CACHE_TTL_MS);
+  }
+};
+
+const compressFactSheetForFormat = (factSheetText = '', format = '') => {
+  if (!SHORT_FORMAT_SET.has(format)) return factSheetText;
+  const verifiedMatch = factSheetText.match(/\[VERIFIED FACTS\]\n([\s\S]*?)(?:\n\n\[|$)/);
+  const reportedMatch = factSheetText.match(/\[REPORTED CLAIMS\]\n([\s\S]*?)(?:\n\n\[|$)/);
+  const openMatch = factSheetText.match(/\[OPEN QUESTIONS\]\n([\s\S]*?)(?:\n\n\[|$)/);
+  const verifiedFacts = verifiedMatch
+    ? verifiedMatch[1].split('\n').filter(l => l.startsWith('- ')).slice(0, 4).join('\n')
+    : '';
+  const reportedClaims = reportedMatch
+    ? reportedMatch[1].split('\n').filter(l => l.startsWith('- ')).slice(0, 2).join('\n')
+    : '';
+  // Keep top-2 open questions as a lite caution signal
+  const openQuestions = openMatch
+    ? openMatch[1].split('\n').filter(l => l.startsWith('- ')).slice(0, 2).join('\n')
+    : '';
+  const focusSummary = [
+    verifiedFacts ? `[VERIFIED FACTS]\n${verifiedFacts}` : '',
+    reportedClaims ? `[REPORTED CLAIMS]\n${reportedClaims}` : '',
+    openQuestions ? `[OPEN QUESTIONS]\n${openQuestions}` : '',
+  ].filter(Boolean).join('\n\n');
+
+  if (!focusSummary) return factSheetText;
+
+  return [
+    '[FOCUSED SNAPSHOT FOR SHORT FORMAT]',
+    focusSummary,
+    '[FULL FACT SHEET]',
+    factSheetText,
+  ].join('\n\n');
+};
+
+const buildContentBriefPrompt = ({ factSheet, length, tone, format, customInstructions = '', intentProfile = null }) => {
+  const profile = buildFormatProfile(format);
+  const toneGuide = TONE_GUIDES[tone] || tone;
+  const rawInstructions = normalizeCacheText(customInstructions) || 'None';
+
+  return `
+[TASK]
+Create a concise writing brief for the final Thai writer.
+
+[FORMAT]
+${format} (${profile.label})
+
+[LENGTH]
+${normalizeLength(length)}
+
+[TONE]
+${toneGuide}
+
+[FORMAT RULES]
+${profile.structure}
+${profile.goals}
+
+[RAW USER INSTRUCTIONS]
+${rawInstructions}
+
+[NORMALIZED INTENT]
+${intentProfile ? JSON.stringify(intentProfile, null, 2) : 'None'}
+
+[FACT SHEET]
+${factSheet}
+
+[OUTPUT REQUIREMENTS]
+- Return JSON only.
+- Treat the fact sheet as the source of truth.
+- Preserve the user's explicit request. Use normalized intent only as guidance when it resolves ambiguity.
+- Separate strong facts from softer claims and unresolved questions.
+- If the fact sheet contains uncertainty, preserve it in caveats instead of forcing certainty.
+- Do not invent games, quizzes, activities, hashtags, or CTA unless the user explicitly asks.
+- Choose a structure that fits the requested format instead of forcing a fixed house style.
+- Prefer natural Thai over dramatic packaging. Avoid fake hooks, fake punchlines, or lines that sound like generic social-copy filler.
+- If the content works best as one compact paragraph, choose that. Do not force multiple short paragraphs unless they genuinely improve readability.
+- For social and thread formats, synthesize the research into an original Thai angle instead of recapping what each source said.
+- Do not use publisher names, website names, or outlet attribution as the main narrative spine unless the publisher itself is the subject.
+- Include an openerStrategy that explains the most suitable opening move for this piece. It can be direct, analytical, conversational, tension-led, or fact-led, and it should stay plain if the material does not support a stronger hook.
+`.trim();
+};
+
+const buildContentBrief = async ({ factSheet, length, tone, format, customInstructions = '', intentProfile = null }) => {
+  const cacheKey = buildCacheKey('content-brief', {
+    factSheet,
+    length,
+    tone,
+    format,
+    customInstructions,
+    intentProfile,
+  });
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: 'Return a concise Thai content brief as JSON only. Stay grounded in the fact sheet.',
+      prompt: buildContentBriefPrompt({ factSheet, length, tone, format, customInstructions, intentProfile }),
+      schema: CONTENT_BRIEF_SCHEMA,
+    });
+
+    return setCachedValue(responseCache, cacheKey, object, CONTENT_BRIEF_CACHE_TTL_MS);
+  } catch (error) {
+    console.warn('[GrokService] Brief generation fallback:', error);
+    return setCachedValue(responseCache, cacheKey, {
+      mainAngle: 'สรุปประเด็นสำคัญจากข้อมูลที่มีอย่างชัดเจนและน่าเชื่อถือ',
+      audience: 'ผู้อ่านทั่วไปที่ต้องการความเข้าใจเร็ว',
+      voiceNotes: tone === 'กระตือรือร้น/ไวรัล'
+        ? ['กระชับ', 'น่าเชื่อถือ', 'มีพลังงาน', 'ดึงดูดตั้งแต่บรรทัดแรก']
+        : tone === 'เป็นกันเอง/เพื่อนเล่าให้ฟัง'
+          ? ['กระชับ', 'น่าเชื่อถือ', 'ใกล้ชิด', 'เป็นธรรมชาติ']
+          : ['กระชับ', 'น่าเชื่อถือ', 'ไม่โอเวอร์'],
+      mustIncludeFacts: ['ยึดตาม fact sheet', 'แยกข้อเท็จจริงออกจากความเห็น'],
+      caveats: ['ระบุข้อจำกัดของข้อมูลเมื่อยังไม่ชัดเจน'],
+      structure: ['เปิดด้วยประเด็นหลัก', 'ขยายบริบทสำคัญ', 'ปิดด้วยข้อสรุปที่พอดี'],
+      titleIdea: 'สรุปประเด็นสำคัญล่าสุด',
+      ctaMode: 'none',
+    }, CONTENT_BRIEF_CACHE_TTL_MS);
+  }
+};
+
+const callGrok = async ({
+  system,
+  prompt,
+  modelName = MODEL_NEWS_FAST,
+  providerOptions,
+  temperature = 0.7,
+  topP = 0.85,
+  frequencyPenalty = 0.35,
+  presencePenalty = 0.1,
+  maxTokens,
+  allowEmoji = false,
+}) => {
+  try {
+    const { text } = await generateText({
+      model: grok(modelName),
+      system,
+      prompt,
+      providerOptions,
+      temperature,
+      topP,
+      frequencyPenalty,
+      presencePenalty,
+      maxTokens,
+    });
+
+    return cleanGeneratedContent(text, { allowEmoji });
+  } catch (error) {
+    console.error(`[GrokService] Error calling ${modelName}:`, error);
+    if (error.status === 400) {
+      console.warn('[GrokService] Bad Request. Check parameters/reasoningEffort for model:', modelName);
+    }
+    throw error;
+  }
+};
+
+const deriveResearchQuery = async (input, context = '') => {
+  const baseInput = (input || '').replace(/\s+/g, ' ').trim().slice(0, 160) || 'latest news';
+  const combinedInput = context ? `${context}\n\n[USER INPUT]: ${baseInput}` : baseInput;
+
+  // 1. Heuristic-first bypass for simple/raw queries
+  const hasUrl = /https?:\/\//i.test(baseInput);
+  const wordCount = baseInput.split(/\s+/).length;
+
+  // If it's just a URL and WE HAVE NO CONTEXT, we are forced to use the URL/fallback
+  // But if we have CONTEXT, we should use the LLM to get the BEST keywords
+  if (!context && (hasUrl || (wordCount < 12 && baseInput.length < 100))) {
+    return baseInput.replace(/https?:\/\/\S+/g, '').trim() || baseInput;
+  }
+
+  const cacheKey = buildCacheKey('research-query', combinedInput);
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  console.log('[GrokService] Deriving research query for:', baseInput.slice(0, 50) + '...');
+
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system:
+        'สกัดหนึ่งหัวข้อค้นหาที่กระชับจากคำขอและบริบทพยายามรักษาชื่อสำคัญ, ผลิตภัณฑ์, บริษัท และหัวข้อหลักไว้ หากบริบทมีเนื้อหาเยอะ ให้เลือกจุดที่สำคัญที่สุดเพื่อใช้ค้นหาข่าวที่เกี่ยวข้อง ห้ามใช้ URL เป็นคำค้นหา ส่งผลลัพธ์เป็น JSON เท่านั้น',
+      prompt: combinedInput.slice(0, 1500),
+      schema: z.object({
+        searchQuery: z.string().min(1).max(160),
+      }),
+    });
+
+    const result = (object.searchQuery || baseInput).trim();
+    console.log('[GrokService] Derived research query:', result);
+    return setCachedValue(
+      responseCache,
+      cacheKey,
+      result,
+      QUERY_CACHE_TTL_MS,
+    );
+  } catch (error) {
+    console.warn('[GrokService] Falling back in deriveResearchQuery:', error.message);
+    return setCachedValue(responseCache, cacheKey, baseInput, QUERY_CACHE_TTL_MS);
+  }
+};
+
+
+
+// --- [NEWS FLOW FUNCTIONS] ---
+
+export const generateGrokSummary = async (fullStoryText) => {
+  const results = await generateGrokBatch([fullStoryText]);
+  return results[0] || fullStoryText;
+};
+
+const shortenInsightText = (value = '', _maxLength = 400) => {
+  const cleaned = normalizeCacheText(stripDisallowedThaiOutputScripts(cleanGeneratedContent(value)));
+  if (!cleaned) return '';
+  return cleaned; // Do not truncate, let the UI layout handle text length naturally to avoid lost information
+};
+
+const compactInsightEntities = (items = [], maxItems = 3, maxLength = 28) =>
+  dedupeByNormalizedText(items || [])
+    .map((item) => shortenInsightText(item, maxLength))
+    .filter(Boolean)
+    .slice(0, maxItems);
+
+const buildCompactArticleInsights = (rawInsights = {}) => {
+  const summary = shortenInsightText(rawInsights.summary, 120);
+  const whyItMattersCandidate = shortenInsightText(rawInsights.whyItMatters, 120);
+  const whyItMatters =
+    summary && textSimilarity(summary, whyItMattersCandidate) >= 0.72
+      ? ''
+      : whyItMattersCandidate;
+  const dedupeAgainst = [summary, whyItMatters].filter(Boolean);
+
+  const keyPoints = dedupeByNormalizedText(rawInsights.keyPoints || [])
+    .map((item) => shortenInsightText(item, 90))
+    .filter(Boolean)
+    .filter((item) =>
+      dedupeAgainst.every((existing) => textSimilarity(existing, item) < 0.72),
+    )
+    .slice(0, 2);
+
+  return {
+    summary,
+    whyItMatters,
+    keyPoints,
+    companies: compactInsightEntities(rawInsights.companies, 3, 26),
+    people: compactInsightEntities(rawInsights.people, 3, 26),
+    topics: compactInsightEntities(rawInsights.topics, 3, 24),
+  };
+};
+
+export const generateArticleInsights = async ({
+  title = '',
+  excerpt = '',
+  content = '',
+  siteName = '',
+} = {}) => {
+  const normalizedTitle = sanitizeForPrompt(title, 220);
+  const normalizedExcerpt = sanitizeForPrompt(excerpt, 320);
+  const normalizedContent = sanitizeForPrompt(content, 6000);
+  const normalizedSite = sanitizeForPrompt(siteName, 120);
+
+  if (!normalizedTitle && !normalizedContent) return null;
+
+  const cacheKey = buildCacheKey('article-insights-v2', {
+    normalizedTitle,
+    normalizedExcerpt,
+    normalizedContent: normalizedContent.slice(0, 2500),
+    normalizedSite,
+  });
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: `You create ultra-compact AI insight cards for a news reader UI. You are a versatile professional analyst distilling news articles and social posts.
+
+ Rules:
+ - Return Thai for insight text. Accuracy is paramount: NEVER distort facts, but BE CONCISE.
+ - Translate idioms and jargon into natural, context-aware Thai equivalents. Avoid literal word-for-word translations.
+ - summary: 1 very short sentence, the single most important fact. Max ~100 Thai chars.
+ - whyItMatters: 1 very short sentence explaining impact. Max ~100 Thai chars.
+ - keyPoints: 1-2 punchy bullets. Each bullet under 80 chars. 
+ - DO NOT include a trailing period (.) at the end of Thai sentences.
+ - Preserve proper names in Latin script only when they are central or have no direct Thai equivalent.
+ - No fluff, no filler phrases. คม ชัด พรึ่บ.`,
+      prompt: [
+        PROPER_NAME_PRESERVATION_RULES,
+        normalizedSite ? `Source: ${normalizedSite}` : '',
+        normalizedTitle ? `Title: ${normalizedTitle}` : '',
+        normalizedExcerpt ? `Excerpt: ${normalizedExcerpt}` : '',
+        normalizedContent ? `Article Body:\n${normalizedContent}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      schema: z.object({
+        summary: z.string().min(10).max(200),
+        whyItMatters: z.string().min(10).max(200),
+        keyPoints: z.array(z.string().max(160)).max(3),
+        companies: z.array(z.string()).max(5),
+        people: z.array(z.string()).max(5),
+        topics: z.array(z.string()).max(5),
+      }),
+      temperature: 0.1,
+    });
+
+    const normalizedInsights = buildCompactArticleInsights(object);
+
+    return setCachedValue(responseCache, cacheKey, normalizedInsights, CONTENT_BRIEF_CACHE_TTL_MS);
+  } catch (error) {
+    console.warn('[GrokService] Article insights failed:', error);
+    return null;
+  }
+};
+
+const TRANSLATION_BODY_SYSTEM = `You are a senior Thai newspaper editor translating foreign-language articles into publication-quality Thai for an in-app news reader.
+
+Translation philosophy — apply in order:
+1. Understand the full meaning and intent of each passage before writing Thai.
+2. Express that meaning as a skilled Thai journalist would write it natively — never map clause-by-clause from the source language.
+3. Adapt idioms, metaphors, and culturally-specific phrases into natural Thai equivalents. If no clean equivalent exists, rephrase to convey the underlying meaning clearly.
+4. Break long compound sentences into 2–3 shorter Thai sentences for readability and natural rhythm.
+
+Output rules:
+- Return markdown only. No preamble, no closing notes, no code fences, no explanations.
+- Translate every paragraph completely. Do not summarize, skip, or compress any content.
+- Preserve all numbers, currencies, percentages, dates, times, and units exactly as they appear.
+- Keep all quotes verbatim and preserve who said them.
+- Preserve markdown structure (headings, lists, bold, italic, links) from the source.
+- Do NOT add a trailing period (.) to Thai sentences.
+- Do NOT add new facts, interpretation, or editorial commentary.
+
+Common pitfalls — never do these:
+- Never write literal calque translations of English idioms (e.g., never "ผลไม้แขวนต่ำ" for "low-hanging fruit" — write "งานที่ทำได้ง่ายที่สุด" instead)
+- Do not rigidly copy English SVO sentence structure into Thai
+- Avoid overusing "และ"; vary naturally with รวมถึง, ทั้งนี้, นอกจากนี้, ในขณะที่, โดย, ซึ่ง, พร้อมกันนี้
+- Avoid robotic passive-voice constructions; prefer active Thai phrasing where natural
+- Never mix Japanese, Chinese, or Korean characters into Thai output
+
+Style example (match this quality level):
+English: "The CEO called it a 'no-brainer' that gives them a first-mover advantage in the emerging market, though analysts warned the deal still carries significant execution risk."
+Thai: "ซีอีโอระบุว่านี่คือการตัดสินใจที่ 'ชัดเจนในตัวเอง' และจะทำให้บริษัทได้เปรียบในฐานะผู้บุกเบิกตลาดที่กำลังเติบโต ทว่านักวิเคราะห์เตือนว่าดีลนี้ยังคงมีความเสี่ยงด้านการปฏิบัติที่มีนัยสำคัญ"
+Note: "no-brainer" → "ชัดเจนในตัวเอง" (not "ไม่ต้องใช้สมอง"), "first-mover advantage" → "ได้เปรียบในฐานะผู้บุกเบิก", one long English sentence split into two natural Thai sentences.`;
+
+const DOMAIN_STYLE_HINTS: Record<string, string> = {
+  tech: 'Tech-journalism Thai: keep English technical terms (API, SDK, AI, LLM, GPU, cloud) as-is; translate surrounding descriptions naturally.',
+  finance: 'Financial-journalism Thai: use formal register; preserve all figures, percentages, tickers, and financial instrument names exactly.',
+  politics: 'Formal news Thai: be precise with government titles, ministry names, and policy terms; use ภาษาข่าวทางการ.',
+  science: 'Accessible science Thai: translate concept descriptions naturally; keep scientific/Latin names in parentheses where helpful.',
+  health: 'Health-journalism Thai: keep medical terms with a brief Thai explanation in parentheses when the term is obscure to general readers.',
+  sports: 'Sports-journalism Thai: keep team names, player names, and league names in English; use lively, present-tense style.',
+  business: 'Business-journalism Thai: keep company names, product names, and KPIs as-is; formal but readable register.',
+  general: 'Standard news Thai with a neutral, accessible register suitable for a broad audience.',
+};
+
+const extractTranslationGlossary = async ({
+  title,
+  excerpt,
+  content,
+}: {
+  title: string;
+  excerpt: string;
+  content: string;
+}) => {
+  const sample = [
+    title ? `Title: ${title}` : '',
+    excerpt ? `Excerpt: ${excerpt}` : '',
+    content ? `Article opening:\n${content.slice(0, 1500)}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+
+  if (!sample.trim()) return null;
+
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: 'You analyze a news article and extract translation metadata for a Thai localization pipeline. Return JSON only.',
+      prompt: `${sample}\n\nExtract:\n1. The article domain\n2. Appropriate Thai register\n3. Up to 10 key terms that need consistent Thai translation — focus on idioms, jargon, metaphors, or domain-specific phrases commonly mistranslated literally. For each provide the correct Thai equivalent, or an empty string to keep the English term as-is.`,
+      schema: z.object({
+        domain: z.enum(['tech', 'finance', 'politics', 'science', 'health', 'sports', 'business', 'general']),
+        register: z.enum(['formal', 'neutral', 'conversational']),
+        terms: z.array(z.object({
+          en: z.string().describe('Original English term or phrase'),
+          th: z.string().describe('Correct Thai equivalent, or empty string to keep as English'),
+        })).max(10),
+      }),
+      temperature: 0.1,
+      topP: 0.5,
+      maxTokens: 500,
+    });
+    return object;
+  } catch {
+    return null;
+  }
+};
+
+export const translateArticleToThai = async ({
+  title = '',
+  excerpt = '',
+  contentMarkdown = '',
+  content = '',
+  siteName = '',
+} = {}) => {
+  const normalizedTitle = sanitizeForPrompt(title, 220);
+  const normalizedExcerpt = sanitizeForPrompt(excerpt, 320);
+  const normalizedMarkdown = sanitizeForPrompt(contentMarkdown, 12000);
+  const normalizedContent = sanitizeForPrompt(content, 12000);
+  const normalizedSite = sanitizeForPrompt(siteName, 120);
+  const sourceBody = normalizedMarkdown || normalizedContent;
+  if (!sourceBody) return null;
+
+  const translationChunks = splitArticleIntoTranslationChunks(sourceBody);
+
+  const cacheKey = buildCacheKey('article-translation-th-v7', {
+    normalizedTitle,
+    normalizedExcerpt,
+    normalizedSite,
+    sourceBody: sourceBody.slice(0, 6000),
+  });
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  // Pre-extract glossary and domain in parallel with title translation setup
+  const glossaryPromise = extractTranslationGlossary({
+    title: normalizedTitle,
+    excerpt: normalizedExcerpt,
+    content: sourceBody,
+  });
+
+  try {
+    const [glossary, { object: titleObject }] = await Promise.all([
+      glossaryPromise,
+      generateObject({
+        model: grok(MODEL_REASONING_FAST),
+      system: `You translate article headlines into natural, publication-quality Thai for an in-app news reader.
+
+Rules:
+- Translate the title only. Do not summarize, expand, or add context.
+- Keep names, organizations, product names, dates, numbers, and quoted terms exactly as they appear.
+- Write Thai that sounds like a real Thai newspaper headline — concise, punchy, and natural.
+- If a term has no clean Thai equivalent, keep the original term in parentheses after the Thai phrase.
+- Output only the Thai title in the JSON field.
+- Do NOT put a trailing period (.) at the end.`,
+      prompt: [
+        PROPER_NAME_PRESERVATION_RULES,
+        normalizedSite ? `Source: ${normalizedSite}` : '',
+        normalizedTitle ? `Original title: ${normalizedTitle}` : '',
+        normalizedExcerpt ? `Original excerpt: ${normalizedExcerpt}` : '',
+        'Translate the article title into natural Thai.',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      schema: z.object({
+        titleTh: z.string(),
+      }),
+      temperature: 0.1,
+      topP: 0.75,
+      maxTokens: 300,
+    }),
+  ]);
+
+    const domainHint = glossary?.domain ? (DOMAIN_STYLE_HINTS[glossary.domain] || '') : '';
+    const glossaryLines = (glossary?.terms || [])
+      .filter((t) => t.en && t.th !== undefined)
+      .map((t) => `- "${t.en}" → ${t.th || '(keep English as-is)'}`)
+      .join('\n');
+    const glossaryBlock = glossaryLines
+      ? `Translation glossary — use these consistently throughout:\n${glossaryLines}`
+      : '';
+
+    const translatedChunks = [];
+    for (let index = 0; index < translationChunks.length; index += 1) {
+      const chunk = translationChunks[index];
+      const prevTranslationTail = index > 0
+        ? translatedChunks[index - 1].slice(-300).trim()
+        : '';
+
+      const { text } = await generateText({
+        model: grok(MODEL_NEWS_FAST),
+        system: TRANSLATION_BODY_SYSTEM,
+        prompt: [
+          PROPER_NAME_PRESERVATION_RULES,
+          domainHint ? `Style guide for this article: ${domainHint}` : '',
+          glossaryBlock,
+          normalizedSite ? `Source: ${normalizedSite}` : '',
+          normalizedTitle ? `Article title: ${normalizedTitle}` : '',
+          prevTranslationTail
+            ? `Previous passage ending (for context continuity — do NOT retranslate this):\n"…${prevTranslationTail}"`
+            : '',
+          translationChunks.length > 1 ? `Passage ${index + 1} of ${translationChunks.length}` : '',
+          `Translate this article passage to Thai:\n\n${chunk}`,
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        temperature: 0.15,
+        topP: 0.75,
+        maxTokens: 4000,
+      });
+
+      translatedChunks.push(stripDisallowedThaiOutputScripts(text || ''));
+    }
+
+    const payload = {
+      titleTh: cleanupTranslatedArticleText(stripDisallowedThaiOutputScripts(titleObject.titleTh || '')),
+      markdown: cleanupTranslatedArticleText(translatedChunks.join('\n\n')),
+    };
+
+    return setCachedValue(responseCache, cacheKey, payload, CONTENT_BRIEF_CACHE_TTL_MS);
+  } catch (error) {
+    console.warn('[GrokService] Article translation failed:', error);
+    return null;
+  }
+};
+
+export const generateGrokBatch = async (stories) => {
+  if (!stories || stories.length === 0) return [];
+
+  // 1. Identify unique stories and map them to their original positions
+  const uniqueStories = [];
+  const storyToUniqueIndex = [];
+  const seenStories = new Map();
+
+  for (const story of stories) {
+    const normalized = normalizeCacheText(story);
+    const cacheKey = buildCacheKey('story-summary-v5', normalized);
+
+    if (seenStories.has(cacheKey)) {
+      storyToUniqueIndex.push(seenStories.get(cacheKey));
+    } else {
+      const index = uniqueStories.length;
+      seenStories.set(cacheKey, index);
+      uniqueStories.push({ text: story, key: cacheKey, index });
+      storyToUniqueIndex.push(index);
+    }
+  }
+
+  // 2. Check cache for unique stories
+  const results = new Array(uniqueStories.length);
+  const uncached = [];
+
+  uniqueStories.forEach((item) => {
+    const cached = getCachedValue(responseCache, item.key);
+    if (cached) {
+      results[item.index] = cached;
+    } else {
+      uncached.push(item);
+    }
+  });
+
+  if (uncached.length === 0) {
+    return storyToUniqueIndex.map(i => results[i]);
+  }
+
+  // 3. Process uncached in batch with STRICT mapping
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      _legacySystem: `คุณคือบรรณาธิการข่าวผู้เชี่ยวชาญ หน้าที่คือสรุปข่าวภาษาไทยสั้นๆ 1-2 ประโยคต่อเรื่อง
+กฎเหล็ก:
+- ห้ามระบุชื่อ X หรือ Twitter
+- ห้ามใส่ลิงก์
+- ห้ามมโนข้อมูลที่ไม่มีในต้นฉบับ
+- รักษาความแม่นยำ 100% และคงคำศัพท์เทคนิคภาษาอังกฤษไว้
+- คืนค่าผลลัพธ์เป็น JSON Object ที่ Map ระหว่าง "index" และ "summary" ให้ตรงตามลำดับต้นฉบับเป๊ะๆ`,
+      _legacyPrompt: `สรุปข่าวเหล่านี้เป็นภาษาไทย (Translate & Summarize):\n${JSON.stringify(
+        uncached.map(u => ({ index: u.index, original: u.text })),
+        null,
+        2
+      )}`,
+      system: `You are an expert Thai news content curator and analyst. Summarize each source item into concise, natural Thai in 1-2 sentences.
+
+ Hard rules:
+ - Do not mention X or Twitter.
+ - Do not include links.
+ - Do not invent any facts that are not present in the source text.
+ - Use **natural, modern Thai journalistic or conversational language**. Strictly DO NOT use archaic, overly poetic, or overly formal words (like 'แผ้วพาน', 'อุบัติขึ้น', 'ดั่งกล่าวนั้น').
+ - Translate idioms and jargon into natural, correct Thai equivalents. Avoid literal word-for-word translation. Create a smooth narrative flow rather than robotic segmented text (e.g., do NOT write "โดยมีการอัปเดตข้อมูลเมื่อ...", "รวมถึงความเป็นครั้งแรกของ...").
+ - **Strictly forbid mixing characters from other scripts like Japanese (読, 中, etc.) or Chinese into Thai text.**
+ - Preserve accuracy 100% and keep technical terms in English when appropriate.
+ - Write the summary in Thai, but preserve proper names in their original Latin spelling unless the source already provides an official Thai form.
+ - Do not transliterate or guess Thai names for people.
+ - Return JSON only and map each "index" to its matching "summary" in the exact original order.`,
+      prompt: `${PROPER_NAME_PRESERVATION_RULES}\n\nSource items:\n${JSON.stringify(
+        uncached.map(u => ({ index: u.index, original: u.text })),
+        null,
+        2
+      )}`,
+      schema: z.object({
+        mapped_summaries: z.array(z.object({
+          index: z.number(),
+          summary: z.string()
+        })).length(uncached.length)
+      }),
+      temperature: 0.1,
+    });
+
+    // 4. Update results and cache
+    object.mapped_summaries.forEach((item) => {
+      const cleanSum = cleanGeneratedContent(item.summary);
+      const polishedSummary = polishThaiContent(cleanSum, {
+        format: 'โพสต์โซเชียล',
+        allowEmoji: false,
+      });
+      results[item.index] = polishedSummary;
+      const key = uniqueStories[item.index].key;
+      setCachedValue(responseCache, key, polishedSummary, SUMMARY_CACHE_TTL_MS);
+    });
+
+    // Final mapping back to original input order
+    return storyToUniqueIndex.map(i => results[i] || stories[i]);
+  } catch (error) {
+    console.error('[GrokService] Batch summarization error (V3):', error);
+    return stories.map((s, i) => results[storyToUniqueIndex[i]] || s);
+  }
+};
+
+export const agentFilterFeed = async (tweetsData, userPrompt, options = {}) => {
+  if (!tweetsData?.length) return [];
+  const { preferCredibleSources = false, webContext = '' } = options;
+
+  const compressedInput = tweetsData.map((tweet) => ({
+    id: String(tweet.id),
+    text: tweet.text,
+    createdAt: tweet.created_at || tweet.createdAt || null,
+    username: tweet.author?.username || null,
+    authorName: tweet.author?.name || null,
+    authorBio: tweet.author?.description || tweet.author?.profile_bio?.description || null,
+    followers: tweet.author?.followers || tweet.author?.fastFollowersCount || 0,
+    isVerified: Boolean(tweet.author?.isVerified),
+    isBlueVerified: Boolean(tweet.author?.isBlueVerified),
+    isAutomated: Boolean(tweet.author?.isAutomated),
+    likeCount: tweet.like_count || tweet.likeCount || 0,
+    retweetCount: tweet.retweet_count || tweet.retweetCount || 0,
+    replyCount: tweet.reply_count || tweet.replyCount || 0,
+    quoteCount: tweet.quote_count || tweet.quoteCount || 0,
+    viewCount: tweet.view_count || tweet.viewCount || 0,
+  }));
+
+  try {
+    const safePrompt = sanitizeForPrompt(userPrompt, 300);
+    const safeWebCtx = webContext ? sanitizeForPrompt(webContext, 2000) : '';
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: `You are filtering a private watchlist feed for the user's intent: "${safePrompt}".
+${safeWebCtx ? `Use this WEB CONTEXT as a source of truth to prioritize tweets that discuss confirmed events or high-quality topics:\n${safeWebCtx}\n` : ''}
+Rules:
+- The job is INTENT MATCHING first, not virality ranking.
+- Select every post that genuinely matches what the user asked for, up to 12 posts.
+- If the user asks for mood/style-based content such as funny posts, memes, sarcasm, reactions, drama, helpful threads, bullish takes, or niche opinions, prioritize semantic fit over engagement.
+- REJECT posts that do not clearly match the user intent, even if they are viral or from large accounts.
+- Do not default to "important news" unless the prompt explicitly asks for that.
+- For recreational topics: prefer posts that are actually funny, entertaining, interesting, or stylistically relevant to the request.
+${preferCredibleSources ? '- Prioritize topic fit first, then strictly prefer credible/authority sources.' : ''}
+- Assign a 'temporalTag': "Breaking" (very new/urgent), "Trending" (currently popular), or "Related" (relevant but not especially fresh or viral).
+- **Reasoning Language:** เขียน 'reasoning' เป็นภาษาไทยเท่านั้น โดยสรุปสั้นๆ (1 ประโยค) ว่าทำไมโพสต์นี้ถึงสำคัญหรือตรงกับความต้องการ สื่อสารให้เข้าใจง่ายเหมือนเพื่อนเล่าให้ฟัง`,
+      prompt: JSON.stringify(compressedInput),
+      schema: z.object({
+        picks: z.array(z.object({
+          id: z.string(),
+          reasoning: z.string().describe('เหตุผลที่เลือกโพสต์นี้เป็นภาษาไทย'),
+          temporalTag: z.enum(['Breaking', 'Trending', 'Related']).describe('The temporal context of the post'),
+        })),
+      }),
+      temperature: 0,
+    });
+
+    const validIdSet = new Set(compressedInput.map((tweet) => String(tweet.id)));
+    const finalPicks = object.picks.filter((pick) => validIdSet.has(String(pick.id)));
+    return finalPicks.map((pick, i) => ({ ...pick, citation_id: `[F${i + 1}]` }));
+  } catch (error) {
+    if (error.status === 400) {
+      console.warn('[GrokService] 400 Bad Request in agentFilterFeed. Check parameters/model.');
+    }
+    console.error('[GrokService] Filter error:', error);
+    return [];
+  }
+};
+
+const normalizeForoFilterSections = (brief) => {
+  if (!brief) return [];
+
+  const structuredSections = Array.isArray(brief.sections)
+    ? brief.sections
+      .map((section) => ({
+        title: cleanGeneratedContent(section?.title || ''),
+        items: Array.isArray(section?.items)
+          ? section.items.map((item) => cleanGeneratedContent(item || '')).filter(Boolean)
+          : [],
+      }))
+      .filter((section) => section.title && section.items.length > 0)
+    : [];
+
+  if (structuredSections.length > 0) return structuredSections;
+
+  const safeSectionLabel = cleanGeneratedContent(brief.sectionLabel || 'ประเด็นสำคัญ');
+  const matchedSignals = Array.isArray(brief.matchedSignals)
+    ? brief.matchedSignals.map((item) => cleanGeneratedContent(item || '')).filter(Boolean)
+    : [];
+
+  return matchedSignals.length > 0
+    ? [{ title: safeSectionLabel, items: matchedSignals }]
+    : [];
+};
+
+const FORO_BRIEF_TONE_RULES = [
+  [/^ชุดโพสต์\s+/gi, ''],
+  [/^โพสต์\s+/gi, ''],
+  [/\btrending\b/gi, 'ที่ถูกพูดถึง'],
+  [/\btool\b/gi, 'เครื่องมือ'],
+  [/\bbusiness\b/gi, 'ธุรกิจ'],
+  [/\binsight\b/gi, 'มุมมอง'],
+  [/ใหม่ๆ/gi, 'รุ่นใหม่'],
+  [/กำลังมาแรง/gi, 'ถูกพูดถึงมากขึ้น'],
+  [/มาแรง/gi, 'ถูกพูดถึงมากขึ้น'],
+  [/ร้อนแรง/gi, 'ถูกพูดถึงมาก'],
+  [/กำลังร้อน/gi, 'ชัดขึ้น'],
+  [/เดือด/gi, 'เข้มข้น'],
+  [/เจ๋ง/gi, 'น่าจับตา'],
+  [/ครอบคลุมทุกมุม/gi, 'ให้ภาพรวม'],
+  [/แชร์ insight ล่าสุด/gi, 'อธิบายแนวโน้มล่าสุด'],
+];
+
+const FORMAL_FORO_OUTPUT_LABELS = {
+  overview: 'สรุปภาพรวม',
+  opinion: 'มุมมองต่อประเด็นนี้',
+  ranking: 'ลำดับความสำคัญ',
+  shortlist: 'รายการที่คัดเลือก',
+  themes: 'ประเด็นสำคัญ',
+  opportunities: 'โอกาสที่เห็น',
+  risks: 'ประเด็นที่ควรระวัง',
+  content_angles: 'มุมที่นำไปใช้ต่อได้',
+};
+
+const FORO_OUTPUT_PROFILES = {
+  overview: {
+    outputLabel: 'สรุปภาพรวม',
+    sectionTitles: ['ประเด็นสำคัญ', 'รายละเอียดสนับสนุน', 'นัยสำคัญ'],
+    sectionHint: 'Use this when the user wants an overall synthesis that helps them understand the full picture quickly',
+  },
+  themes: {
+    outputLabel: 'ประเด็นสำคัญ',
+    sectionTitles: ['ประเด็นสำคัญ', 'รายละเอียดสนับสนุน', 'นัยสำคัญ'],
+    sectionHint: 'Use this when the user wants the major themes or patterns across the set',
+  },
+  opinion: {
+    outputLabel: 'มุมมองต่อประเด็นนี้',
+    sectionTitles: ['ข้อสังเกตหลัก', 'เหตุผลประกอบ', 'นัยสำคัญ'],
+    sectionHint: 'Use this when the user asks for a view, interpretation, or take grounded in the selected items',
+  },
+  ranking: {
+    outputLabel: 'ลำดับความสำคัญ',
+    sectionTitles: ['ลำดับหลัก', 'เหตุผลประกอบ', 'รายการถัดไป'],
+    sectionHint: 'Use this when the user wants items arranged by importance, strength, or urgency',
+  },
+  shortlist: {
+    outputLabel: 'รายการที่คัดเลือก',
+    sectionTitles: ['รายการที่คัดเลือก', 'เหตุผลประกอบ', 'ข้อพิจารณาเพิ่มเติม'],
+    sectionHint: 'Use this when the user wants a small set of selected items with reasons',
+  },
+  opportunities: {
+    outputLabel: 'โอกาสที่เห็น',
+    sectionTitles: ['โอกาสหลัก', 'หลักฐานสนับสนุน', 'นัยสำคัญ'],
+    sectionHint: 'Use this when the user asks what opportunities, openings, or upside can be taken from the feed',
+  },
+  risks: {
+    outputLabel: 'ประเด็นที่ควรระวัง',
+    sectionTitles: ['ประเด็นที่ควรระวัง', 'สัญญาณสนับสนุน', 'ผลกระทบที่ควรจับตา'],
+    sectionHint: 'Use this when the user asks about risk, downside, uncertainty, or caution points',
+  },
+  content_angles: {
+    outputLabel: 'มุมที่นำไปใช้ต่อได้',
+    sectionTitles: ['มุมที่นำไปใช้ต่อได้', 'เหตุผลที่น่าสนใจ', 'ประเด็นต่อยอด'],
+    sectionHint: 'Use this when the user asks for hooks, angles, or directions they can use for follow-up work',
+  },
+  contradictions: {
+    outputLabel: 'จุดที่ขัดกัน',
+    sectionTitles: ['จุดที่ขัดกัน', 'รายละเอียดสนับสนุน', 'สิ่งที่ควรติดตาม'],
+    sectionHint: 'Use this when the user asks what signals conflict, diverge, or do not line up cleanly',
+  },
+};
+
+const polishForoBriefTone = (value = '') =>
+  FORO_BRIEF_TONE_RULES.reduce(
+    (text, [pattern, replacement]) => text.replace(pattern, replacement),
+    cleanGeneratedContent(value),
+  )
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+const stripForoBriefCitations = (value = '') =>
+  polishForoBriefTone(value).replace(/\[(?:F|W)\d+\]/gi, '').replace(/\s{2,}/g, ' ').trim();
+
+const FORO_BRIEF_CITATION_PATTERN = /\[(?:F|W)\d+\]/gi;
+
+const extractForoBriefCitations = (value = '') =>
+  Array.from(new Set(String(value || '').match(FORO_BRIEF_CITATION_PATTERN) || []));
+
+const normalizeForoBriefItemKey = (value = '') =>
+  stripForoBriefCitations(value)
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+const mergeForoBriefItems = (items = []) => {
+  const merged = [];
+
+  (Array.isArray(items) ? items : []).forEach((rawItem) => {
+    const polished = polishForoBriefTone(rawItem || '');
+    const text = stripForoBriefCitations(polished);
+    const citations = extractForoBriefCitations(polished);
+    const key = normalizeForoBriefItemKey(polished);
+
+    if (!text || !key) return;
+
+    const existing = merged.find((entry) =>
+      entry.key === key ||
+      (entry.key.includes(key) && key.length >= Math.floor(entry.key.length * 0.72)) ||
+      (key.includes(entry.key) && entry.key.length >= Math.floor(key.length * 0.72)));
+
+    if (existing) {
+      if (text.length > existing.text.length) existing.text = text;
+      existing.citations = Array.from(new Set([...existing.citations, ...citations]));
+      return;
+    }
+
+    merged.push({ key, text, citations });
+  });
+
+  return merged.map((entry) => `${entry.text}${entry.citations.length ? ` ${entry.citations.join('')}` : ''}`.trim());
+};
+
+const getForoOutputProfile = (outputMode = '') => {
+  const normalizedMode = cleanGeneratedContent(outputMode).toLowerCase();
+  return FORO_OUTPUT_PROFILES[normalizedMode] || FORO_OUTPUT_PROFILES.overview;
+};
+
+const normalizeForoSectionTitle = (outputMode = '', index, total) => {
+  const profile = getForoOutputProfile(outputMode);
+  if (total <= 1) return profile.sectionTitles[0] || 'ประเด็นสำคัญ';
+  if (total === 2) {
+    return profile.sectionTitles[index] || profile.sectionTitles[Math.min(index, profile.sectionTitles.length - 1)] || 'รายละเอียดสนับสนุน';
+  }
+  return profile.sectionTitles[index] || profile.sectionTitles[profile.sectionTitles.length - 1] || 'รายละเอียดสนับสนุน';
+};
+
+const normalizeForoOutputLabel = (outputMode = '', fallbackLabel = '') => {
+  const normalizedMode = cleanGeneratedContent(outputMode).toLowerCase();
+  if (FORMAL_FORO_OUTPUT_LABELS[normalizedMode]) return FORMAL_FORO_OUTPUT_LABELS[normalizedMode];
+  if (getForoOutputProfile(outputMode)?.outputLabel) return getForoOutputProfile(outputMode).outputLabel;
+  return stripForoBriefCitations(fallbackLabel || '') || 'สรุปภาพรวม';
+};
+
+const inferForoOutputMode = (query = '') => {
+  const normalizedQuery = sanitizeForPrompt(query, 260).toLowerCase();
+
+  const matchers = [
+    { mode: 'ranking', patterns: [/จัดอันดับ/, /\btop\b/, /\brank/, /ลำดับ/, /priority/] },
+    { mode: 'shortlist', patterns: [/shortlist/, /คัดเลือก/, /คัดมา/, /เลือกชุด/, /รายการที่เลือก/] },
+    { mode: 'opinion', patterns: [/ความเห็น/, /ความคิดเห็น/, /มุมมอง/, /ตีความ/, /คิดเห็นอย่างไร/, /\bopinion\b/, /\bview\b/] },
+    { mode: 'opportunities', patterns: [/โอกาส/, /\bopportunit/, /upside/, /ช่องว่าง/] },
+    { mode: 'risks', patterns: [/ความเสี่ยง/, /เสี่ยง/, /ข้อควรระวัง/, /\brisk\b/, /downside/] },
+    { mode: 'content_angles', patterns: [/คอนเทนต์/, /วิดีโอ/, /angle/, /hook/, /ต่อยอด/, /ไอเดียวิดีโอ/, /ไอเดียคอนเทนต์/] },
+    { mode: 'contradictions', patterns: [/ขัดกัน/, /ไม่ตรงกัน/, /สวนทาง/, /contradict/, /conflict/] },
+    { mode: 'themes', patterns: [/ธีม/, /pattern/, /แพตเทิร์น/, /สัญญาณ/, /ประเด็นหลัก/] },
+    { mode: 'overview', patterns: [/สรุป/, /ภาพรวม/, /overview/, /digest/] },
+  ];
+
+  const matched = matchers.find(({ patterns }) => patterns.some((pattern) => pattern.test(normalizedQuery)));
+  return matched?.mode || 'overview';
+};
+
+export const buildForoFilterBriefMarkdown = (brief) => {
+  if (!brief) return '';
+
+  const safeHeadline = stripForoBriefCitations(brief.headline || '');
+  const safeWhyNow = stripForoBriefCitations(brief.whyNow || '');
+  const sections = normalizeForoFilterSections(brief).map((section) => ({
+    ...section,
+    items: mergeForoBriefItems(section.items || []),
+  }));
+
+  return [
+    safeHeadline,
+    safeWhyNow,
+    ...sections.map((section) => [
+      section.title,
+      ...section.items.map((item) => `- ${item}`),
+    ].join('\n')),
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+    .trim();
+};
+
+export const generateForoFilterBrief = async (validTweets, userQuery, options = {}) => {
+  if (!validTweets?.length) return null;
+
+  const safeQuery = sanitizeForPrompt(userQuery, 260);
+  const focusMode = sanitizeForPrompt(String(options.focusMode || ''), 80);
+  const preferredOutputMode = inferForoOutputMode(focusMode || safeQuery);
+  const preferredProfile = getForoOutputProfile(preferredOutputMode);
+  const candidates = validTweets;
+
+  const perTweetCharLimit = candidates.length > 36 ? 110 : candidates.length > 20 ? 140 : 220;
+
+  const cacheKey = buildCacheKey('foro-filter-brief-v8', {
+    safeQuery,
+    focusMode,
+    preferredOutputMode,
+    candidateCount: candidates.length,
+    tweets: candidates.map((tweet) => ({
+      id: tweet.id,
+      citation: tweet.citation_id,
+      text: normalizeCacheText(tweet.text || tweet.summary || '').slice(0, perTweetCharLimit),
+      reasoning: normalizeCacheText(tweet.ai_reasoning || ''),
+      temporalTag: tweet.temporalTag || '',
+    })),
+  });
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  const compressedInput = candidates
+    .map((tweet) => {
+      const summarySource = sanitizeForPrompt(tweet.summary || tweet.text || '', perTweetCharLimit);
+      const reasoningSource = sanitizeForPrompt(tweet.ai_reasoning || '', 120);
+      return [
+        `${tweet.citation_id || '[F?]'} | ${tweet.temporalTag || 'Related'}`,
+        `Content: ${summarySource}`,
+        reasoningSource ? `Signal: ${reasoningSource}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n');
+    })
+    .join('\n---\n');
+
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: `You create a compact "FORO Filter" result brief for a feed UI.
+
+Rules:
+- Return Thai only.
+- Be exact and grounded only in the provided picks.
+- Treat the full provided set as the working set. Synthesize across all selected posts, not just the first few.
+- Before writing, identify the main clusters or strands in the set and make sure the brief reflects that spread.
+- Infer the best output mode from the user query. Examples include overview, opinion, ranking, shortlist, opportunities, risks, themes, contradictions, content angles, or another concise analysis mode if it fits better.
+- Preferred output mode for this request: ${preferredOutputMode}
+- Preferred output label: ${preferredProfile.outputLabel}
+- Preferred section titles: ${preferredProfile.sectionTitles.join(' | ')}
+- Preferred mode guidance: ${preferredProfile.sectionHint}
+- This is not a generic news-summary widget. FORO Filter is an AI card-management layer that helps the user understand why these cards were selected for their instruction.
+- Write like a sharp human teammate explaining what this filter command surfaced and why the chosen cards are useful.
+- The result should feel like a compact selection note: one clear lead, then 1-2 tight groups that explain the strongest reasons or patterns behind the selected cards.
+- headline: 1 short sentence that tells the user what kind of cards this command surfaced. It should match the instruction intent such as summary, standout posts, content ideas, funny posts, contradictions, or other useful slices.
+- whyNow: 1-2 short lines in plain Thai that explain why this selection is useful or how the user should read the chosen cards.
+- headline and whyNow must never include citations like [F1].
+- If the selected posts are heterogeneous, keep headline and whyNow at umbrella level. Do not let one company, product, or post dominate the lead unless it clearly represents most of the set.
+- Do not mention the names or handles of the people who posted these items unless that person is genuinely the subject of the news itself. Prefer describing the topic, shift, product, or implication directly.
+- sections: 2-3 sections. Each section needs a short Thai title and 2-4 bullets. Use formal section titles that work across industries and general audiences. Good examples are "ประเด็นสำคัญ", "รายละเอียดสนับสนุน", and "นัยสำคัญ". Across all sections together, cover the full set as much as possible.
+- Every bullet must explain an important theme, pattern, standout item, or takeaway from the selected posts in plain Thai and end with one or more citations like [F1] or [F2][F4].
+- Every bullet must be understandable on its own even if the reader only skims that one line. Start with the topic, product, company, policy, or issue first, then explain what changed or why it matters.
+- Avoid vague floating bullets that begin with verbs or fragments such as "แก้ปัญหา...", "ขยาย...", "เปิดตัว...", "ทดสอบ..." unless the subject is already named at the start of that same bullet.
+- Total bullets across all sections should usually be 4-7 unless the filtered set is extremely small.
+- When the set is larger than 8 posts, the brief should usually cite at least 4 different posts across the full output and should cover more than one topic cluster when multiple clusters exist.
+- Avoid repeating the same company, product, or event in most bullets unless the evidence truly shows that it dominates the selected set.
+- outputMode: one short lowercase English token for the inferred mode, such as "overview", "opinion", "ranking", "shortlist", "themes", "opportunities", "risks", "content_angles", or another close fit
+- outputLabel: a short Thai label for this result mode, such as "สรุปภาพรวม", "มุมมองจากประเด็นนี้", "โพสต์เด่น", or "shortlist ตามโจทย์"
+- Do not use markdown in field values.
+- Do not add periods at the end of Thai sentences.
+- Keep proper names in Latin script when needed.
+- Do not write labels like "Why It Matters", "Decision Note", "Key Takeaways", or anything that sounds like a formal report inside the field values.
+- Avoid system-y phrasing such as "ชุดโพสต์", "โพสต์ชุดนี้", "ชุดข้อมูล", or other wording that would sound odd if someone copied the result into chat or email.
+- Avoid consultant, analyst, or AI-assistant tone. Prefer natural Thai that a person would actually forward to friends or teammates.
+- Avoid hype, fanboy, celebrity-first, or clickbait wording such as "สุดล้ำ", "ร้อนแรง", "ตัวท็อป", "ยอดฝีมือ", "บิ๊กเนม", "ดราม่าเดือด", or similar language unless the source itself truly centers on that exact point.
+- Prefer calm, concrete phrasing that explains what changed, why it matters, and what to pay attention to next.
+- For overview-style prompts, focus on the themes and signals first, not on celebrity names.
+- Bullets should read like someone explaining the feed clearly to a colleague, not like ad copy, fan commentary, or social hype.
+- Avoid source-attribution phrasing such as "X แชร์", "Y พูด", "Z ชี้" when the name is only the poster, not the subject.
+- Do not mention how many posts were filtered, selected, or summarized.
+- Do not use filler labels or meta phrases that talk about the system itself.
+${focusMode ? `- Treat this as the preferred analysis mode: ${focusMode}` : ''}`,
+      prompt: `User filter query: ${safeQuery}\n\nSelected posts:\n${compressedInput}`,
+      schema: z.object({
+        headline: z.string().min(10).max(180),
+        whyNow: z.string().min(10).max(220),
+        sections: z.array(
+          z.object({
+            title: z.string().min(4).max(40),
+            items: z.array(z.string().min(10).max(260)).min(2).max(4),
+          }),
+        ).min(1).max(2),
+        outputMode: z.string().min(3).max(40),
+        outputLabel: z.string().min(4).max(80),
+      }),
+      temperature: 0.05,
+    });
+
+    const outputMode = cleanGeneratedContent(object.outputMode || preferredOutputMode);
+    const outputLabel = normalizeForoOutputLabel(outputMode, object.outputLabel);
+    const sections = [{
+      title: outputLabel,
+      items: mergeForoBriefItems((object.sections || []).flatMap((section) => section.items || [])),
+    }]
+      .map((section, index, allSections) => ({
+        title: normalizeForoSectionTitle(outputMode, index, allSections.length),
+        items: (section.items || []).map((item) => polishForoBriefTone(item)).filter(Boolean),
+      }))
+      .filter((section) => section.title && section.items.length > 0);
+
+    const payload = {
+      headline: polishForoBriefTone(object.headline),
+      whyNow: polishForoBriefTone(object.whyNow),
+      sections,
+      matchedSignals: sections.flatMap((section) => section.items),
+      outputMode,
+      outputLabel,
+      sectionLabel: sections[0]?.title || 'ประเด็นสำคัญ',
+    };
+
+    return setCachedValue(responseCache, cacheKey, payload, EXECUTIVE_SUMMARY_CACHE_TTL_MS);
+  } catch (error) {
+    console.warn('[GrokService] FORO filter brief failed:', error);
+    return null;
+  }
+};
+
+const URL_PATTERN = /https?:\/\/[^\s)\]]+/gi;
+
+const extractUrlsFromText = (text = '') =>
+  Array.from(
+    new Set(
+      String(text || '')
+        .match(URL_PATTERN)
+        ?.map((url) => url.replace(/[),.;!?]+$/g, '').trim())
+        .filter(Boolean) || [],
+    ),
+  );
+
+const isSocialPlatformUrl = (url = '') => {
+  try {
+    const hostname = new URL(url).hostname.replace(/^www\./, '').toLowerCase();
+    return ['x.com', 'twitter.com', 't.co'].includes(hostname);
+  } catch {
+    return false;
+  }
+};
+
+const isXPostUrl = (url = '') => {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    return ['x.com', 'twitter.com'].includes(hostname) && /\/status(?:es)?\/\d+/i.test(parsed.pathname);
+  } catch {
+    return false;
+  }
+};
+
+const isXAssetUrl = (url = '') => {
+  try {
+    const parsed = new URL(url);
+    const hostname = parsed.hostname.replace(/^www\./, '').toLowerCase();
+    const pathname = parsed.pathname.toLowerCase();
+
+    if (hostname === 'pbs.twimg.com' || hostname.endsWith('.pbs.twimg.com')) {
+      return true;
+    }
+
+    if (!['x.com', 'twitter.com'].includes(hostname)) {
+      return false;
+    }
+
+    return pathname.startsWith('/profile_images/')
+      || pathname.startsWith('/profile_banners/')
+      || pathname.startsWith('/media/')
+      || pathname.startsWith('/amplify_video_thumb/')
+      || pathname.startsWith('/ext_tw_video_thumb/')
+      || pathname.startsWith('/tweet_video_thumb/');
+  } catch {
+    return false;
+  }
+};
+
+const isUsableCitationUrl = (url = '') => {
+  if (!url) return false;
+  return !isSocialPlatformUrl(url) && !isXAssetUrl(url);
+};
+
+const isCitableSourceUrl = (url = '') => {
+  if (!url) return false;
+  return isXPostUrl(url) || isUsableCitationUrl(url);
+};
+
+const extractExternalSourceUrls = (...chunks) =>
+  Array.from(
+    new Set(
+      chunks
+        .flatMap((chunk) => extractUrlsFromText(chunk))
+        .filter((url) => isUsableCitationUrl(url)),
+    ),
+  ).slice(0, 2);
+
+const URL_LIKE_KEY_PATTERN = /(url|urls|expanded|expanded_url|expandedurl|unwound|unwound_url|link|links|card|canonical)/i;
+
+const extractUrlsFromObject = (value, depth = 0, seen = new Set()) => {
+  if (!value || depth > 4) return [];
+  if (typeof value === 'string') return extractUrlsFromText(value);
+  if (typeof value !== 'object') return [];
+  if (seen.has(value)) return [];
+
+  seen.add(value);
+
+  const collected = [];
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collected.push(...extractUrlsFromObject(item, depth + 1, seen));
+    }
+    return collected;
+  }
+
+  for (const [key, nestedValue] of Object.entries(value)) {
+    if (typeof nestedValue === 'string') {
+      if (URL_LIKE_KEY_PATTERN.test(key) || /^https?:\/\//i.test(nestedValue) || /\b(?:t\.co|x\.com|twitter\.com)\//i.test(nestedValue)) {
+        collected.push(...extractUrlsFromText(nestedValue));
+      }
+      continue;
+    }
+
+    if (nestedValue && typeof nestedValue === 'object') {
+      collected.push(...extractUrlsFromObject(nestedValue, depth + 1, seen));
+    }
+  }
+
+  return collected;
+};
+
+const mergeExternalSourceUrls = (...collections) =>
+  Array.from(
+    new Set(
+      collections
+        .flat()
+        .filter(Boolean)
+        .flatMap((item) => (Array.isArray(item) ? item : [item]))
+        .filter((url) => isUsableCitationUrl(url)),
+    ),
+  ).slice(0, 3);
+
+const _buildTavilyContextBlock = (label, data) => {
+  if (!data || (!data.answer && !data.results?.length)) return '';
+
+  const results = Array.isArray(data.results) ? data.results : [];
+  return [
+    data.answer ? `[${label} ANSWER]\n${data.answer}` : '',
+    results.length
+      ? `[${label} SOURCES]\n${results
+        .map((result, index) => {
+          const snippet = (result.content || result.raw_content || '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, 320);
+          return `${index + 1}. ${result.title || result.url} - ${snippet} (${result.url})`;
+        })
+        .join('\n')}`
+      : '',
+  ]
+    .filter(Boolean)
+    .join('\n\n');
+};
+
+export const generateExecutiveSummary = async (
+  validTweets,
+  userQuery,
+  onStreamChunk,
+  webContext = '',
+  options = {},
+) => {
+  if (!validTweets?.length) return null;
+  const preferXSummary = Boolean(options.preferXSummary);
+  const allowWebLead = Boolean(options.allowWebLead);
+  const focusMode = String(options.focusMode || '').trim().toLowerCase();
+  const summaryMode = String(options.summaryMode || 'balanced').trim().toLowerCase();
+
+  const toNum = (value) => {
+    const normalized = String(value ?? '0').replace(/,/g, '').trim();
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  };
+
+  const getSummaryPriorityScore = (tweet = {}) => {
+    const likes = toNum(tweet.like_count || tweet.likeCount);
+    const retweets = toNum(tweet.retweet_count || tweet.retweetCount);
+    const replies = toNum(tweet.reply_count || tweet.replyCount);
+    const quotes = toNum(tweet.quote_count || tweet.quoteCount);
+    const views = toNum(tweet.view_count || tweet.viewCount);
+    const engagement = likes + retweets + replies + quotes;
+    const followers = toNum(tweet.author?.followers || tweet.author?.fastFollowersCount);
+    const searchScore = toNum(tweet.search_score);
+    const momentumScore = toNum(tweet.broad_viral_momentum_score);
+    const semanticScore = toNum(tweet.broad_semantic_score);
+    const authorityScore = toNum(tweet.broad_global_authority_score);
+    const verifiedBoost = tweet.author?.isVerified ? 1.25 : tweet.author?.isBlueVerified ? 0.45 : 0;
+    const rssBoost =
+      summaryMode === 'rss_first'
+        ? String(tweet.sourceType || '').toLowerCase() === 'rss'
+          ? 8.5
+          : 0.6
+        : 0;
+
+    return (
+      searchScore * 3.2 +
+      momentumScore * 2.2 +
+      semanticScore * 1.8 +
+      authorityScore * 1.2 +
+      Math.log10(engagement + 1) * 2.4 +
+      Math.log10(views + 1) * 0.8 +
+      Math.log10(followers + 1) * 0.55 +
+      verifiedBoost +
+      rssBoost
+    );
+  };
+
+  const rankedSummaryCandidates = dedupeByNormalizedText(
+    [...validTweets].sort((left, right) => getSummaryPriorityScore(right) - getSummaryPriorityScore(left)),
+    (tweet) => tweet?.text,
+  );
+
+  const tweetsForSummary = [];
+  const authorUsage = new Map();
+
+  for (const tweet of rankedSummaryCandidates) {
+    const username = String(tweet?.author?.username || '').toLowerCase();
+    const authorCount = username ? (authorUsage.get(username) || 0) : 0;
+    const isTooSimilar = tweetsForSummary.some((existing) => textSimilarity(existing?.text, tweet?.text) >= 0.72);
+
+    // Keep the very top signals, then diversify so the summary covers multiple
+    // major storylines instead of ten versions of the same angle.
+    if (tweetsForSummary.length >= 3 && (authorCount >= 2 || isTooSimilar)) {
+      continue;
+    }
+
+    tweetsForSummary.push(tweet);
+    if (username) authorUsage.set(username, authorCount + 1);
+    if (tweetsForSummary.length >= 10) break;
+  }
+
+  if (tweetsForSummary.length < Math.min(6, rankedSummaryCandidates.length)) {
+    for (const tweet of rankedSummaryCandidates) {
+      if (tweetsForSummary.some((existing) => String(existing.id) === String(tweet.id))) continue;
+      tweetsForSummary.push(tweet);
+      if (tweetsForSummary.length >= 10) break;
+    }
+  }
+
+  if (!tweetsForSummary.length) return null;
+
+  const cacheKey = buildCacheKey('executive-summary-v2', {
+    userQuery,
+    webContext,
+    preferXSummary,
+    allowWebLead,
+    focusMode,
+    summaryMode,
+    tweets: tweetsForSummary.map((tweet) => ({
+      id: tweet.id,
+      text: normalizeCacheText(tweet.text),
+      createdAt: tweet.created_at || tweet.createdAt || null,
+    })),
+  });
+  const cached = getCachedValue(responseCache, cacheKey);
+
+  if (cached) {
+    if (onStreamChunk) {
+      onStreamChunk(cached, cached);
+    }
+    return cached;
+  }
+
+  const safeQuery = sanitizeForPrompt(userQuery, 300);
+  const safeWebCtx =
+    webContext && !preferXSummary ? sanitizeForPrompt(webContext, 2000) : '';
+
+  const contentToAnalyze = tweetsForSummary
+    .map((tweet) => {
+      const authorLabel =
+        String(tweet.sourceType || '').toLowerCase() === 'rss'
+          ? tweet.author?.name || tweet.author?.username || 'rss-source'
+          : tweet.author?.username
+            ? `@${tweet.author.username}`
+            : tweet.author?.name || 'unknown';
+      const titlePrefix =
+        String(tweet.sourceType || '').toLowerCase() === 'rss' && tweet.title
+          ? `${sanitizeForPrompt(tweet.title, 160)} :: `
+          : '';
+      return `${tweet.citation_id || '[F?]'} (${authorLabel}) ${titlePrefix}${sanitizeForPrompt(tweet.text, 400)}`;
+    })
+    .join('\n---\n');
+
+  const summarySystem = `You are a zero-hallucination news summarizer.
+Write the output in Thai.
+Summarize the key developments for the topic "${safeQuery}" using combined signals from X posts and web context when available.
+${safeWebCtx ? `Use the web context below only to verify, clarify, or add confirmed developments that are not obvious from X evidence:
+${safeWebCtx}
+` : ""}
+${focusMode ? `Preferred user focus for this summary: ${focusMode}. When there are multiple valid storylines, prioritize the ones that best match this focus without inventing anything.` : ''}
+${summaryMode === 'rss_first' ? 'When RSS/news-source items and X posts both appear, treat RSS items as the primary factual spine for confirmed developments, while using X posts to capture reaction, momentum, and angles that matter.' : ''}
+
+Hard rules:
+- Do not invent people, companies, products, events, or numbers.
+- Treat X evidence and web context as the only allowed sources.
+- ${preferXSummary ? 'Prioritize X post evidence first. Build the summary from [F#] citations as the default. Web context is optional and should not lead the summary.' : 'Use X evidence as the primary signal unless the web context adds a crucial confirmed development.'}
+- Do not use wording like "????????", "???????????", or any phrase that implies the summary comes from X alone.
+- Every important claim must end with a citation such as [F1], [F2], [W1], or combined citations like [F2][W1].
+- If a claim cannot be traced to one of the provided sources, do not include it.
+- Prioritize the biggest developments first: strongest impact, strongest authority, strongest corroboration, or strongest momentum.
+- Ignore minor side-notes or weakly relevant mentions even if they contain the query keyword.
+- Format strictly:
+Opening sentence on its own line.
+- bullet 1
+- bullet 2
+- bullet 3
+You may expand to 5 bullets only if there are clearly more than 3 major storylines.
+- Each bullet must describe a distinct major development, not minor examples of the same development.
+- Tone: compact, factual, serious, no fluff.
+- If X and web context conflict, prioritize what is actually supported and make uncertainty clear.
+- Use markdown bold only for the most important terms relevant to the query.
+- End with a confidence tag on the final line in this exact format:
+[CONFIDENCE_SCORE: 85%]`;
+  const enhancedSummarySystem = `${summarySystem}
+
+Additional citation rules:
+- Use [F1], [F2] for X posts.
+- Use [W1], [W2] for website sources provided in Web Context.
+- If a claim is supported by both X and web, cite both, for example [F2][W1].
+- You may expand to 5 bullets if there are clearly more than 3 important storylines.
+- ${allowWebLead ? 'If the web source contains a crucial confirmed development not obvious from the tweets, you may include it as one bullet with [W#] citation.' : 'Do not let [W#] citations dominate the summary. If you use web context at all, keep it secondary and tie it back to [F#] when possible.'}`;
+  const finalSummarySystem = `${enhancedSummarySystem}
+
+${PROPER_NAME_PRESERVATION_RULES}`;
+
+  if (onStreamChunk) {
+    try {
+      const { textStream } = await streamText({
+        model: grok(MODEL_REASONING_FAST),
+        system: finalSummarySystem,
+        prompt: contentToAnalyze,
+        maxTokens: 600,
+      });
+
+      let fullText = '';
+      for await (const textPart of textStream) {
+        fullText += textPart;
+        onStreamChunk(textPart, normalizeExecutiveSummaryOutput(fullText));
+      }
+      return setCachedValue(
+        responseCache,
+        cacheKey,
+        normalizeExecutiveSummaryOutput(fullText),
+        EXECUTIVE_SUMMARY_CACHE_TTL_MS,
+      );
+    } catch (error) {
+      console.error('[GrokService] Stream summary error:', error);
+      // Fallback to normal if stream fails
+    }
+  }
+
+  return setCachedValue(responseCache, cacheKey, normalizeExecutiveSummaryOutput(await callGrok({
+    modelName: MODEL_NEWS_FAST,
+    system: finalSummarySystem,
+    prompt: contentToAnalyze,
+  })), EXECUTIVE_SUMMARY_CACHE_TTL_MS);
+};
+
+export const expandSearchQuery = async (originalQuery, isLatest = false) => {
+  if (!originalQuery) return originalQuery;
+  const cacheKey = buildCacheKey('expand-search-query', { originalQuery, isLatest });
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+  const globalByDefault = !isExplicitlyLocalSearchQuery(originalQuery) &&
+    !/local|asia|asian|ญี่ปุ่น|japan|เกาหลี|korea|จีน|china/i.test(String(originalQuery || ''));
+
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_REASONING_FAST),
+      system: `เปลี่ยนหัวข้อของผู้ใช้ให้เป็นคำค้นหาขั้นสูง (Advanced Search) บน X เพื่อหาข้อมูลระดับสากล
+กฎ:
+- รักษาเจตนาเดิมของหัวข้อที่ต้องการค้นหา
+- ${globalByDefault
+          ? 'ถ้าผู้ใช้ไม่ได้ระบุประเทศ ภาษา หรือภูมิภาคแบบ local ชัดเจน ให้ถือว่าเป็น global-first และใช้คำค้นหาอังกฤษ/สากลเป็นหลัก ห้ามเติมคีย์เวิร์ดไทยเอง'
+          : 'ถ้าผู้ใช้ระบุประเทศ ภาษา หรือภูมิภาคแบบ local ชัดเจน ให้ขยายคำค้นหาโดยใช้ทั้งภาษาท้องถิ่นและภาษาอังกฤษเท่าที่จำเป็น'
+        }
+- ต้องใส่ -filter:replies เสมอ 1 ครั้ง
+- ${isLatest ? 'โหมดสายฟ้าจะถูกคัดในแอปให้เหลือเฉพาะ 24 ชั่วโมงล่าสุดอยู่แล้ว ดังนั้นห้ามบังคับ since:today หรือคำค้นที่แคบเกินไป ให้โฟกัส recent developments แบบยังได้โพสต์คุณภาพ' : 'เน้นโพสต์ที่มีสัญญาณสำคัญสูง เหมาะสำหรับผลลัพธ์แบบยอดนิยม (Top)'}
+- ส่งคืนผลลัพธ์เป็น JSON เท่านั้น`,
+      prompt: `Topic: ${originalQuery}`,
+      schema: z.object({
+        finalXQuery: z.string().min(3),
+      }),
+    });
+
+    const finalQuery = object.finalXQuery.replace(/\s+/g, ' ').trim();
+    return setCachedValue(
+      responseCache,
+      cacheKey,
+      finalQuery.includes('-filter:replies') ? finalQuery : `${finalQuery} -filter:replies`,
+      QUERY_CACHE_TTL_MS,
+    );
+  } catch (error) {
+    if (error.status === 400) {
+      console.warn('[GrokService] 400 Bad Request in expandSearchQuery. Check parameters/model.');
+    }
+    console.error('[GrokService] Query optimizer error:', error);
+    return setCachedValue(responseCache, cacheKey, `${originalQuery} -filter:replies`, QUERY_CACHE_TTL_MS);
+  }
+};
+
+export const buildSearchPlan = async (originalQuery, isLatest = false, webContext = '', isComplexQuery = true) => {
+  const fallbackQuery = `${originalQuery} -filter:replies`.trim();
+  const cacheKey = buildCacheKey('search-plan-v2', { originalQuery, isLatest, webContextLength: webContext.length, isComplexQuery });
+
+  if (!originalQuery) {
+    return {
+      queries: [],
+      primaryQuery: '',
+      topicLabels: [],
+    };
+  }
+
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { object } = await generateObject({
+      model: grok(isComplexQuery ? MODEL_REASONING_FAST : MODEL_NEWS_FAST),
+      system: `คุณคือสถาปนิกการค้นหาระดับพระกาฬ (Elite Search Architect)
+ภารกิจ: เฟ้นหาคอนเทนต์ที่เป็น "ที่สุด" (Masterpieces) โดยใช้เทคนิค "Keyword Explosion" ยัดคีย์เวิร์ดให้แน่นที่สุด
+ตอนนี้คุณกำลังทำ Adaptive RAG (News-Anchored Search)
+คุณมีโควต้าการค้นหาบนแพลตฟอร์ม X เพียง 2 ครั้งเท่านั้น:
+1. "primaryQuery": Broad Viral Net -> ยัดคำพ้องความหมาย (Synonyms) ไทย/อังกฤษ ให้ครอบคลุมความหมายกว้างๆ (ใช้ OR เยอะๆ)
+2. "relatedQuery": Precision Snipe -> ใช้ข้อมูลจากข่าวด้านล่าง (Web Context) มาดึงชื่อคน ชื่อบริษัท ชื่องาน หรือคีย์เวิร์ดที่กำลังเป็นกระแสเป๊ะๆ
+
+กฎเหล็กของคุณภาพ (Strict Quality Bar):
+- ความยาวสูงสุดต่อ Query คือ 512 ตัวอักษร (ยัดให้คุ้มค่าที่สุด)
+- ทุก Query ต้องจบด้วย -filter:replies 
+- ${isLatest ? 'โหมดสายฟ้า (Latest): ใช้ min_faves:1-5 เพื่อให้ได้ข่าวใหม่ที่เริ่มมีพลัง' : 'โหมดปกติ (Top): ใช้ min_faves:10-50 สำหรับหัวข้อทั่วไป แต่หัวข้อเฉพาะทางหรือภาษาไทยให้ใช้ min_faves:2-5 เพื่อป้องกันผลลัพธ์ว่างแดปล่า'}
+- ปรับแต่งคีย์เวิร์ดให้ครอบคลุมทั้งไทยและอังกฤษ (เช่น เกม OR gaming)
+- เน้นคอนเทนต์คุณภาพสูงที่มีสาระ ไม่เอาสแปมหรือบทสนทนาไร้สาระ
+- ตอบเป็น JSON เท่านั้น`,
+      prompt: `Topic: ${originalQuery}\n\nWeb Context (Ground Truth from Tavily):\n${webContext.slice(0, 1500) || 'No web news available.'}`,
+      schema: z.object({
+        primaryQuery: z.string().min(3).max(512),
+        relatedQuery: z.string().min(3).max(512),
+        topicLabels: z.array(z.string().min(2)).max(5),
+      }),
+    });
+
+    const normalizeQuery = (query) => {
+      const finalQuery = String(query || '').replace(/\s+/g, ' ').trim();
+      if (!finalQuery) return '';
+      return finalQuery.includes('-filter:replies') ? finalQuery : `${finalQuery} -filter:replies`;
+    };
+
+    const queries = Array.from(
+      new Set([object.primaryQuery, object.relatedQuery].map(normalizeQuery).filter(Boolean)),
+    ).slice(0, 2); // Exactly 2 queries max
+
+    return setCachedValue(responseCache, cacheKey, {
+      queries: queries.length ? queries : [fallbackQuery],
+      primaryQuery: queries[0] || fallbackQuery,
+      topicLabels: Array.from(
+        new Set((object.topicLabels || []).map((label) => String(label || '').trim()).filter(Boolean)),
+      ),
+    }, QUERY_CACHE_TTL_MS);
+  } catch (error) {
+    console.error('[GrokService] Search plan optimizer error:', error);
+    return setCachedValue(responseCache, cacheKey, {
+      queries: [fallbackQuery],
+      primaryQuery: fallbackQuery,
+      topicLabels: [originalQuery],
+    }, QUERY_CACHE_TTL_MS);
+  }
+};
+
+export const discoverTopExperts = async (categoryQuery, excludeUsernames = []) => {
+  try {
+    // 1. Pre-fetch real active accounts right now using the query
+    let activeContext = '';
+    try {
+      const searchData = await searchEverything(categoryQuery, '', false, 'Top', false);
+      if (searchData?.data?.length > 0) {
+        const seenUsernames = new Map();
+
+        for (const t of searchData.data) {
+          if (t.author && t.author.username) {
+            const uname = t.author.username.toLowerCase();
+            const engagement = (Number(t.likeCount || t.like_count || 0) * 1) +
+              (Number(t.retweetCount || t.retweet_count || 0) * 2) +
+              (Number(t.replyCount || t.reply_count || 0) * 1.5);
+
+            if (!seenUsernames.has(uname)) {
+              seenUsernames.set(uname, {
+                ...t.author,
+                _engagementSignal: engagement
+              });
+            } else {
+              const existing = seenUsernames.get(uname);
+              existing._engagementSignal += engagement;
+            }
+          }
+        }
+
+        // Filter out small accounts and prioritize by real-time engagement impact!
+        const qualifiedAuthors = Array.from(seenUsernames.values())
+          .filter(a => (a.followers || a.fastFollowersCount || 0) > 1000)
+          .sort((a, b) => b._engagementSignal - a._engagementSignal)
+          .slice(0, 15);
+
+        if (qualifiedAuthors.length > 0) {
+          activeContext = `\n[อัปเดตแบบ Real-time (Weighted Impact Signal)]: นี่คือรายชื่อบัญชีเทียร์สูงที่มีอิทธิพลต่อหัวข้อนี้ในช่วง 24 ชั่วโมงที่ผ่านมา จัดเรียงตาม Real-time Engagement Score:\n${qualifiedAuthors.map(a => `- @${a.username} (${a.name}) | ผู้ติดตาม: ${a.followers || a.fastFollowersCount} | พลังการพูดคุยล่าสุด: สูงมาก (Score: ${a._engagementSignal})`).join('\n')
+            }\n`;
+        }
+      }
+    } catch (e) {
+      console.warn('Could not fetch active context for experts:', e);
+    }
+
+    const { object } = await generateObject({
+      model: grok(MODEL_REASONING_FAST),
+      system: `คุณคือ "นักล่าดาวรุ่งและปรมาจารย์ระดับโลก" (Global Headhunter AI)
+ภารกิจ: แนะนำบัญชี Twitter (X) สุดยอดผู้เชี่ยวชาญในหัวข้อ "${categoryQuery}" จำนวนสูงสุด 6 บัญชี
+${activeContext ? activeContext : '\n[คำเตือน: ไม่มีข้อมูลอัปเดตแบบ Real-time ในหัวข้อนี้ กรุณาอิงเฉพาะบัญชีระดับโลกของแท้เท่านั้น]\n'}
+
+[กฎการคัดเลือกขั้นเด็ดขาด (STRICT RULES)]:
+1. **The Core Ground Truth (ความจริงสูงสุด):** 
+   - หากมี [อัปเดตแบบ Real-time] ด้านบน คุณ **ต้อง** คัดเลือกบัญชีจากรายชื่อนั้นมาเป็นแกนหลักก่อนเสมอ! เพราะพวกเขาได้รับการพิสูจน์แล้วว่าแอคทีฟและมีค่า Engagement สูงสุดใน 24 ชั่วโมงที่ผ่านมา (ซึ่งมักจะรวมถึงอินฟลูเอนเซอร์ระดับกลางที่กำลังสร้างเทรนด์อยู่ด้วย)
+2. **Quality Mid-Tier & Legends Zone (พื้นที่สำหรับคนเก่งจริง):** 
+   - หากคุณจำเป็นต้องแนะนำบัญชีที่ *ไม่ได้อยู่ในลิสต์ Real-time* บัญชีนั้นต้องเป็น **"สำนักข่าวระดับโลก, บุคคลสำคัญระดับตำนาน, หรือ อินฟลูเอนเซอร์ระดับกลาง (Mid-tier/Niche Experts) ที่เก่งและทรงอิทธิพลเฉพาะทางจริงๆ"** (มีผู้ติดตามตั้งแต่หลักหมื่นไปจนถึงหลายล้าน)
+   - ห้ามแต่งชื่อบัญชีแบบสุ่มขึ้นมาเองเด็ดขาด (No random hallucinations) คุณต้องมั่นใจ 100% ว่าบัญชีนี้มีตัวตนจริง, ไม่ร้าง, และเป็นที่ยอมรับในสายนั้นจริงๆ เท่านั้น
+3. **Red Flag Penalty:** ข้ามบัญชีที่เป็นบอทก๊อปข่าว แฟนคลับ หรือบัญชีที่ดูเหมือนสแปมเด็ดขาด
+4. **ความหลากหลาย (Diversity):** ผสมผสานระหว่าง สำนักข่าว, บุคคลในวงการ (Insider/Dev/Niche Experts), และนักวิเคราะห์ ไม่ให้ซ้ำซากเกินไป
+5. **บัญชีที่ห้ามเลือก:** [${excludeUsernames.join(', ')}]
+6. **Reasoning:** เขียนภาษาไทยสั้นๆ 1 ประโยค รีวิวความสามารถว่าทำไมเขาถึงควรค่าแก่การติดตาม (ถ้าเป็นคนเก่งเฉพาะทาง ให้ระบุจุดเด่นชัดๆ)`,
+      prompt: `ค้นหาบัญชีที่ดีที่สุด 6 อันดับในสาย "${categoryQuery}" อิงตามโครงสร้าง Real-time ด้านบนเป็นหลัก ห้ามแต่งบัญชีโนเนมหรือบัญชีร้างขึ้นมาเองเด็ดขาด! (username ห้ามมี @ นำหน้า)`,
+      schema: z.object({
+        experts: z.array(
+          z.object({
+            username: z.string().describe('ชื่อบัญชี x ไม่ต้องมี @'),
+            name: z.string().describe('ชื่อแสดงผล หรือชื่อองค์กร'),
+            reasoning: z.string().describe('เหตุผลที่ควรติดตาม ภาษาไทย 1 ประโยค')
+          })
+        ).max(6),
+      }),
+    });
+
+    return (object.experts || []).map(expert => ({
+      ...expert,
+      username: (expert.username || '').replace(/^@/, '').trim(),
+      // No profile_image_url yet, UI will handle lazy hydration and rendering
+    }));
+  } catch (error) {
+    console.error('[GrokService] Expert discovery LLM error:', error);
+    if (error.status === 400) {
+      console.warn('[GrokService] 400 Bad Request in discovery. Check parameters/reasoningEffort for model.');
+    }
+    return [];
+  }
+};
+
+// Query expansion map: same single API call, broader initial results — zero extra cost
+const CATEGORY_QUERY_EXPANSION: Record<string, string> = {
+  'AI': 'AI OR "artificial intelligence" OR LLM OR ChatGPT OR "machine learning"',
+  'ai': 'AI OR "artificial intelligence" OR LLM OR ChatGPT OR "machine learning"',
+  'เทคโนโลยี': 'เทคโนโลยี OR technology OR tech OR software',
+  'ธุรกิจ': 'ธุรกิจ OR startup OR business OR entrepreneur',
+  'การตลาด': 'การตลาด OR marketing OR "digital marketing" OR branding',
+  'การเงิน': 'การเงิน OR finance OR "personal finance" OR fintech',
+  'การลงทุน': 'การลงทุน OR investing OR investment OR stocks OR equity',
+  'คริปโต': 'คริปโต OR crypto OR bitcoin OR ethereum OR DeFi OR web3',
+  'สุขภาพ': 'สุขภาพ OR health OR wellness OR fitness OR nutrition',
+  'ไลฟ์สไตล์': 'ไลฟ์สไตล์ OR lifestyle OR productivity OR mindset',
+  'เศรษฐกิจ': 'เศรษฐกิจ OR economy OR economics OR macro',
+  'การเมือง': 'การเมือง OR politics OR policy OR geopolitics',
+  'การพัฒนาตัวเอง': 'การพัฒนาตัวเอง OR "self improvement" OR productivity OR habits',
+};
+
+const EXPERT_DISCOVERY_SIGNAL_DEFS = [
+  {
+    id: 'gaming',
+    pattern: /ธุรกิจเกม|การตลาดเกม|เกมมือถือ|เกมพีซี|วงการเกม|เกม|gaming|videogame|video game|gamedev|game dev|game studio|publisher|esports/i,
+    query: '"video game" OR gaming OR videogames OR gamedev OR "game studio" OR publisher OR esports',
+  },
+  {
+    id: 'business',
+    pattern: /ธุรกิจ|ผู้ประกอบ|สตาร์ทอัพ|startup|business|entrepreneur|venture capital|vc|founder|ceo|โมเดลรายได้|revenue|monetization|strategy/i,
+    query: 'business OR startups OR entrepreneurship OR venture capital OR "business model" OR monetization OR strategy',
+  },
+  {
+    id: 'marketing',
+    pattern: /การตลาด|มาร์เก็ต|marketing|แบรนด์|brand|user acquisition|growth/i,
+    query: 'marketing OR growth marketing OR branding OR digital marketing OR creator marketing OR user acquisition',
+  },
+  {
+    id: 'ai',
+    pattern: /AI|artificial intelligence|machine learning|llm|gpt/i,
+    query: 'AI OR "artificial intelligence" OR LLM OR ChatGPT OR "machine learning"',
+  },
+  {
+    id: 'tech',
+    pattern: /เทค|เทคโนโลยี|technology|tech|software|developer/i,
+    query: 'technology OR tech OR software OR developer tools OR startups',
+  },
+  {
+    id: 'finance',
+    pattern: /การเงิน|ไฟแนนซ์|finance|fintech/i,
+    query: 'finance OR fintech OR markets OR investing OR economics',
+  },
+  {
+    id: 'investing',
+    pattern: /ลงทุน|หุ้น|investment|investing|stocks|equity/i,
+    query: 'investing OR investment strategy OR stocks OR markets OR venture capital',
+  },
+  {
+    id: 'crypto',
+    pattern: /คริปโต|crypto|bitcoin|ethereum|web3|blockchain/i,
+    query: 'crypto OR bitcoin OR ethereum OR DeFi OR web3',
+  },
+  {
+    id: 'health',
+    pattern: /สุขภาพ|health|medicine|wellness|fitness/i,
+    query: 'health OR medicine OR public health OR wellness OR fitness',
+  },
+  {
+    id: 'economics',
+    pattern: /เศรษฐกิจ|economy|economic|macro/i,
+    query: 'economics OR macroeconomics OR economy OR markets OR policy',
+  },
+];
+
+const getMatchedExpertDiscoverySignals = (categoryQuery = '') => {
+  const rawQuery = String(categoryQuery || '').trim();
+  if (!rawQuery) return [];
+  return EXPERT_DISCOVERY_SIGNAL_DEFS.filter(({ pattern }) => pattern.test(rawQuery));
+};
+
+const EXPERT_ROLE_PATTERN =
+  /podcast|host|creator|content|youtuber|streamer|journalist|reporter|editor|analyst|researcher|writer|blogger|influencer|commentator|reviewer|insider|diplomat|executive|operator|founder|ceo|investor|developer|engineer|professor|นักข่าว|ครีเอเตอร์|คนทำคอนเทนต์|คนทำ content|พอดแคสต์|พิธีกร|นักวิเคราะห์|นักวิจัย|นักเขียน|บล็อกเกอร์|อินฟลู|ผู้บริหาร|ผู้ก่อตั้ง|นักพัฒนา|วิศวกร|นักการทูต|สายข่าว/i;
+
+const SIMPLE_EXPERT_TOPIC_PATTERN =
+  /^(ai|technology|tech|software|business|startup|marketing|finance|investing|crypto|bitcoin|ethereum|health|wellness|fitness|economy|economics|politics|policy|geopolitics|sports|football|soccer|basketball|tennis|entertainment|film|movie|music|celebrity|travel|tourism|food|restaurant|cooking|environment|climate|education|learning|analysis|commentary|real estate|realestate|housing|property|auto|cars|automotive|vehicle|ev|gaming|videogame|video game|gamedev|game dev|kpop|k-pop|anime|manga|fashion|fashion week|เทคโนโลยี|ธุรกิจ|การตลาด|การเงิน|การลงทุน|คริปโต|สุขภาพ|ไลฟ์สไตล์|เศรษฐกิจ|การเมือง|กีฬา|บันเทิง|ท่องเที่ยว|อาหาร|สิ่งแวดล้อม|การศึกษา|บทวิเคราะห์|อสังหา|อสังหาฯ|ยานยนต์|วงการเกม|เกม)$/i;
+
+const isBroadTopicOnlyExpertQuery = (categoryQuery = '') => {
+  const rawQuery = String(categoryQuery || '').trim();
+  if (!rawQuery) return false;
+  if (EXPERT_ROLE_PATTERN.test(rawQuery)) return false;
+  if (SIMPLE_EXPERT_TOPIC_PATTERN.test(rawQuery)) return true;
+
+  const matchedSignals = getMatchedExpertDiscoverySignals(rawQuery);
+  const tokenCount = rawQuery.split(/\s+/).filter(Boolean).length;
+  return matchedSignals.length === 1 && tokenCount <= 3;
+};
+
+const isSpecialCompositeExpertQuery = (categoryQuery = '') =>
+  /ธุรกิจเกม|เกม.*ธุรกิจ|ธุรกิจ.*เกม|gaming business|game business|game industry|gaming industry|video game business|การตลาดเกม|เกม.*การตลาด|การตลาด.*เกม|game marketing|gaming marketing/i.test(
+    String(categoryQuery || ''),
+  );
+
+const shouldUseCanonicalExpertFallbacks = (categoryQuery = '') =>
+  isBroadTopicOnlyExpertQuery(categoryQuery) || isSpecialCompositeExpertQuery(categoryQuery);
+
+const THAI_EXPERT_DISCOVERY_QUERIES = [
+  {
+    pattern: /ธุรกิจเกม|เกม.*ธุรกิจ|ธุรกิจ.*เกม|gaming business|game business|game industry|gaming industry|video game business/i,
+    query: '("video game" OR gaming OR videogames OR gamedev OR "game studio" OR publisher OR esports) AND (business OR startups OR entrepreneurship OR venture capital OR "business model" OR monetization OR strategy)',
+  },
+  {
+    pattern: /การตลาดเกม|เกม.*การตลาด|การตลาด.*เกม|game marketing|gaming marketing/i,
+    query: '("video game" OR gaming OR videogames OR mobile games OR "game studio") AND (marketing OR branding OR growth OR "user acquisition" OR creator marketing)',
+  },
+  {
+    pattern: /การเมืองไทย|ไทย.*การเมือง|การเมือง.*ไทย|thai politics|thailand politics/i,
+    query: 'Thailand politics OR Thai politics OR Thai government OR Thailand policy analysis',
+  },
+  {
+    pattern: /ธุรกิจ|ผู้ประกอบ|สตาร์ทอัพ|startup|business/i,
+    query: 'business strategy OR startups OR entrepreneurship OR venture capital OR "business model"',
+  },
+  {
+    pattern: /การตลาด|มาร์เก็ต|marketing|แบรนด์|brand/i,
+    query: 'marketing OR growth marketing OR branding OR digital marketing OR creator marketing',
+  },
+  {
+    pattern: /การเงิน|ไฟแนนซ์|finance|fintech/i,
+    query: 'finance OR fintech OR markets OR investing OR economics',
+  },
+  {
+    pattern: /ลงทุน|หุ้น|investment|investing|stocks/i,
+    query: 'investing OR investment strategy OR stocks OR markets OR venture capital',
+  },
+  {
+    pattern: /การเมือง|politics|นโยบาย|policy/i,
+    query: 'politics OR policy OR geopolitics OR government analysis',
+  },
+  {
+    pattern: /เศรษฐกิจ|economy|economic|macro/i,
+    query: 'economics OR macroeconomics OR economy OR markets OR policy',
+  },
+  {
+    pattern: /เทค|เทคโนโลยี|technology|software/i,
+    query: 'technology OR software OR startups OR AI OR developer tools',
+  },
+  {
+    pattern: /ไซเบอร์|security|cyber|infosec/i,
+    query: 'cybersecurity OR infosec OR security research OR threat intelligence',
+  },
+  {
+    pattern: /คริปโต|crypto|bitcoin|ethereum|web3/i,
+    query: 'crypto OR bitcoin OR ethereum OR DeFi OR web3',
+  },
+  {
+    pattern: /สุขภาพ|health|medicine|wellness/i,
+    query: 'health OR medicine OR public health OR wellness OR fitness',
+  },
+  {
+    pattern: /กีฬา|sports|football|basketball/i,
+    query: 'sports OR football OR basketball OR sports analytics',
+  },
+  {
+    pattern: /บันเทิง|entertainment|film|music|streaming/i,
+    query: 'entertainment OR film OR music OR streaming OR pop culture',
+  },
+  {
+    pattern: /ท่องเที่ยว|travel|tourism|hospitality/i,
+    query: 'travel OR aviation OR hospitality OR tourism',
+  },
+  {
+    pattern: /อาหาร|food|restaurant|cooking/i,
+    query: 'food OR restaurants OR cooking OR dining',
+  },
+];
+
+const buildExpertDiscoveryQuery = (categoryQuery = '') => {
+  const rawQuery = String(categoryQuery || '').trim();
+  const mappedQuery = THAI_EXPERT_DISCOVERY_QUERIES.find(({ pattern }) => pattern.test(rawQuery))?.query;
+  if (mappedQuery) return mappedQuery;
+
+  if (!isBroadTopicOnlyExpertQuery(rawQuery)) {
+    return rawQuery;
+  }
+
+  const matchedSignals = getMatchedExpertDiscoverySignals(rawQuery);
+  if (matchedSignals.length >= 2) {
+    return matchedSignals
+      .slice(0, 3)
+      .map(({ query }) => `(${query})`)
+      .join(' AND ');
+  }
+
+  return CATEGORY_QUERY_EXPANSION[rawQuery] || matchedSignals[0]?.query || rawQuery;
+};
+
+const interpretExpertDiscoveryIntent = async (rawQuery = '') => {
+  const userQuery = String(rawQuery || '').trim();
+  const ruleQuery = buildExpertDiscoveryQuery(userQuery);
+  const localHints = [];
+
+  if (/ฮอลลีวูด|hollywood|ดารา|นักแสดง/i.test(userQuery)) {
+    localHints.push('Hollywood actors, comedians, entertainment personalities');
+  }
+  if (/ตลก|คอมเมดี้|comedy|comedian/i.test(userQuery)) {
+    localHints.push('comedy, comedians, funny entertainers');
+  }
+  if (/นักบอล|footballer|soccer|บอล/i.test(userQuery)) {
+    localHints.push('footballers, soccer players, football analysts');
+  }
+  if (/กำลังดัง|ตอนนี้|ล่าสุด|มาแรง|trending|viral|now/i.test(userQuery)) {
+    localHints.push('currently trending, rising, active now');
+  }
+  if (/เดินป่า|hiking|trekking|outdoor|backpacking|camping/i.test(userQuery)) {
+    localHints.push('hiking influencer OR backpacking creator OR thru-hiking YouTuber OR outdoor adventure creator OR camping influencer OR trail running creator');
+  }
+  if (/podcast|พอดแคสต์|พิธีกร/i.test(userQuery)) {
+    localHints.push('podcast host OR podcast creator OR show host OR interviewer');
+  }
+  if (/creator|content|ครีเอเตอร์|คนทำคอนเทนต์|คนทำ content|youtuber|streamer|blogger/i.test(userQuery)) {
+    localHints.push('creator OR commentator OR YouTuber OR streamer OR blogger OR content creator');
+  }
+  if (/journalist|reporter|editor|นักข่าว|สื่อ/i.test(userQuery)) {
+    localHints.push('journalist OR reporter OR editor OR correspondent OR newsroom');
+  }
+  if (/analyst|นักวิเคราะห์|insider|commentator|reviewer/i.test(userQuery)) {
+    localHints.push('analyst OR insider OR commentator OR reviewer OR critic');
+  }
+  if (/นักการทูต|diplomat|ambassador/i.test(userQuery)) {
+    localHints.push('diplomat OR ambassador OR foreign policy practitioner OR international affairs commentator');
+  }
+  if (/kpop|k-pop|เคป็อป/i.test(userQuery)) {
+    localHints.push('K-pop journalist OR K-pop insider OR K-pop analyst OR K-pop creator');
+  }
+  if (/anime|manga|อนิเมะ|มังงะ/i.test(userQuery)) {
+    localHints.push('anime reviewer OR manga commentator OR anime journalist OR manga creator');
+  }
+  if (/fashion|แฟชั่น|fashion week/i.test(userQuery)) {
+    localHints.push('fashion journalist OR fashion editor OR stylist OR fashion week insider OR runway commentator');
+  }
+  if (/basketball|nba|บาส|บาสเกตบอล/i.test(userQuery)) {
+    localHints.push('basketball analyst OR NBA creator OR basketball commentator OR hoops journalist');
+  }
+  if (/ญี่ปุ่น|japan|ญี่ปุ่น/i.test(userQuery) && /travel|ท่องเที่ยว|creator|ครีเอเตอร์/i.test(userQuery)) {
+    localHints.push('Japan travel creator OR Japan travel journalist OR Japan-focused travel guide');
+  }
+
+  const heuristicQuery = localHints.length > 0 ? localHints.join(' OR ') : ruleQuery;
+
+  try {
+    const { object } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      temperature: 0,
+      system: `You translate messy Thai/English user requests into an expert-discovery plan for finding Twitter/X accounts.
+
+Rules:
+- Preserve the user's intent even if phrased casually.
+- Convert Thai concepts into strong English search terms because global X/web discovery works better in English.
+- Do not assume Thailand/Thai accounts just because the user typed Thai. Default to global/English results unless the user explicitly says ไทย, ในไทย, คนไทย, Thailand, or Thai.
+- Detect niche, role, geography, and freshness needs.
+- Do not recommend accounts here. Return only the search plan.
+- Return 3-5 discovery queries ordered from broad recall to sharper role/topic precision.
+- Keep each query short enough for X search. Avoid over-constraining niche topics with too many AND-style clauses.
+- Never inject Thailand, Thai, lang:th, or local scope unless the user explicitly asked for it.`,
+      prompt: `User wants to follow experts/accounts for: "${userQuery}"`,
+      schema: z.object({
+        interpretedLabel: z.string().describe('Short human-readable topic label'),
+        discoveryQuery: z.string().describe('English-heavy boolean-ish query for web/X discovery'),
+        searchQueries: z.array(z.string()).max(5).describe('Ordered list of broad-to-precise X search queries'),
+        freshnessMode: z.enum(['weekly', 'latest', 'evergreen']).describe('How fresh the accounts should be'),
+        includeTerms: z.array(z.string()).max(10).describe('Terms that indicate good topic fit'),
+        excludeTerms: z.array(z.string()).max(10).describe('Terms that indicate off-topic results'),
+        scopeNote: z.string().optional().describe('Any location, role, or niche scope'),
+      }),
+    });
+
+    return {
+      interpretedLabel: object.interpretedLabel || userQuery,
+      discoveryQuery: object.discoveryQuery || heuristicQuery,
+      searchQueries: Array.from(
+        new Set(
+          [object.discoveryQuery, ...(object.searchQueries || [])]
+            .map((query) => String(query || '').trim())
+            .filter(Boolean),
+        ),
+      ).slice(0, 5),
+      freshnessMode: object.freshnessMode || (/(กำลังดัง|ตอนนี้|ล่าสุด|มาแรง|trending|viral|now)/i.test(userQuery) ? 'latest' : 'weekly'),
+      includeTerms: object.includeTerms || [],
+      excludeTerms: object.excludeTerms || [],
+      scopeNote: object.scopeNote || '',
+    };
+  } catch (error) {
+    console.warn('[GrokService] Expert intent interpretation failed:', error);
+    return {
+      interpretedLabel: userQuery,
+      discoveryQuery: heuristicQuery,
+      searchQueries: [heuristicQuery, ruleQuery].filter(Boolean),
+      freshnessMode: /(กำลังดัง|ตอนนี้|ล่าสุด|มาแรง|trending|viral|now)/i.test(userQuery) ? 'latest' : 'weekly',
+      includeTerms: localHints.flatMap((hint) => hint.split(/,\s*|\s+OR\s+/i)).filter(Boolean).slice(0, 10),
+      excludeTerms: [],
+      scopeNote: '',
+    };
+  }
+};
+
+const shouldUseThailandScope = (categoryQuery = '') =>
+  /การเมืองไทย|ไทย.*การเมือง|การเมือง.*ไทย|thai politics|thailand politics/i.test(String(categoryQuery || ''));
+
+const CANONICAL_EXPERT_FALLBACKS = [
+  {
+    pattern: /podcast.*business|business.*podcast|startup.*podcast|podcast.*startup|entrepreneur.*podcast|คนทำ podcast.*business|พอดแคสต์.*ธุรกิจ/i,
+    experts: [
+      { username: 'AcquiredFM', name: 'Acquired' },
+      { username: 'InvestLikeBest', name: 'Invest Like the Best' },
+      { username: 'patrick_oshag', name: "Patrick O'Shaughnessy" },
+      { username: 'mfaber', name: 'Meb Faber' },
+      { username: 'theallinpod', name: 'All-In Podcast' },
+      { username: 'pivotpodcast', name: 'Pivot' },
+    ],
+  },
+  {
+    pattern: /kpop|k-pop|เคป๊อป/i,
+    experts: [
+      { username: 'Jeff__Benjamin', name: 'Jeff Benjamin' },
+      { username: 'soompi', name: 'Soompi' },
+      { username: 'allkpop', name: 'allkpop' },
+      { username: 'Koreaboo', name: 'Koreaboo' },
+      { username: 'billboard', name: 'Billboard' },
+      { username: 'NME', name: 'NME' },
+    ],
+  },
+  {
+    pattern: /fashion week|แฟชั่นวีค|แฟชั่น/i,
+    experts: [
+      { username: 'BoF', name: 'The Business of Fashion' },
+      { username: 'derekblasberg', name: 'Derek Blasberg' },
+      { username: 'susiebubble', name: 'Susie Bubble' },
+      { username: 'imranamed', name: 'Imran Amed' },
+      { username: 'voguemagazine', name: 'Vogue Magazine' },
+      { username: 'wmag', name: 'W Magazine' },
+    ],
+  },
+  {
+    pattern: /basketball|nba|บาส|บาสเกตบอล/i,
+    experts: [
+      { username: 'ShamsCharania', name: 'Shams Charania' },
+      { username: 'TheAthleticNBA', name: 'The Athletic NBA' },
+      { username: 'KOT4Q', name: 'KOT4Q' },
+      { username: 'DimeDropperPod', name: 'Dime Dropper' },
+      { username: 'LegionHoops', name: 'Legion Hoops' },
+      { username: 'NBA', name: 'NBA' },
+    ],
+  },
+  {
+    pattern: /ธุรกิจเกม|เกม.*ธุรกิจ|ธุรกิจ.*เกม|gaming business|game business|game industry|gaming industry|video game business|สตูดิโอเกม|โมเดลรายได้.*เกม|เกมมือถือ|mobile game|mobile gaming|game studio|publisher/i,
+    experts: [
+      { username: 'ZhugeEX', name: 'Daniel Ahmad' },
+      { username: 'MatPiscatella', name: 'Mat Piscatella' },
+      { username: 'gamesindustry', name: 'GamesIndustry' },
+      { username: 'jasonschreier', name: 'Jason Schreier' },
+      { username: 'geoffkeighley', name: 'Geoff Keighley' },
+      { username: 'tha_rami', name: 'Rami Ismail' },
+    ],
+  },
+  {
+    pattern: /การตลาดเกม|เกม.*การตลาด|การตลาด.*เกม|game marketing|gaming marketing|user acquisition.*game|branding.*game/i,
+    experts: [
+      { username: 'gamesindustry', name: 'GamesIndustry' },
+      { username: 'ZhugeEX', name: 'Daniel Ahmad' },
+      { username: 'geoffkeighley', name: 'Geoff Keighley' },
+      { username: 'jasonschreier', name: 'Jason Schreier' },
+      { username: 'MatPiscatella', name: 'Mat Piscatella' },
+      { username: 'tha_rami', name: 'Rami Ismail' },
+    ],
+  },
+  {
+    pattern: /เกม|gaming|videogame|video game|gamedev|game dev|esports/i,
+    experts: [
+      { username: 'ZhugeEX', name: 'Daniel Ahmad' },
+      { username: 'jasonschreier', name: 'Jason Schreier' },
+      { username: 'gamesindustry', name: 'GamesIndustry' },
+      { username: 'geoffkeighley', name: 'Geoff Keighley' },
+      { username: 'Wario64', name: 'Wario64' },
+      { username: 'Nibellion', name: 'Nibellion' },
+    ],
+  },
+  {
+    pattern: /การลงทุน|ลงทุน|investment|investing|stocks|equity/i,
+    experts: [
+      { username: 'AswathDamodaran', name: 'Aswath Damodaran' },
+      { username: 'LynAldenContact', name: 'Lyn Alden' },
+      { username: 'awealthofcs', name: 'Ben Carlson' },
+      { username: 'MebFaber', name: 'Meb Faber' },
+      { username: 'charliebilello', name: 'Charlie Bilello' },
+      { username: 'jposhaughnessy', name: "Jim O'Shaughnessy" },
+      { username: 'LizAnnSonders', name: 'Liz Ann Sonders' },
+      { username: 'BrianFeroldi', name: 'Brian Feroldi' },
+      { username: 'KobeissiLetter', name: 'The Kobeissi Letter' },
+      { username: 'DividendGrowth', name: 'Dividend Growth Investor' },
+      { username: 'zerohedge', name: 'Zero Hedge' },
+      { username: 'WSJMarkets', name: 'WSJ Markets' },
+    ],
+  },
+  {
+    pattern: /การเงิน|finance|fintech|personal finance/i,
+    experts: [
+      { username: 'AswathDamodaran', name: 'Aswath Damodaran' },
+      { username: 'LynAldenContact', name: 'Lyn Alden' },
+      { username: 'awealthofcs', name: 'Ben Carlson' },
+      { username: 'michaelbatnick', name: 'Michael Batnick' },
+      { username: 'RampCapitalLLC', name: 'Ramp Capital' },
+      { username: 'TheMotleyFool', name: 'The Motley Fool' },
+    ],
+  },
+  {
+    pattern: /ธุรกิจ|business|startup|entrepreneur/i,
+    experts: [
+      { username: 'pmarca', name: 'Marc Andreessen' },
+      { username: 'sama', name: 'Sam Altman' },
+      { username: 'bhorowitz', name: 'Ben Horowitz' },
+      { username: 'naval', name: 'Naval Ravikant' },
+      { username: 'Jason', name: 'Jason Calacanis' },
+      { username: 'profgalloway', name: 'Scott Galloway' },
+    ],
+  },
+  {
+    pattern: /AI|artificial intelligence|machine learning|llm|gpt/i,
+    experts: [
+      { username: 'AndrewYNg', name: 'Andrew Ng' },
+      { username: 'karpathy', name: 'Andrej Karpathy' },
+      { username: 'OpenAI', name: 'OpenAI' },
+      { username: 'huggingface', name: 'Hugging Face' },
+      { username: 'rowancheung', name: 'Rowan Cheung' },
+      { username: 'hardmaru', name: 'David Ha' },
+      { username: 'ylecun', name: 'Yann LeCun' },
+      { username: 'demishassabis', name: 'Demis Hassabis' },
+      { username: 'JeffDean', name: 'Jeff Dean' },
+    ],
+  },
+  {
+    pattern: /เทคโนโลยี|technology|tech|software/i,
+    experts: [
+      { username: 'TechCrunch', name: 'TechCrunch' },
+      { username: 'verge', name: 'The Verge' },
+      { username: 'WIRED', name: 'WIRED' },
+      { username: 'benedictevans', name: 'Benedict Evans' },
+      { username: 'JoannaStern', name: 'Joanna Stern' },
+      { username: 'stratechery', name: 'Stratechery' },
+      { username: 'mkbhd', name: 'Marques Brownlee' },
+      { username: 'paulg', name: 'Paul Graham' },
+      { username: 'amasad', name: 'Amjad Masad' },
+    ],
+  },
+  {
+    pattern: /การตลาด|marketing|digital marketing|branding/i,
+    experts: [
+      { username: 'neilpatel', name: 'Neil Patel' },
+      { username: 'garyvee', name: 'Gary Vaynerchuk' },
+      { username: 'randfish', name: 'Rand Fishkin' },
+      { username: 'annhandley', name: 'Ann Handley' },
+      { username: 'MarketingProfs', name: 'MarketingProfs' },
+      { username: 'larrykim', name: 'Larry Kim' },
+    ],
+  },
+  {
+    pattern: /คริปโต|crypto|bitcoin|ethereum|web3|blockchain/i,
+    experts: [
+      { username: 'VitalikButerin', name: 'Vitalik Buterin' },
+      { username: 'aantonop', name: 'Andreas M. Antonopoulos' },
+      { username: 'CoinDesk', name: 'CoinDesk' },
+      { username: 'TheBlockCo', name: 'The Block' },
+      { username: 'lopp', name: 'Jameson Lopp' },
+      { username: 'sassal0x', name: 'Sassal' },
+    ],
+  },
+  {
+    pattern: /ความปลอดภัยไซเบอร์|ไซเบอร์|security|cybersecurity|infosec/i,
+    experts: [
+      { username: 'briankrebs', name: 'Brian Krebs' },
+      { username: 'Mikko', name: 'Mikko Hypponen' },
+      { username: 'troyhunt', name: 'Troy Hunt' },
+      { username: 'schneierblog', name: 'Bruce Schneier' },
+      { username: 'SwiftOnSecurity', name: 'SwiftOnSecurity' },
+      { username: 'CISAgov', name: 'CISA' },
+    ],
+  },
+  {
+    pattern: /สุขภาพ|health|wellness|fitness|nutrition/i,
+    experts: [
+      { username: 'EricTopol', name: 'Eric Topol' },
+      { username: 'hubermanlab', name: 'Andrew Huberman' },
+      { username: 'PeterAttiaMD', name: 'Peter Attia' },
+      { username: 'WHO', name: 'World Health Organization' },
+      { username: 'NEJM', name: 'NEJM' },
+      { username: 'kevinmd', name: 'Kevin Pho' },
+    ],
+  },
+  {
+    pattern: /ไลฟ์สไตล์|lifestyle|productivity|mindset|self improvement/i,
+    experts: [
+      { username: 'JamesClear', name: 'James Clear' },
+      { username: 'tferriss', name: 'Tim Ferriss' },
+      { username: 'AliAbdaal', name: 'Ali Abdaal' },
+      { username: 'RyanHoliday', name: 'Ryan Holiday' },
+      { username: 'IAmMarkManson', name: 'Mark Manson' },
+      { username: 'simonsinek', name: 'Simon Sinek' },
+    ],
+  },
+  {
+    pattern: /เศรษฐกิจ|economy|economics|macro/i,
+    experts: [
+      { username: 'paulkrugman', name: 'Paul Krugman' },
+      { username: 'elerianm', name: 'Mohamed A. El-Erian' },
+      { username: 'Claudia_Sahm', name: 'Claudia Sahm' },
+      { username: 'Noahpinion', name: 'Noah Smith' },
+      { username: 'LHSummers', name: 'Lawrence H. Summers' },
+      { username: 'SoberLook', name: 'The Daily Shot' },
+    ],
+  },
+  {
+    pattern: /การเมือง|politics|policy|geopolitics/i,
+    experts: [
+      { username: 'ianbremmer', name: 'Ian Bremmer' },
+      { username: 'NateSilver538', name: 'Nate Silver' },
+      { username: 'FareedZakaria', name: 'Fareed Zakaria' },
+      { username: 'anneapplebaum', name: 'Anne Applebaum' },
+      { username: 'RadioFreeTom', name: 'Tom Nichols' },
+      { username: 'TheEconomist', name: 'The Economist' },
+    ],
+  },
+  {
+    pattern: /กีฬา|sports|football|soccer|basketball|tennis/i,
+    experts: [
+      { username: 'espn', name: 'ESPN' },
+      { username: 'TheAthletic', name: 'The Athletic' },
+      { username: 'BleacherReport', name: 'Bleacher Report' },
+      { username: 'ShamsCharania', name: 'Shams Charania' },
+      { username: 'FabrizioRomano', name: 'Fabrizio Romano' },
+      { username: 'BenFawkes22', name: 'Ben Fawkes' },
+    ],
+  },
+  {
+    pattern: /บันเทิง|entertainment|film|movie|music|celebrity/i,
+    experts: [
+      { username: 'Variety', name: 'Variety' },
+      { username: 'THR', name: 'The Hollywood Reporter' },
+      { username: 'DiscussingFilm', name: 'DiscussingFilm' },
+      { username: 'DEADLINE', name: 'Deadline Hollywood' },
+      { username: 'RottenTomatoes', name: 'Rotten Tomatoes' },
+      { username: 'netflix', name: 'Netflix' },
+    ],
+  },
+  {
+    pattern: /เดินป่า|hiking|trekking|outdoor|backpacking|camping|trail/i,
+    experts: [
+      { username: 'outsidemagazine', name: 'Outside Magazine' },
+      { username: 'natgeotravel', name: 'National Geographic Travel' },
+      { username: 'theblondeabroad', name: 'The Blonde Abroad' },
+      { username: 'alltrails', name: 'AllTrails' },
+      { username: 'MatadorNetwork', name: 'Matador Network' },
+      { username: 'HikingProject', name: 'Hiking Project' },
+    ],
+  },
+  {
+    pattern: /ท่องเที่ยว|travel|tourism/i,
+    experts: [
+      { username: 'lonelyplanet', name: 'Lonely Planet' },
+      { username: 'NatGeoTravel', name: 'National Geographic Travel' },
+      { username: 'RickSteves', name: 'Rick Steves' },
+      { username: 'AFARmedia', name: 'AFAR' },
+      { username: 'CNTraveler', name: 'Condé Nast Traveler' },
+      { username: 'TravelLeisure', name: 'Travel + Leisure' },
+    ],
+  },
+  {
+    pattern: /อาหาร|food|restaurant|cooking|dining/i,
+    experts: [
+      { username: 'Eater', name: 'Eater' },
+      { username: 'FoodNetwork', name: 'Food Network' },
+      { username: 'seriouseats', name: 'Serious Eats' },
+      { username: 'bonappetit', name: 'Bon Appetit' },
+      { username: 'NYTCooking', name: 'NYT Cooking' },
+      { username: 'testkitchen', name: "America's Test Kitchen" },
+    ],
+  },
+  {
+    pattern: /สิ่งแวดล้อม|environment|climate|sustainability/i,
+    experts: [
+      { username: 'ClimateCentral', name: 'Climate Central' },
+      { username: 'CarbonBrief', name: 'Carbon Brief' },
+      { username: 'insideclimate', name: 'Inside Climate News' },
+      { username: 'MichaelEMann', name: 'Michael E. Mann' },
+      { username: 'KHayhoe', name: 'Katharine Hayhoe' },
+      { username: 'UNFCCC', name: 'UN Climate Change' },
+    ],
+  },
+  {
+    pattern: /การศึกษา|education|learning|teaching/i,
+    experts: [
+      { username: 'edutopia', name: 'Edutopia' },
+      { username: 'MindShiftKQED', name: 'MindShift' },
+      { username: 'educationweek', name: 'Education Week' },
+      { username: 'dylanwiliam', name: 'Dylan Wiliam' },
+      { username: 'cultofpedagogy', name: 'Cult of Pedagogy' },
+      { username: 'SirKenRobinson', name: 'Ken Robinson' },
+    ],
+  },
+  {
+    pattern: /บทวิเคราะห์|opinion|analysis|commentary/i,
+    experts: [
+      { username: 'paulg', name: 'Paul Graham' },
+      { username: 'tylercowen', name: 'Tyler Cowen' },
+      { username: 'Noahpinion', name: 'Noah Smith' },
+      { username: 'ezraklein', name: 'Ezra Klein' },
+      { username: 'mattyglesias', name: 'Matthew Yglesias' },
+      { username: 'pmarca', name: 'Marc Andreessen' },
+    ],
+  },
+  {
+    pattern: /อสังหาฯ|อสังหา|realestate|real estate|housing|property/i,
+    experts: [
+      { username: 'BiggerPockets', name: 'BiggerPockets' },
+      { username: 'HousingWire', name: 'HousingWire' },
+      { username: 'Redfin', name: 'Redfin' },
+      { username: 'zillow', name: 'Zillow' },
+      { username: 'calculatedrisk', name: 'Calculated Risk' },
+      { username: 'RyanSerhant', name: 'Ryan Serhant' },
+    ],
+  },
+  {
+    pattern: /ยานยนต์|auto|cars|automotive|vehicle|ev/i,
+    experts: [
+      { username: 'caranddriver', name: 'Car and Driver' },
+      { username: 'MotorTrend', name: 'MotorTrend' },
+      { username: 'edmunds', name: 'Edmunds' },
+      { username: 'roadandtrack', name: 'Road & Track' },
+      { username: 'Jalopnik', name: 'Jalopnik' },
+      { username: 'Autocar', name: 'Autocar' },
+    ],
+  },
+];
+
+const getCanonicalExpertFallbacks = (categoryQuery = '') => {
+  const rawQuery = String(categoryQuery || '').trim();
+  return CANONICAL_EXPERT_FALLBACKS.find(({ pattern }) => pattern.test(rawQuery))?.experts || [];
+};
+
+const isFastSeedableExpertQuery = (categoryQuery = '') =>
+  shouldUseCanonicalExpertFallbacks(categoryQuery) &&
+  !EXPERT_ROLE_PATTERN.test(String(categoryQuery || '').trim()) &&
+  CANONICAL_EXPERT_FALLBACKS.some(({ pattern }) => pattern.test(String(categoryQuery || '').trim()));
+
+const normalizeExpertUsername = (username = '') =>
+  String(username || '').replace(/^@/, '').replace(/[^\w]/g, '').trim();
+
+const isValidExpertUsername = (username = '') => /^[a-z0-9_]{1,15}$/i.test(String(username || ''));
+
+const extractExpertHandlesFromText = (text = '') => {
+  const handles = new Set();
+  const source = String(text || '');
+  const patterns = [
+    /(?:^|[^\w])@([A-Za-z0-9_]{1,15})\b/g,
+    /(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})(?:\b|[/?#])/gi,
+  ];
+
+  for (const pattern of patterns) {
+    for (const match of source.matchAll(pattern)) {
+      const username = normalizeExpertUsername(match[1]);
+      if (isValidExpertUsername(username)) handles.add(username);
+    }
+  }
+
+  return Array.from(handles);
+};
+
+const buildExpertWebEvidence = (tavilyData = {}) => {
+  const evidence = new Map();
+  const results = Array.isArray(tavilyData?.results) ? tavilyData.results : [];
+
+  const addEvidence = (username, source = {}) => {
+    const key = normalizeExpertUsername(username).toLowerCase();
+    if (!isValidExpertUsername(key)) return;
+    const current = evidence.get(key) || {
+      mentions: 0,
+      sources: [],
+      sourceTitles: [],
+    };
+    current.mentions += 1;
+    if (source.url && !current.sources.includes(source.url)) current.sources.push(source.url);
+    if (source.title && !current.sourceTitles.includes(source.title)) current.sourceTitles.push(source.title);
+    evidence.set(key, current);
+  };
+
+  extractExpertHandlesFromText(tavilyData?.answer || '').forEach((username) =>
+    addEvidence(username, { title: 'Tavily answer', url: '' }),
+  );
+
+  results.forEach((result) => {
+    const combined = [result?.title, result?.content, result?.raw_content, result?.url].filter(Boolean).join('\n');
+    extractExpertHandlesFromText(combined).forEach((username) => addEvidence(username, result));
+  });
+
+  return evidence;
+};
+
+const dedupeExpertSearchTweets = (tweets = []) => {
+  const seen = new Map();
+  for (const tweet of Array.isArray(tweets) ? tweets : []) {
+    const key = String(tweet?.id || '').trim()
+      || `${String(tweet?.author?.username || '').toLowerCase()}::${String(tweet?.text || '').trim().slice(0, 120)}`;
+    if (!key) continue;
+    if (!seen.has(key)) seen.set(key, tweet);
+  }
+  return Array.from(seen.values());
+};
+
+const EXPERT_ROLE_HINT_DEFS = [
+  { pattern: /podcast|พอดแคสต์|พอดแคสท์|host|พิธีกร/i, terms: ['podcast host', 'podcaster', 'show host'] },
+  { pattern: /creator|content|ครีเอเตอร์|คนทำคอนเทนต์|youtuber|streamer|blogger/i, terms: ['content creator', 'creator', 'commentator'] },
+  { pattern: /journalist|reporter|editor|นักข่าว|สื่อ/i, terms: ['journalist', 'reporter', 'editor'] },
+  { pattern: /analyst|insider|reviewer|critic|นักวิเคราะห์|สายข่าว/i, terms: ['analyst', 'insider', 'commentator'] },
+  { pattern: /developer|engineer|นักพัฒนา|วิศวกร|coder|programmer/i, terms: ['developer', 'engineer', 'builder'] },
+  { pattern: /executive|operator|founder|ceo|ผู้บริหาร|ผู้ก่อตั้ง/i, terms: ['operator', 'executive', 'founder'] },
+  { pattern: /diplomat|ambassador|นักการทูต/i, terms: ['diplomat', 'foreign policy practitioner', 'ambassador'] },
+];
+
+const EXPERT_TOPIC_HINT_DEFS = [
+  { pattern: /kpop|k-pop|เคป๊อป/i, terms: ['K-pop', 'Kpop', 'K-pop news', 'K-pop industry'] },
+  { pattern: /fashion week|แฟชั่นวีค/i, terms: ['fashion week', 'runway', 'fashion industry'] },
+  { pattern: /fashion|แฟชั่น/i, terms: ['fashion', 'style', 'fashion industry'] },
+  { pattern: /basketball|nba|บาส|บาสเกตบอล/i, terms: ['basketball', 'NBA', 'hoops'] },
+  { pattern: /business|startup|ธุรกิจ|สตาร์ทอัพ|entrepreneur/i, terms: ['business', 'startup', 'entrepreneurship'] },
+  { pattern: /gaming|game|เกม|วงการเกม/i, terms: ['gaming', 'video game', 'game industry'] },
+  { pattern: /ai|artificial intelligence|machine learning|เอไอ/i, terms: ['AI', 'artificial intelligence', 'machine learning'] },
+  { pattern: /marketing|branding|การตลาด|แบรนด์/i, terms: ['marketing', 'branding', 'growth'] },
+  { pattern: /geopolitics|foreign policy|การทูต|ภูมิรัฐศาสตร์/i, terms: ['geopolitics', 'foreign policy', 'international affairs'] },
+  { pattern: /travel|tourism|ท่องเที่ยว/i, terms: ['travel', 'tourism', 'trip'] },
+];
+
+const parseExpertDiscoveryIntentHints = (rawQuery = '', includeTerms = []) => {
+  const query = String(rawQuery || '').trim();
+  const roleTerms = [];
+  const topicTerms = [];
+
+  EXPERT_ROLE_HINT_DEFS.forEach(({ pattern, terms }) => {
+    if (pattern.test(query)) roleTerms.push(...terms);
+  });
+
+  EXPERT_TOPIC_HINT_DEFS.forEach(({ pattern, terms }) => {
+    if (pattern.test(query)) topicTerms.push(...terms);
+  });
+
+  const normalizedIncludeTerms = (includeTerms || []).map((term) => String(term || '').trim()).filter(Boolean);
+  normalizedIncludeTerms.forEach((term) => {
+    if (EXPERT_ROLE_PATTERN.test(term)) {
+      roleTerms.push(term);
+    } else {
+      topicTerms.push(term);
+    }
+  });
+
+  const scopeTerms = [];
+  if (/ญี่ปุ่น|japan/i.test(query)) scopeTerms.push('Japan');
+  if (/ไทย|thailand|thai/i.test(query)) scopeTerms.push('Thailand');
+  if (/global|ทั่วโลก|ต่างประเทศ/i.test(query)) scopeTerms.push('global');
+
+  const freshnessTerms = [];
+  if (/กำลังดัง|ตอนนี้|ล่าสุด|มาแรง|trending|viral|now/i.test(query)) freshnessTerms.push('active now');
+
+  return {
+    roleTerms: Array.from(new Set(roleTerms)).slice(0, 6),
+    topicTerms: Array.from(new Set(topicTerms)).slice(0, 6),
+    scopeTerms: Array.from(new Set(scopeTerms)).slice(0, 3),
+    freshnessTerms: Array.from(new Set(freshnessTerms)).slice(0, 2),
+  };
+};
+
+const stripImplicitThailandBiasFromExpertQuery = (query = '', thailandScope = false) => {
+  const raw = String(query || '').trim();
+  if (!raw) return '';
+  if (thailandScope) return raw;
+
+  return raw
+    .replace(/\blang:th\b/gi, ' ')
+    .replace(/\b(?:Thailand|Thai)\b/gi, ' ')
+    .replace(/[\u0E00-\u0E7F]+/gu, ' ')
+    .replace(/\(\s*\)/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+};
+
+const ensureExpertDiscoveryLang = (query = '', thailandScope = false) => {
+  const cleaned = String(query || '')
+    .replace(/\blang:(?:en|th)\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  if (!cleaned) return '';
+  return `${cleaned} ${thailandScope ? 'lang:th' : 'lang:en'}`.trim();
+};
+
+const buildExpertDiscoverySearchQueries = ({
+  categoryQuery = '',
+  intentPlan = {},
+  expandedQuery = '',
+  thailandScope = false,
+}) => {
+  const querySet = new Set();
+  const pushQuery = (value = '') => {
+    const stripped = stripImplicitThailandBiasFromExpertQuery(value, thailandScope);
+    const normalized = ensureExpertDiscoveryLang(stripped, thailandScope);
+    if (normalized) querySet.add(normalized);
+  };
+
+  pushQuery(expandedQuery);
+
+  const plannedQueries = Array.isArray(intentPlan.searchQueries) ? intentPlan.searchQueries : [];
+  plannedQueries.forEach((query) => pushQuery(query));
+
+  const fallbackRawQuery = buildExpertDiscoveryQuery(categoryQuery);
+  pushQuery(fallbackRawQuery);
+  const parsedIntentHints = parseExpertDiscoveryIntentHints(categoryQuery, intentPlan.includeTerms || []);
+
+  const parenthesizedGroups = stripImplicitThailandBiasFromExpertQuery(expandedQuery, thailandScope).match(/\([^()]+\)/g) || [];
+  if (!shouldUseCanonicalExpertFallbacks(categoryQuery)) {
+    if (parenthesizedGroups.length >= 2) {
+      pushQuery(`${parenthesizedGroups[0]} ${parenthesizedGroups[1]}`);
+    }
+    if (parenthesizedGroups.length >= 1) {
+      pushQuery(parenthesizedGroups[0]);
+    }
+  }
+
+  const roleTerms = (intentPlan.includeTerms || [])
+    .map((term) => String(term || '').trim())
+    .filter(Boolean)
+    .filter((term) => EXPERT_ROLE_PATTERN.test(term))
+    .slice(0, 4);
+  const topicTerms = (intentPlan.includeTerms || [])
+    .map((term) => String(term || '').trim())
+    .filter(Boolean)
+    .filter((term) => !EXPERT_ROLE_PATTERN.test(term))
+    .slice(0, 4);
+
+  if (roleTerms.length > 0 && topicTerms.length > 0) {
+    pushQuery(`(${topicTerms.join(' OR ')}) (${roleTerms.join(' OR ')})`);
+  } else if (topicTerms.length > 0) {
+    pushQuery(`(${topicTerms.join(' OR ')})`);
+  }
+
+  const mergedRoleTerms = Array.from(new Set([...roleTerms, ...parsedIntentHints.roleTerms])).slice(0, 4);
+  const mergedTopicTerms = Array.from(new Set([...topicTerms, ...parsedIntentHints.topicTerms])).slice(0, 4);
+  const mergedScopeTerms = parsedIntentHints.scopeTerms.slice(0, 2);
+  const mergedFreshnessTerms = parsedIntentHints.freshnessTerms.slice(0, 1);
+
+  const buildPhrase = (parts = []) => parts.filter(Boolean).join(' ');
+  if (mergedTopicTerms.length > 0 && mergedRoleTerms.length > 0) {
+    pushQuery(buildPhrase([mergedTopicTerms[0], mergedRoleTerms[0], ...mergedScopeTerms]));
+    pushQuery(buildPhrase([mergedTopicTerms[0], mergedRoleTerms[0], ...mergedFreshnessTerms]));
+    pushQuery(`(${mergedTopicTerms.join(' OR ')}) (${mergedRoleTerms.join(' OR ')}) ${mergedScopeTerms.join(' ')}`.trim());
+  }
+  if (mergedTopicTerms.length > 0) {
+    pushQuery(buildPhrase([mergedTopicTerms[0], ...mergedScopeTerms, ...mergedFreshnessTerms]));
+  }
+
+  return Array.from(querySet).slice(0, 5);
+};
+
+const mergeExpertCandidate = (candidateMap, expert = {}, source = 'unknown') => {
+  const username = normalizeExpertUsername(expert.username);
+  if (!isValidExpertUsername(username)) return;
+  const key = username.toLowerCase();
+  const current = candidateMap.get(key) || {
+    username,
+    name: expert.name || username,
+    reasoning: '',
+    description: '',
+    sourceTitles: [],
+    sources: new Set(),
+    grokConfidence: 0,
+  };
+
+  current.username = current.username || username;
+  current.name = expert.name || current.name || username;
+  current.reasoning = expert.reasoning || current.reasoning || '';
+  current.description = expert.description || current.description || '';
+  current.sourceTitles = Array.from(new Set([...(current.sourceTitles || []), ...(expert.sourceTitles || [])])).filter(Boolean);
+  current.grokConfidence = Math.max(current.grokConfidence || 0, Number(expert.confidence || 0));
+  current.sources.add(source);
+  candidateMap.set(key, current);
+};
+
+const scoreExpertCandidate = ({ candidate, activity, webEvidence }) => {
+  const followers = Number(activity?.followers || 0);
+  const lastSeenDays = Number(activity?.lastSeenDays);
+  const activeScore = Number.isFinite(lastSeenDays)
+    ? lastSeenDays <= 7
+      ? 34
+      : lastSeenDays <= 30
+        ? 24
+        : 0
+    : 0;
+  const authorityScore = followers > 0 ? Math.min(24, Math.log10(followers + 1) * 4) : 0;
+  const verifiedScore = activity?.isVerified ? 8 : 0;
+  const engagementScore = Math.min(12, Math.log10(Number(activity?.engagementSignal || 0) + 1) * 4);
+  const webScore = Math.min(28, Number(webEvidence?.mentions || 0) * 10 + Math.min(8, Number(webEvidence?.sources?.length || 0) * 4));
+  const grokScore = Math.min(18, Number(candidate.grokConfidence || 0) * 18);
+  const seedScore = candidate.sources?.has('seed') ? 42 : 0;
+  const realtimeScore = candidate.sources?.has('x-realtime') ? 14 : 0;
+  const noActivityPenalty = Number.isFinite(lastSeenDays) ? 0 : candidate.sources?.has('seed') ? 8 : 50;
+
+  return activeScore + authorityScore + verifiedScore + engagementScore + webScore + grokScore + seedScore + realtimeScore - noActivityPenalty;
+};
+
+const getExpertTopicPenalty = (expert = {}, categoryQuery = '') => {
+  const query = String(categoryQuery || '').toLowerCase();
+  const text = [expert.username, expert.name, expert.reasoning].map((value) => String(value || '').toLowerCase()).join(' ');
+  let penalty = 0;
+
+  if (!/คริปโต|crypto|bitcoin|ethereum|web3|blockchain|defi/i.test(query) && /crypto|bitcoin|ethereum|web3|defi|nft/i.test(text)) {
+    penalty += 42;
+  }
+
+  if (!/กีฬา|sports|football|soccer|basketball|tennis/i.test(query) && /sports|football|soccer|basketball|nba|premierleague/i.test(text)) {
+    penalty += 30;
+  }
+  if (/นักบอล|football|soccer/i.test(query) && /vaccine|health|alliance|gavi\.org|immuni/i.test(text)) {
+    penalty += 90;
+  }
+  if (/เดินป่า|hiking|trekking|outdoor|backpacking|camping|trail/i.test(query) && /tourism authority|amazingthailand|government|japan|jp|lawyer|hashtag/i.test(text)) {
+    penalty += 70;
+  }
+
+  if (!/บันเทิง|entertainment|film|movie|music|celebrity/i.test(query) && /movie|film|music|celebrity|netflix/i.test(text)) {
+    penalty += 26;
+  }
+
+  return penalty;
+};
+
+const getExpertScopePenalty = (expert = {}, { thailandScope = false } = {}) => {
+  const text = [expert.username, expert.name].map((value) => String(value || '')).join(' ');
+  if (thailandScope) {
+    return /[\u0E00-\u0E7F]|thailand|thai|bangkok|เชียงใหม่|ภูเก็ต|ไทย/i.test(text) ? 0 : 70;
+  }
+  return /[\u0E00-\u0E7F\u3040-\u30FF]/.test(text) ? 55 : 0;
+};
+
+export const discoverTopExpertsStrict = async (categoryQuery, excludeUsernames = []) => {
+  try {
+    let activeContext = '';
+    let canonicalContext = '';
+    let qualifiedAuthors = [];
+    let realtimeCandidateAuthors = [];
+
+    const useFastSeedPath = isFastSeedableExpertQuery(categoryQuery) && !/กำลังดัง|ตอนนี้|ล่าสุด|มาแรง|อินฟลู|influencer|creator|trending|viral|now|ในไทย|คนไทย|ประเทศไทย|Thailand|Thai/i.test(categoryQuery);
+    const intentPlan = useFastSeedPath
+      ? {
+        interpretedLabel: categoryQuery,
+        discoveryQuery: buildExpertDiscoveryQuery(categoryQuery),
+        searchQueries: [buildExpertDiscoveryQuery(categoryQuery)],
+        freshnessMode: 'weekly',
+        includeTerms: [],
+        excludeTerms: [],
+        scopeNote: '',
+      }
+      : await interpretExpertDiscoveryIntent(categoryQuery);
+    const expandedQuery = intentPlan.discoveryQuery || buildExpertDiscoveryQuery(categoryQuery);
+    const topicLabel = intentPlan.interpretedLabel || categoryQuery;
+    const effectiveFreshnessMode = /กำลังดัง|ตอนนี้|ล่าสุด|มาแรง|อินฟลู|influencer|creator|trending|viral|now/i.test(
+      `${categoryQuery} ${topicLabel} ${expandedQuery}`,
+    )
+      ? 'latest'
+      : intentPlan.freshnessMode;
+    const thailandScope = shouldUseThailandScope(categoryQuery);
+    const scopedDiscoveryQuery = thailandScope && !/thailand|thai|ไทย|lang:th/i.test(expandedQuery)
+      ? `${expandedQuery} Thailand Thai lang:th`
+      : expandedQuery;
+    const xDiscoveryQuery = ensureExpertDiscoveryLang(
+      stripImplicitThailandBiasFromExpertQuery(scopedDiscoveryQuery, thailandScope),
+      thailandScope,
+    );
+    const directCanonicalExperts = thailandScope ? [] : getCanonicalExpertFallbacks(categoryQuery);
+    const shouldPreferDirectCanonicalExperts =
+      directCanonicalExperts.length > 0 &&
+      /kpop|k-pop|fashion|fashion week|basketball|nba|podcast/i.test(String(categoryQuery || '')) &&
+      !/trending|viral|now|ล่าสุด|มาแรง|กำลังดัง/i.test(`${categoryQuery} ${topicLabel} ${expandedQuery}`);
+    if (shouldPreferDirectCanonicalExperts) {
+      return directCanonicalExperts
+        .filter((expert) => {
+          const username = normalizeExpertUsername(expert?.username || '').toLowerCase();
+          return username && !(excludeUsernames || []).some((item) => normalizeExpertUsername(item).toLowerCase() === username);
+        })
+        .slice(0, 6)
+        .map((expert) => ({
+          username: normalizeExpertUsername(expert.username),
+          name: expert.name,
+          description: '',
+          reasoning: buildNaturalExpertReasoning(topicLabel, expert),
+          lastSeenDays: undefined,
+          activityLabel: '',
+          recentTweetCount: 0,
+          followers: 0,
+          profile_image_url: '',
+          webMentionCount: 0,
+          webSources: [],
+        }));
+    }
+    const expertSearchQueries = useFastSeedPath
+      ? [xDiscoveryQuery]
+      : buildExpertDiscoverySearchQueries({
+        categoryQuery,
+        intentPlan,
+        expandedQuery: xDiscoveryQuery,
+        thailandScope,
+      });
+    const nowMs = Date.now();
+
+    const shouldUseWebEvidence = /วิจัย|research|เว็บ|web|sources?|อ้างอิง|ไม่มั่นใจ|verify/i.test(categoryQuery);
+
+    const shouldUseAdaptiveWebEvidence =
+      shouldUseWebEvidence ||
+      (!useFastSeedPath && !shouldUseCanonicalExpertFallbacks(categoryQuery));
+
+    // Run only the fast candidate search by default; Tavily is reserved for explicit deeper verification.
+    const [searchData, tavilyData] = await Promise.all([
+      useFastSeedPath
+        ? Promise.resolve({ data: [] })
+        : Promise.all(
+          expertSearchQueries.map((query) =>
+            withTimeoutFallback(
+              searchEverything(query, '', false, effectiveFreshnessMode === 'latest' ? 'Latest' : 'Top', false),
+              { data: [] },
+              EXPERT_CONTEXT_FETCH_TIMEOUT_MS,
+            ).catch(() => ({ data: [] })),
+          ),
+        ).then((results) => ({
+          data: dedupeExpertSearchTweets(
+            results.flatMap((result) => (Array.isArray(result?.data) ? result.data : [])),
+          ),
+        })),
+      shouldUseAdaptiveWebEvidence
+        ? tavilySearch(
+          `best ${scopedDiscoveryQuery} twitter accounts experts to follow`,
+          effectiveFreshnessMode === 'latest',
+          { max_results: 5, include_answer: true, search_depth: 'basic' },
+        ).catch(() => ({ results: [], answer: '' }))
+        : Promise.resolve({ results: [], answer: '' }),
+    ]);
+
+    // ── Signal A: Tavily canonical context ──────────────────────────────────
+    // Web articles & journalism = who the internet agrees are the canonical experts
+    const webEvidenceMap = buildExpertWebEvidence(tavilyData);
+    try {
+      const tavilyAnswer = (tavilyData?.answer || '').trim();
+      const tavilySnippets = (tavilyData?.results || [])
+        .map((r) => (r.content || '').slice(0, 300))
+        .filter(Boolean)
+        .join('\n');
+      const rawCanonical = [tavilyAnswer, tavilySnippets].filter(Boolean).join('\n').trim();
+      if (rawCanonical) {
+        canonicalContext = [
+          '[WEB-CURATED CANONICAL LIST]',
+          `From web articles, journalism, and expert lists about "${topicLabel}":`,
+          rawCanonical,
+          'Extract any Twitter/X usernames or names mentioned. These are accounts the broader internet considers canonical authorities.',
+          '',
+        ].join('\n');
+      }
+    } catch (e) {
+      console.warn('Could not build canonical context:', e);
+    }
+
+    // ── Signal B: X real-time shortlist ────────────────────────────────────
+    // Twitter search = who is actively posting about the topic right now
+    try {
+      const curatedTweets = curateSearchResults(searchData?.data || [], expandedQuery, {
+        latestMode: effectiveFreshnessMode === 'latest',
+        preferCredibleSources: true,
+      });
+
+      if (curatedTweets.length > 0) {
+        const authorsByUsername = new Map();
+        const topicTerms = [
+          topicLabel,
+          categoryQuery,
+          expandedQuery,
+          ...(intentPlan.includeTerms || []),
+        ].map((term) => String(term || '').toLowerCase()).filter(Boolean);
+
+        for (const tweet of curatedTweets) {
+          const username = (tweet?.author?.username || '').toLowerCase();
+          if (!username) continue;
+
+          const tweetAgeMs = tweet.created_at ? nowMs - new Date(tweet.created_at).getTime() : Infinity;
+          const tweetAgeDays = tweetAgeMs / 86_400_000;
+          const recencyMult = tweetAgeDays <= 7 ? 1.8 : tweetAgeDays <= 30 ? 1.2 : tweetAgeDays <= 90 ? 0.8 : 0.4;
+
+          const rawEngagement =
+            Number(tweet.likeCount || tweet.like_count || 0) +
+            Number(tweet.retweetCount || tweet.retweet_count || 0) * 2 +
+            Number(tweet.replyCount || tweet.reply_count || 0) * 1.5;
+
+          const topicSignal =
+            (Number(tweet.broad_semantic_score || 0) +
+              Number(tweet.search_score || 0) +
+              (topicTerms.some((term) => String(tweet.text || '').toLowerCase().includes(term)) ? 1.25 : 0)) * recencyMult;
+
+          if (!authorsByUsername.has(username)) {
+            authorsByUsername.set(username, {
+              ...tweet.author,
+              _engagementSignal: rawEngagement * recencyMult,
+              _topicSignal: topicSignal,
+              _topicTweetCount: 1,
+              _latestTweetAgeDays: tweetAgeDays,
+            });
+            continue;
+          }
+
+          const existing = authorsByUsername.get(username);
+          existing._engagementSignal += rawEngagement * recencyMult;
+          existing._topicSignal += topicSignal;
+          existing._topicTweetCount += 1;
+          if (tweetAgeDays < existing._latestTweetAgeDays) existing._latestTweetAgeDays = tweetAgeDays;
+        }
+
+        const scoredAuthors = Array.from(authorsByUsername.values()).map((author) => {
+          const followers = Number(author.followers || author.fastFollowersCount || 0);
+          const engRate = followers > 0 ? (author._engagementSignal / followers) * 100 : 0;
+          const followersScore = followers > 0 ? Math.min(30, Math.log10(followers + 1) * 7) : 0;
+          const hasBio = (author.description || '').length > 20;
+          const accountAgeDays = author.createdAt ? (nowMs - new Date(author.createdAt).getTime()) / 86_400_000 : 365;
+          const verifiedBonus = author.isVerified ? 15 : author.isBlueVerified ? 6 : 0;
+          const activityScore = author._latestTweetAgeDays <= 7 ? 20 : 0;
+          const expertQualityScore =
+            author._topicSignal * 3 +
+            Math.min(35, Math.log10(followers + 1) * 7) +
+            Math.min(35, engRate * 12) +
+            verifiedBonus +
+            activityScore +
+            Math.min(15, author._topicTweetCount * 3);
+
+          return {
+            ...author,
+            _compositeScore:
+              author._topicSignal * 2.5 +
+              Math.min(1, engRate / 5) * 50 +
+              followersScore +
+              verifiedBonus + (hasBio ? 4 : 0) + Math.min(8, accountAgeDays / 180) +
+              activityScore +
+              Math.min(15, author._topicTweetCount * 3),
+            _engRate: engRate,
+            _activityDays: author._latestTweetAgeDays,
+            _expertQualityScore: expertQualityScore,
+          };
+        });
+
+        realtimeCandidateAuthors = scoredAuthors
+          .filter((a) => (a.followers || a.fastFollowersCount || 0) >= 5000 || a.isVerified || a.isBlueVerified)
+          .filter((a) => !isLowQualityExpertAuthor(a))
+          .filter((a) => a._latestTweetAgeDays <= EXPERT_ACTIVE_MAX_DAYS)
+          .filter((a) =>
+            a._engagementSignal >= 2 ||
+            (a.followers || a.fastFollowersCount || 0) >= 20000 ||
+            a.isVerified ||
+            a.isBlueVerified
+          )
+          .sort((a, b) => b._expertQualityScore - a._expertQualityScore)
+          .slice(0, 24);
+
+        qualifiedAuthors = scoredAuthors
+          .filter((a) => (a.followers || a.fastFollowersCount || 0) >= EXPERT_MIN_FOLLOWERS || a.isVerified || a.isBlueVerified)
+          .filter((a) => !isLowQualityExpertAuthor(a))
+          .filter((a) => a._topicSignal >= EXPERT_MIN_TOPIC_SIGNAL)
+          .filter((a) => a._latestTweetAgeDays <= EXPERT_ACTIVE_MAX_DAYS)
+          .filter((a) =>
+            a._engagementSignal >= EXPERT_MIN_ENGAGEMENT_SIGNAL ||
+            (a.followers || a.fastFollowersCount || 0) >= 50000 ||
+            a.isVerified ||
+            a.isBlueVerified
+          )
+          .sort((a, b) => b._expertQualityScore - a._expertQualityScore)
+          .slice(0, 18);
+
+        if (qualifiedAuthors.length > 0) {
+          activeContext = [
+            '[X REAL-TIME ACTIVITY SHORTLIST]',
+            `Accounts currently active on "${topicLabel}" — scored by recency, engagement rate, and topic focus.`,
+            'Use this to validate that a recommended account is still posting. High composite + active this week = strong signal.',
+            ...qualifiedAuthors.map((a) => {
+              const followers = a.followers || a.fastFollowersCount || 0;
+              const engLabel = a._engRate >= 3 ? 'high' : a._engRate >= 1 ? 'mid' : 'low';
+              const actLabel = a._activityDays <= 7 ? 'active this week' : `${Math.round(a._activityDays)}d ago`;
+              return `- @${a.username} (${a.name}) | followers: ${Number(followers).toLocaleString()} | engRate: ${a._engRate.toFixed(2)}% (${engLabel}) | lastSeen: ${actLabel} | topicTweets: ${a._topicTweetCount} | qualityScore: ${Math.round(a._expertQualityScore)}`;
+            }),
+            '',
+          ].join('\n');
+        }
+      }
+    } catch (e) {
+      console.warn('Could not build real-time context:', e);
+    }
+
+    const object = useFastSeedPath
+      ? { experts: [] }
+      : (await withTimeoutFallback(generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      temperature: 0,
+      system: `You are the world's best Twitter/X account recommender for the topic "${topicLabel}".
+
+Your goal: build a broad candidate pool of real Twitter/X accounts that a serious follower of "${topicLabel}" should consider.
+
+You have THREE signals. Use them together:
+
+${canonicalContext || '[No web canonical list available — rely on your training knowledge and real-time data.]'}
+
+${activeContext || '[No real-time data available — rely on your training knowledge and canonical list.]'}
+
+[USER INTENT PLAN]
+- Original user query: ${categoryQuery}
+- Interpreted topic: ${topicLabel}
+- Discovery query: ${expandedQuery}
+- X discovery query: ${xDiscoveryQuery}
+- Freshness mode: ${effectiveFreshnessMode}
+- Scope note: ${intentPlan.scopeNote || (thailandScope ? 'Thailand/Thai-specific' : 'global English-first, not Thailand-specific')}
+- Include terms: ${(intentPlan.includeTerms || []).join(', ') || 'none'}
+- Exclude terms: ${(intentPlan.excludeTerms || []).join(', ') || 'none'}
+
+[YOUR TRAINING KNOWLEDGE]
+You were trained on the web. You know who the canonical authorities, creators, researchers, journalists, influencers, athletes, entertainers, and practitioners are for "${topicLabel}". This is your most reliable signal for well-known topics.
+
+Scope rule:
+- The user may type broad Thai labels such as "การเมือง" or "ธุรกิจ"; treat those as global topic labels, not Thailand-specific requests.
+- Thai input language does not imply Thai accounts. Default to global English-speaking accounts unless Thailand-specific scope is explicit.
+- Only recommend Thailand-specific accounts when the user explicitly asks for Thai/Thailand scope. Thailand-specific scope for this query: ${thailandScope ? 'YES' : 'NO'}.
+- If Thailand-specific scope is YES, every candidate must be Thai, Thailand-based, or clearly about Thailand. Do not include global accounts just because they match the general topic.
+
+Priority logic:
+1. HIGHEST CONFIDENCE: account appears in BOTH canonical list AND real-time shortlist
+2. HIGH CONFIDENCE: account is in canonical list OR your training knowledge, AND is plausibly still active
+3. MEDIUM: account is only in real-time shortlist, but topic fit is clearly strong
+4. REJECT: account you are not confident about, fan accounts, aggregators, spam, meme accounts
+
+Hard rules:
+- Return 18-30 candidates when the topic is broad. Do not stop at 6.
+- Topic fit is non-negotiable. Never recommend based on follower count alone.
+- Quality is non-negotiable. Prefer accounts with strong follower signal, real engagement, recent posts, and domain expertise for "${topicLabel}".
+- Reject accounts that are merely active but low authority, random, anonymous, spammy, fan accounts, engagement bait, or only loosely related.
+- Do not hallucinate usernames. If you are not confident a username is real and active, skip it.
+- Prefer diversity: mix practitioners, analysts, journalists, researchers — not 6 accounts of the same type.
+- Exclude list — never recommend these: [${excludeUsernames.join(', ')}]
+- Write "reasoning" in natural Thai, 1-2 sentences, like a human recommendation. Explain who this account is or what role it has, what it usually posts or covers, and what the user will get from following it for "${categoryQuery}". Do not repeat the account name at the start. Do not use templated phrases like "เหมาะสำหรับ", "ช่วยให้", "ถ้าอยากตาม", or "ทำไมควรติดตาม". Do not describe activity, engagement, scoring, or internal verification.`,
+      prompt: `Recall 18-30 real Twitter/X accounts for "${topicLabel}" from the user's request "${categoryQuery}". Username must not start with @. Include the right account types for this niche: experts, creators, analysts, journalists, operators, athletes, entertainers, or high-quality publications where relevant. Write reasoning in natural Thai, 1 sentence, as a human recommendation about domain expertise or useful perspective. Never mention backend scoring, activity checks, engagement, signals, recency, "แอคทีฟ", or "โพสต์สม่ำเสมอ" in reasoning.`,
+      schema: z.object({
+        experts: z.array(
+          z.object({
+            username: z.string().describe('Twitter/X username without @'),
+            name: z.string().describe('Display name'),
+            reasoning: z.string().describe('Thai — 1 sentence on why this account is a must-follow for this topic'),
+            confidence: z.number().min(0).max(1).optional().describe('Confidence that this is a real, relevant account'),
+          }),
+        ).max(30),
+      }),
+    }), { object: { experts: [] } }, EXPERT_MODEL_DISCOVERY_TIMEOUT_MS)).object;
+
+    const normalizedExcludedUsernames = new Set(
+      (excludeUsernames || []).map((item) => String(item || '').replace(/^@/, '').trim().toLowerCase()).filter(Boolean),
+    );
+    const weakRealtimePool = qualifiedAuthors.length < 4 && realtimeCandidateAuthors.length < 4;
+    const canonicalFallbackExperts = (thailandScope || (!shouldUseCanonicalExpertFallbacks(categoryQuery) && !weakRealtimePool) ? [] : getCanonicalExpertFallbacks(categoryQuery))
+      .filter((expert) => {
+        const username = String(expert?.username || '').replace(/^@/, '').trim().toLowerCase();
+        return username && !normalizedExcludedUsernames.has(username);
+      });
+    const modelExperts = (object.experts || [])
+      .map((expert) => ({ ...expert, username: normalizeExpertUsername(expert.username), confidence: expert.confidence ?? 0.75 }))
+      .filter((expert) => {
+        const username = (expert.username || '').toLowerCase();
+        if (!isValidExpertUsername(username) || normalizedExcludedUsernames.has(username)) return false;
+        return true;
+      });
+
+    const candidateMap = new Map();
+    canonicalFallbackExperts.forEach((expert) => mergeExpertCandidate(candidateMap, expert, 'seed'));
+    modelExperts.forEach((expert) => mergeExpertCandidate(candidateMap, expert, 'grok'));
+    const allowRealtimeCandidates =
+      effectiveFreshnessMode === 'latest' ||
+      /influencer|creator|athlete|football|soccer|hiking|trekking|outdoor|comedian|actor|celebrity|viral|trending|กำลังดัง|อินฟลู|นักบอล|เดินป่า|ดารา|ตลก/i.test(
+        `${categoryQuery} ${topicLabel} ${expandedQuery}`,
+      );
+    if (allowRealtimeCandidates) {
+      const realtimePool = realtimeCandidateAuthors.length > 0 ? realtimeCandidateAuthors : qualifiedAuthors;
+      realtimePool.forEach((author) => {
+        mergeExpertCandidate(
+          candidateMap,
+          {
+            username: author?.username,
+            name: author?.name,
+            description: author?.description || '',
+            reasoning: buildNaturalExpertReasoning(topicLabel, author),
+            confidence: 0.62,
+          },
+          'x-realtime',
+        );
+      });
+    }
+    const activeActivityMap = new Map(
+      qualifiedAuthors.map((author) => [
+        String(author?.username || '').toLowerCase(),
+        {
+          lastSeenDays: author?._latestTweetAgeDays,
+          name: author?.name || author?.username,
+          tweetCount: author?._topicTweetCount || 0,
+          engagementSignal: author?._engagementSignal || 0,
+          followers: author?.followers || author?.fastFollowersCount || 0,
+          isVerified: Boolean(author?.isVerified || author?.isBlueVerified),
+          profile_image_url: author?.profile_image_url || author?.profilePicture || '',
+        },
+      ]),
+    );
+    const usernamesToVerify = Array.from(
+      new Set([
+        ...Array.from(candidateMap.values()).map((expert) => expert.username),
+      ]),
+    ).slice(0, EXPERT_ACTIVITY_VERIFY_LIMIT);
+    const verifiedActivityMap = await withTimeoutFallback(
+      buildRecentExpertActivityMap(usernamesToVerify),
+      new Map(),
+      EXPERT_ACTIVITY_VERIFY_TIMEOUT_MS,
+    );
+    const activityMap = new Map(activeActivityMap);
+    verifiedActivityMap.forEach((activity, username) => {
+      const existing = activityMap.get(username) || {};
+      activityMap.set(username, {
+        ...activity,
+        ...existing,
+        lastSeenDays: Math.min(
+          Number.isFinite(existing.lastSeenDays) ? existing.lastSeenDays : Infinity,
+          Number.isFinite(activity.lastSeenDays) ? activity.lastSeenDays : Infinity,
+        ),
+        tweetCount: Math.max(existing.tweetCount || 0, activity.tweetCount || 0),
+        engagementSignal: Math.max(existing.engagementSignal || 0, activity.engagementSignal || 0),
+        followers: Math.max(existing.followers || 0, activity.followers || 0),
+        isVerified: Boolean(existing.isVerified || activity.isVerified),
+        name: existing.name || activity.name || '',
+        profile_image_url: existing.profile_image_url || activity.profile_image_url || '',
+      });
+    });
+
+    const sanitizeExpertReasoningForDisplay = (reasoning, categoryQuery, expert) => {
+      const sanitized = sanitizeExpertReasoning(reasoning, categoryQuery, expert);
+      if (/เป็นบัญชีที่น่าติดตาม|ช่วยให้เห็นภาพรวม|สัญญาณ|บัญชีนี้ช่วยได้ดี|ถ้าคุณอยากตาม|อ่านง่ายกว่าแหล่งทั่วไป/i.test(String(sanitized || ''))) {
+        return buildNaturalExpertReasoning(categoryQuery, expert);
+      }
+      return sanitized;
+    };
+
+    const rankedCandidates = Array.from(candidateMap.values())
+      .map((candidate) => {
+        const username = String(candidate.username || '').toLowerCase();
+        const activity = activityMap.get(username);
+        const webEvidence = webEvidenceMap.get(username);
+        const activityLabel = formatExpertActivityLabel(activity?.lastSeenDays);
+        const candidateForScoring = {
+          ...candidate,
+          name: activity?.name || candidate.name || candidate.username,
+          sourceTitles: webEvidence?.sourceTitles || candidate.sourceTitles || [],
+        };
+        const score =
+          scoreExpertCandidate({ candidate, activity, webEvidence }) -
+          getExpertTopicPenalty(candidateForScoring, topicLabel) -
+          getExpertScopePenalty(candidateForScoring, { thailandScope });
+        return {
+          ...candidate,
+          username: normalizeExpertUsername(candidate.username),
+          name: candidateForScoring.name,
+          description: candidateForScoring.description || candidate.description || '',
+          reasoning: sanitizeExpertReasoningForDisplay(candidate.reasoning, topicLabel, candidateForScoring),
+          lastSeenDays: activity?.lastSeenDays,
+          activityLabel,
+          recentTweetCount: activity?.tweetCount || 0,
+          followers: activity?.followers || 0,
+          profile_image_url: activity?.profile_image_url || candidate.profile_image_url || '',
+          webMentionCount: webEvidence?.mentions || 0,
+          webSources: webEvidence?.sources || [],
+          _score: score,
+          _sourceCount: candidate.sources?.size || 0,
+          _isSeed: Boolean(candidate.sources?.has('seed')),
+        };
+      })
+      .sort((a, b) => b._score - a._score || b._sourceCount - a._sourceCount || String(a.username).localeCompare(String(b.username)))
+      .map((expert) => ({
+        username: expert.username,
+        name: expert.name,
+        description: expert.description || '',
+        reasoning: sanitizeExpertReasoningForDisplay(expert.reasoning, topicLabel, expert),
+        lastSeenDays: expert.lastSeenDays,
+        activityLabel: expert.activityLabel,
+        recentTweetCount: expert.recentTweetCount,
+        followers: expert.followers || 0,
+        profile_image_url: expert.profile_image_url,
+        webMentionCount: expert.webMentionCount,
+        webSources: expert.webSources,
+        _score: expert._score,
+      }));
+
+    const strictExperts = rankedCandidates.filter((expert) => {
+      const username = String(expert.username || '').toLowerCase();
+      if (!isValidExpertUsername(username) || normalizedExcludedUsernames.has(username)) return false;
+      if (isLowQualityExpertAuthor(expert)) return false;
+      const activity = activityMap.get(username);
+      return Boolean(expert.activityLabel) && hasExpertQualitySignal(activity);
+    });
+
+    const strictUsernames = new Set(strictExperts.map((expert) => String(expert.username || '').toLowerCase()));
+    const relaxedBackfillExperts = rankedCandidates.filter((expert) => {
+      const username = String(expert.username || '').toLowerCase();
+      if (!isValidExpertUsername(username) || normalizedExcludedUsernames.has(username)) return false;
+      if (strictUsernames.has(username) || isLowQualityExpertAuthor(expert)) return false;
+      if (!expert.activityLabel) return false;
+
+      const hasUsefulEvidence =
+        Number(expert.followers || 0) >= 5000 ||
+        Number(expert.recentTweetCount || 0) >= 1 ||
+        Number(expert.webMentionCount || 0) >= 1;
+
+      return hasUsefulEvidence;
+    });
+
+    const relaxedUsernames = new Set(relaxedBackfillExperts.map((expert) => String(expert.username || '').toLowerCase()));
+    const fallbackExperts = rankedCandidates.filter((expert) => {
+      const username = String(expert.username || '').toLowerCase();
+      if (!isValidExpertUsername(username) || normalizedExcludedUsernames.has(username)) return false;
+      if (strictUsernames.has(username) || relaxedUsernames.has(username)) return false;
+      if (isLowQualityExpertAuthor(expert)) return false;
+      if (shouldUseCanonicalExpertFallbacks(categoryQuery)) return true;
+
+      return (
+        Number(expert.followers || 0) >= 10000 ||
+        Number(expert.recentTweetCount || 0) >= 1 ||
+        Number(expert.webMentionCount || 0) >= 1
+      );
+    });
+
+    const scoredExperts = strictExperts.length >= 6
+      ? [...strictExperts, ...fallbackExperts]
+      : [...strictExperts, ...relaxedBackfillExperts, ...fallbackExperts];
+
+    const rerankCandidates = scoredExperts.slice(0, 18);
+    let selectedUsernames = [];
+
+    if (shouldUseAdaptiveWebEvidence && rerankCandidates.length > 6) {
+      try {
+        const { object: rerankObject } = await withTimeoutFallback(generateObject({
+          model: grok(MODEL_NEWS_FAST),
+          temperature: 0,
+          system: `You are selecting the final 6 Twitter/X experts for "${topicLabel}" from a pre-verified candidate list.
+
+Rules:
+- Select ONLY usernames from the provided candidates. Never invent a new username.
+- Topic fit is more important than raw activity. Reject accounts that are merely active or famous but not true experts for "${topicLabel}".
+- If at least 6 candidates have "Active this week", select only those weekly-active candidates. Do not choose inactive or merely recently active canonical names in that case.
+- Prefer candidates with activityLabel, webMentionCount, or high score, but do not choose off-topic accounts just because they are active.
+- Keep a useful mix of individuals and high-quality publications when the topic benefits from both.
+- The query is ${thailandScope ? 'Thailand/Thai-specific' : 'global English-first'}; do not choose Thai/Japanese/local-tourism accounts unless that scope is explicit or the account is truly global for the topic.
+- If the query is Thailand/Thai-specific, choose only candidates that are Thai, Thailand-based, or clearly about Thailand.
+- Return exactly 6 usernames when at least 6 candidates are usable.`,
+          prompt: JSON.stringify({
+            topic: categoryQuery,
+            interpretedTopic: topicLabel,
+            discoveryQuery: xDiscoveryQuery,
+            includeTerms: intentPlan.includeTerms || [],
+            excludeTerms: intentPlan.excludeTerms || [],
+            candidates: rerankCandidates.map((candidate) => ({
+              username: candidate.username,
+              name: candidate.name,
+              activityLabel: candidate.activityLabel,
+              webMentionCount: candidate.webMentionCount,
+              score: Math.round(candidate._score || 0),
+              reasoning: candidate.reasoning,
+            })),
+          }),
+          schema: z.object({
+            usernames: z.array(z.string()).max(6),
+          }),
+        }), { object: { usernames: [] } }, EXPERT_MODEL_RERANK_TIMEOUT_MS);
+
+        const allowed = new Set(rerankCandidates.map((candidate) => String(candidate.username || '').toLowerCase()));
+        selectedUsernames = (rerankObject.usernames || [])
+          .map((username) => normalizeExpertUsername(username).toLowerCase())
+          .filter((username, index, list) => allowed.has(username) && list.indexOf(username) === index);
+      } catch (error) {
+        console.warn('[GrokService] Expert final rerank failed:', error);
+      }
+    }
+
+    const selectedSet = new Set(selectedUsernames);
+    const rerankedExperts = [
+      ...selectedUsernames
+        .map((username) => scoredExperts.find((expert) => String(expert.username || '').toLowerCase() === username))
+        .filter(Boolean),
+      ...scoredExperts.filter((expert) => !selectedSet.has(String(expert.username || '').toLowerCase())),
+    ];
+
+    const cleanedExperts = rerankedExperts.map((expert) => {
+      const output = { ...expert };
+      delete output._score;
+      delete output._isSeed;
+      return output;
+    });
+    const visibleExperts = cleanedExperts.slice(0, 6);
+    visibleExperts.overflowExperts = cleanedExperts.slice(6);
+    return visibleExperts;
+  } catch (error) {
+    console.error('[GrokService] Strict expert discovery LLM error:', error);
+    if (error.status === 400) {
+      console.warn('[GrokService] 400 Bad Request in strict discovery. Check parameters/reasoningEffort for model.');
+    }
+    return [];
+  }
+};
+
+export const researchContext = async (query, interactionData = '') => {
+  const { factSheet } = await researchAndPreventHallucination(query, interactionData);
+  return factSheet;
+};
+
+// --- [CONTENT FLOW FUNCTIONS] ---
+
+const TWEET_URL_PATTERN = /(?:twitter|x)\.com\/(?:#!\/)?(\w+)\/status(?:es)?\/(\d+)/i;
+
+const extractTweetIdFromInput = (input = '') => {
+  const match = input.match(TWEET_URL_PATTERN);
+  if (!match) return null;
+  return { username: match[1], tweetId: match[2] };
+};
+
+export const analyzeXVideoPost = async ({ postUrl, fallbackText = '', signal } = {}) => {
+  if (!postUrl || !/(?:twitter|x)\.com\//i.test(postUrl)) return null;
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const cacheKey = buildCacheKey(
+    'x-video-analysis',
+    `${normalizeCacheText(postUrl)}||${normalizeCacheText(fallbackText).slice(0, 500)}`,
+  );
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { object } = await generateObject({
+      model: grok.responses(MODEL_REASONING_FAST),
+      system: `You analyze videos from X posts for a Thai content creation workflow.
+Use the available x_search and view_x_video tools when needed.
+Only analyze the specific X post URL provided by the user.
+If the video cannot be inspected directly, fall back conservatively to the supplied tweet text context.
+Return JSON only.`,
+      prompt: [
+        `Analyze the X video from this exact post URL: ${postUrl}`,
+        fallbackText ? `[Fallback post text/context]\n${fallbackText}` : '',
+        'Extract the key idea, important visuals, and hooks that can be turned into a short-form Thai video script.',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      tools: {
+        x_search: grok.tools.xSearch({
+          enableVideoUnderstanding: true,
+        }),
+        view_x_video: grok.tools.viewXVideo(),
+      },
+      schema: z.object({
+        available: z.boolean(),
+        summary: z.string(),
+        transcriptExcerpt: z.string(),
+        visualNotes: z.array(z.string()).max(5),
+        keyPoints: z.array(z.string()).max(6),
+        hookAngles: z.array(z.string()).max(4),
+      }),
+      providerOptions: {
+        xai: {
+          reasoningEffort: 'medium',
+        },
+      },
+      abortSignal: signal,
+    });
+
+    return setCachedValue(responseCache, cacheKey, object, X_VIDEO_ANALYSIS_CACHE_TTL_MS);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    console.warn('[GrokService] X video analysis failed:', error);
+    return null;
+  }
+};
+
+export const analyzeXImagePost = async ({ postUrl, imageUrls = [], fallbackText = '', signal } = {}) => {
+  if (!postUrl || !/(?:twitter|x)\.com\//i.test(postUrl)) return null;
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+
+  const cacheKey = buildCacheKey(
+    'x-image-analysis',
+    `${normalizeCacheText(postUrl)}||${normalizeCacheText((imageUrls || []).join(' ')).slice(0, 500)}||${normalizeCacheText(fallbackText).slice(0, 500)}`,
+  );
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  try {
+    const { object } = await generateObject({
+      model: grok.responses(MODEL_REASONING_FAST),
+      system: `You analyze image posts from X for a Thai content creation workflow.
+Use the available x_search tool when needed.
+Only analyze the specific X post URL provided by the user.
+Focus on what is visually evident in the attached image post, any visible text inside the image, and angles that are useful for content creation.
+If the image cannot be inspected directly, fall back conservatively to the supplied post text context and image URLs.
+Return JSON only.`,
+      prompt: [
+        `Analyze the X image post from this exact post URL: ${postUrl}`,
+        imageUrls.length ? `[Image URLs]\n${imageUrls.join('\n')}` : '',
+        fallbackText ? `[Fallback post text/context]\n${fallbackText}` : '',
+        'Extract the core visual idea, any readable text in the image, notable elements, and hooks that can be used for a Thai content brief.',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      tools: {
+        x_search: grok.tools.xSearch(),
+      },
+      schema: z.object({
+        available: z.boolean(),
+        summary: z.string(),
+        visibleText: z.array(z.string()).max(8),
+        visualNotes: z.array(z.string()).max(6),
+        keyPoints: z.array(z.string()).max(6),
+        hookAngles: z.array(z.string()).max(4),
+      }),
+      providerOptions: {
+        xai: {
+          reasoningEffort: 'medium',
+        },
+      },
+      abortSignal: signal,
+    });
+
+    return setCachedValue(responseCache, cacheKey, object, X_VIDEO_ANALYSIS_CACHE_TTL_MS);
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    console.warn('[GrokService] X image analysis failed:', error);
+    return null;
+  }
+};
+
+export const researchAndPreventHallucination = async (input, interactionData = '', options = {}) => {
+  const throwIfAborted = () => {
+    if (options.signal?.aborted) {
+      throw new DOMException('Aborted', 'AbortError');
+    }
+  };
+
+  throwIfAborted();
+  const rawInput = options.originalInput || input;
+  const cacheKey = buildCacheKey('fact-sheet-v2', normalizeCacheText(rawInput) + '||' + normalizeCacheText(input) + '||' + normalizeCacheText((interactionData || '').slice(0, 300)));
+  const cached = getCachedValue(responseCache, cacheKey);
+  if (cached) return cached;
+
+  let attachedExternalUrls = mergeExternalSourceUrls(
+    options.primarySourceUrls || [],
+    extractExternalSourceUrls(rawInput, input, interactionData),
+  );
+  let webContext = '';
+  let xContext = '';
+  let extractedSources = [];
+  let attachedSourceContext = '';
+  let primaryLeadTitle = '';
+  const hasPrimaryLead = attachedExternalUrls.length > 0;
+  const attachedXPostUrl = options.attachedXPostUrl || '';
+  const attachedXPostTitle = options.attachedXPostTitle || '';
+
+  // Detect and fetch tweet when input contains a tweet URL
+  const tweetRef = extractTweetIdFromInput(input);
+  if (tweetRef) {
+    try {
+      throwIfAborted();
+      const tweet = await fetchTweetById(tweetRef.tweetId);
+      if (tweet?.text) {
+        const tweetText = tweet.text.replace(/https?:\/\/\S+/g, '').trim();
+        const author = tweet.author?.name || tweet.author?.username || tweetRef.username;
+        const tweetUrl = buildTweetUrl(tweet);
+        const fetchedTweetIntel = `[ORIGINAL TWEET SOURCE]\nAuthor: @${tweet.author?.username || tweetRef.username} (${author})\nContent: ${tweetText}\nLikes: ${tweet.like_count || 0} | Retweets: ${tweet.retweet_count || 0}`;
+        interactionData = [interactionData, fetchedTweetIntel].filter(Boolean).join('\n\n');
+        if (tweetUrl) {
+          extractedSources.push({
+            title: tweetText
+              ? `Original X post by @${tweet.author?.username || tweetRef.username}: ${tweetText.slice(0, 120)}${tweetText.length > 120 ? '...' : ''}`
+              : `Original X post by @${tweet.author?.username || tweetRef.username}`,
+            url: tweetUrl,
+          });
+        }
+        attachedExternalUrls = mergeExternalSourceUrls(
+          attachedExternalUrls,
+          extractExternalSourceUrls(rawInput, input, interactionData, tweet.text),
+          extractUrlsFromObject(tweet),
+        );
+      }
+    } catch {
+      // silently continue without tweet data
+    }
+  }
+
+  let researchQuery = '';
+  const intentProfile = options.intentProfile || null;
+  try {
+    throwIfAborted();
+    const normalizedInputSeed = intentProfile?.researchHint || input;
+    const queryInput = tweetRef ? `${tweetRef.username} ${normalizedInputSeed.replace(TWEET_URL_PATTERN, '').trim()}`.trim() : normalizedInputSeed;
+    researchQuery = await deriveResearchQuery(queryInput, interactionData);
+  } catch (err) {
+    console.warn('[GrokService] Query derivation failed, using raw input:', err.message);
+    researchQuery = input.slice(0, 100);
+  }
+
+  try {
+    throwIfAborted();
+    console.log('[GrokService] Starting research with query:', researchQuery);
+    if (options.onProgress) options.onProgress('fetching');
+
+    // Query Gating: Only fetch X Latest if query seems time-sensitive
+    const isLatestNeeded = /ล่าสุด|วันนี้|breaking|เปิดตัว|ประกาศ|ด่วน|now|today|update/i.test(rawInput) || /ล่าสุด|วันนี้|breaking|เปิดตัว|ประกาศ|ด่วน|now|today|update/i.test(interactionData);
+
+    // When skipWebSearch is true (e.g. RSS source attached with full article body),
+    // skip general Tavily + X search — still fetch attached URLs via Tavily as fallback.
+    const skipWebSearch = Boolean(options.skipWebSearch);
+
+    const [data, xTopResponse, xLatestResponse, attachedUrlResponses] = await Promise.all([
+      skipWebSearch
+        ? Promise.resolve({ results: [], answer: '' })
+        : tavilySearch(researchQuery, false, hasPrimaryLead
+          ? { max_results: 4, include_answer: true, search_depth: 'advanced' }
+          : {}),
+      skipWebSearch
+        ? Promise.resolve({ data: [] })
+        : searchEverything(researchQuery, '', false, 'Top').catch(() => ({ data: [] })),
+      skipWebSearch || !isLatestNeeded
+        ? Promise.resolve({ data: [] })
+        : searchEverything(researchQuery, '', false, 'Latest').catch(() => ({ data: [] })),
+      attachedExternalUrls.length
+        ? Promise.all(
+          attachedExternalUrls.map((url) =>
+            tavilySearch(url, false, {
+              max_results: 3,
+              include_answer: true,
+              include_raw_content: true,
+              search_depth: 'advanced',
+              topic: 'general',
+            }).catch(() => ({ results: [], answer: '' })),
+          ),
+        )
+        : Promise.resolve([]),
+    ]);
+
+    throwIfAborted();
+
+    if (data && (data.results?.length || data.answer)) {
+      const webResults = Array.isArray(data.results) ? data.results : [];
+
+      extractedSources.push(
+        ...webResults.map((result) => ({
+          title: result.title || result.url,
+          url: result.url,
+        })),
+      );
+
+      webContext = [
+        data.answer && !hasPrimaryLead ? `[WEB ANSWER]\n${data.answer}` : '',
+        webResults.length
+          ? `[WEB SOURCES${hasPrimaryLead ? ' - SECONDARY CONTEXT ONLY' : ''}]\n${webResults
+            .map((result, index) => {
+              const snippet = (result.content || result.raw_content || '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 320);
+              return `${index + 1}. ${result.title} - ${snippet} (${result.url})`;
+            })
+            .join('\n')}`
+          : '',
+      ]
+        .filter(Boolean)
+        .join('\n\n');
+    }
+
+    if (attachedExternalUrls.length && attachedUrlResponses.length) {
+      const attachedBlocks = attachedUrlResponses
+        .map((response, index) => {
+          const sourceUrl = attachedExternalUrls[index];
+          if (!response || (!response.results?.length && !response.answer)) return '';
+
+          extractedSources.push(
+            ...((response.results || []).map((result) => ({
+              title: result.title || result.url || sourceUrl,
+              url: result.url || sourceUrl,
+            }))),
+          );
+
+          const matchedPrimarySource = (response.results || []).find((result) => result?.url === sourceUrl);
+          if (matchedPrimarySource) {
+            if (!primaryLeadTitle) primaryLeadTitle = matchedPrimarySource.title || sourceUrl;
+            extractedSources.push({
+              title: matchedPrimarySource.title || sourceUrl,
+              url: matchedPrimarySource.url || sourceUrl,
+            });
+          } else {
+            if (!primaryLeadTitle) primaryLeadTitle = sourceUrl;
+            extractedSources.push({
+              title: sourceUrl,
+              url: sourceUrl,
+            });
+          }
+
+          return buildStrictPrimarySourceContext(`PRIMARY SOURCE WEB ${index + 1}`, response, sourceUrl, primaryLeadTitle || sourceUrl);
+        })
+        .filter(Boolean);
+
+      attachedSourceContext = attachedBlocks.join('\n\n');
+    }
+
+    const xTweets = dedupeByNormalizedText(
+      [...(xTopResponse?.data || []).slice(0, 4), ...(xLatestResponse?.data || []).slice(0, 4)],
+      (tweet) => tweet?.id || tweet?.text,
+    );
+    if (xTweets.length) {
+      xContext = `[X EVIDENCE]\n${toTweetEvidence(xTweets, 6)}`;
+      extractedSources.push(..._extractSourcesFromTweets(xTweets, 4));
+    }
+    if (attachedXPostUrl) {
+      extractedSources.unshift({
+        title: attachedXPostTitle || 'Attached X post',
+        url: attachedXPostUrl,
+      });
+    }
+    console.log('[GrokService] Evidence gathering complete:', { web: !!webContext, x: xTweets.length });
+    if (options.onProgress) options.onProgress('context-built');
+  } catch (error) {
+    if (error?.name === 'AbortError') throw error;
+    console.error('[GrokService] Search aggregation error:', error);
+  }
+
+  try {
+    throwIfAborted();
+    if (options.onProgress) options.onProgress('compiling');
+    const todayDate = new Date().toISOString().split('T')[0];
+    const { object: factSheetObj } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: `คุณคือหัวหน้าทีมนักวิจัย (Lead Investigator) ที่รับผิดชอบความถูกต้องของข้อมูล (Fact-Check) 100%
+เป้าหมาย: สร้าง Fact Sheet ฉบับสมบูรณ์ที่แม่นยำที่สุด โดยห้ามมี Hallucination เด็ดขาด ส่งออกเป็น JSON ตามโครงสร้างที่กำหนดเท่านั้น
+[TODAY'S DATE: ${todayDate}]
+
+[การใช้แหล่งข้อมูล]
+- หากมี [PRIMARY LEAD / ORIGINAL SOURCE] ให้ถือว่านี่คือแกนกลางของเรื่องที่ต้องตรวจสอบและยืนยันเป็นอันดับแรก
+- ให้ลำดับความสำคัญอ้างอิงกับ [WEB SOURCES] (แหล่งข่าวทางการ) เป็นหลัก
+- ใช้ [X EVIDENCE] เพื่อสรุป "ความเคลื่อนไหว" หรือมิติทางสังคม
+- หากมีต้นทางเป็น URL ข่าวโดยตรง ห้ามเดาเส้นทางขนส่ง ผลกระทบต่อผู้บริโภค เจตนาคนร้าย มาตรการบริษัท หรือรายละเอียดแวดล้อมอื่นใด เว้นแต่มีระบุชัดในต้นทางหรือแหล่งข่าวหลักที่สอดคล้องกัน
+- ถ้าข้อมูลใดยังเป็นการอนุมานหรือขยายความจากบริบท ห้ามใส่ใน verified_facts ให้ย้ายไป open_questions หรือไม่ต้องใส่เลย
+
+In verified_facts, reported_claims, and open_questions, write the substance of the story instead of repeatedly saying which outlet reported it.
+Exclude publisher names, website names, and domains from named_entities unless that publisher is directly part of the story.
+
+[CITATIONS RULE]
+- ห้ามระบุชื่อบัญชี (@handle) ของผู้ใช้ทั่วไปที่ไม่มีอิมแพค ให้ใช้คำว่า "กลุ่มผู้ใช้" แทน
+- หากข้อมูลใน [PRIMARY LEAD] ขัดแย้งกับ [WEB SOURCES] อย่างรุนแรง (เช่น อันหนึ่งบอกปิด อีกอันบอกเปิด) **ห้ามตัดสินทิ้งข้อมูลอันใดอันหนึ่งแล้วมโนเรื่องใหม่ขึ้นมาเอง** ให้สรุปข้อคัดแย้งนั้นลงใน [OPEN QUESTIONS] อย่างชัดเจน
+- หากแหล่งที่มาดูไม่น่าเชื่อถือ ให้คัดออกจากการเป็นข้อเท็จจริงยืนยัน (Verified Facts) แต่ต้องระบุไว้ใน [COMMUNITY SIGNAL] ว่ามีกระแสข่าวนี้อยู่
+`,
+      prompt: [
+        interactionData ? `[PRIMARY LEAD / ORIGINAL SOURCE]\n${interactionData}` : '',
+        `[ORIGINAL REQUEST]\n${input}`,
+        `[SEARCH QUERY]\n${researchQuery}`,
+        webContext || '[No web context available]',
+        attachedSourceContext,
+        xContext || '[No X evidence available]',
+      ]
+        .filter(Boolean)
+        .join('\n\n'),
+      schema: z.object({
+        verified_facts: z.array(z.string()).describe("ข้อเท็จจริงที่ได้รับการยืนยันจากแหล่งข้อมูล ถ่ายทอดเป็นประโยคชัดเจน"),
+        reported_claims: z.array(z.string()).describe("ข้อกล่าวอ้างหรือสิ่งที่แหล่งข่าวรายงาน แต่ยังไม่ควรบิดให้เป็นข้อเท็จจริงแข็ง"),
+        open_questions: z.array(z.string()).describe("ประเด็นที่ยังไม่แน่ชัด ขัดแย้งกัน หรือรอการยืนยัน"),
+        community_signal: z.string().describe("กระแสตอบรับหรือมุมมองจากชุมชนชาว X สั้นๆ"),
+        must_not_claim: z.array(z.string()).describe("สิ่งที่ห้ามเคลมหรือห้ามเขียนเด็ดขาดเนื่องจากไม่มีข้อมูลยืนยัน"),
+        named_entities: z.array(z.string()).describe("ชื่อบุคคล/องค์กร/สถานที่ ที่เกี่ยวข้องตัองพิมพ์ให้ถูกต้อง")
+      }),
+    });
+
+    const factSheet = hasPrimaryLead
+      ? strengthenPrimaryLeadFactSheet(JSON.parse(JSON.stringify(factSheetObj)), attachedExternalUrls[0] || '')
+      : JSON.parse(JSON.stringify(factSheetObj));
+    const factSheetText = `[VERIFIED FACTS]\n${factSheet.verified_facts.map(f => `- ${f}`).join('\n')}\n\n[REPORTED CLAIMS]\n${factSheet.reported_claims.map(f => `- ${f}`).join('\n')}\n\n[OPEN QUESTIONS]\n${factSheet.open_questions.map(f => `- ${f}`).join('\n')}\n\n[COMMUNITY SIGNAL]\n${factSheet.community_signal}\n\n[MUST NOT CLAIM]\n${factSheet.must_not_claim.map(f => `- ${f}`).join('\n')}\n\n[KEY ENTITIES]\n${factSheet.named_entities.join(', ')}`;
+
+    const primaryLeadUrl = attachedExternalUrls[0] || '';
+    const finalSources = hasPrimaryLead
+      ? getPrimaryLeadAwareSources(extractedSources, { primaryLeadUrl, primaryLeadTitle })
+      : rankAndFilterSources(extractedSources, {
+        primaryLeadUrl,
+        researchQuery,
+        input: rawInput,
+      });
+
+    const resultPayload = {
+      factSheet: factSheetText,
+      sources: finalSources,
+    };
+
+    return setCachedValue(responseCache, cacheKey, resultPayload, FACT_CACHE_TTL_MS);
+  } catch (error) {
+    console.error('[GrokService] FactSheet generation error:', error);
+    throw error;
+  }
+};
+
+export const generateStructuredContent = async (
+  factSheet,
+  length,
+  tone,
+  format,
+  onStreamChunk,
+  options = {},
+) => {
+  const { allowEmoji = false } = options;
+  const lengthInstruction = getLengthInstruction(length);
+
+  const draftSystemPrompt = `คุณคือนักเขียนภาษาไทยมืออาชีพ
+เขียนโดยอ้างอิงจากข้อมูลข้อเท็จจริง (Fact Sheet) ที่ให้มาเท่านั้น
+
+รูปแบบที่ต้องการ: ${format}
+โทนสีของเนื้อหา: ${tone}
+ความยาว: ${lengthInstruction}
+
+กฎ:
+1. ห้ามสร้างข้อเท็จจริง, ตัวเลข, ชื่อ, ช่วงเวลา หรือคำพูดขึ้นมาเอง
+2. คงชื่อเฉพาะภาษาอังกฤษไว้เป็นภาษาอังกฤษ
+3. ห้ามใส่ URL ของแหล่งข้อมูลลงในเนื้อหาหลัก
+4. หากข้อมูลหลักฐานขัดแจ้งกัน ให้ใช้การเลือกใช้คำที่ระมัดระวัง
+5. สำหรับเนื้อหาสั้น ไม่ต้องใส่หัวข้อหลัก
+6. สำหรับเนื้อหาปานกลางและยาว ให้ใช้ Markdown หัวข้อ (Headings) และจบด้วย "## บทสรุป"
+7. กฎการระบุชื่อ (@handle): สามารถระบุชื่อบัญชีที่มีชื่อเสียง, มีผู้ติดตามสูง, มียอดเอนเกจเม้นท์สูงมาก หรือเป็นต้นทางข้อมูลเท่านั้น ส่วนบัญชีทั่วไปที่แชร์ต่อโดยไม่มีอิมแพค ให้สรุปเป็นภาพรวมว่าเป็นกระแสจากชุมชนแทนการระบุชื่อรายคน`;
+
+  const draftUserPrompt = `[FACT SHEET]\n${factSheet}\n\nWrite the final Thai content now.`;
+
+  if (onStreamChunk) {
+    try {
+      const { textStream } = await streamText({
+        model: grok(MODEL_WRITER),
+        system: draftSystemPrompt,
+        prompt: draftUserPrompt,
+        temperature: 0.7,
+        topP: 0.85,
+        frequencyPenalty: 0.35,
+        presencePenalty: 0.1,
+      });
+
+      let fullContent = '';
+      for await (const textPart of textStream) {
+        fullContent += textPart;
+        onStreamChunk(cleanGeneratedContent(fullContent, { allowEmoji }));
+      }
+
+      return cleanGeneratedContent(fullContent, { allowEmoji });
+    } catch (error) {
+      console.error('[GrokService] Streaming error:', error);
+      throw error;
+    }
+  }
+
+  const contentDraft = await callGrok({
+    modelName: MODEL_WRITER,
+    system: draftSystemPrompt,
+    prompt: draftUserPrompt,
+    temperature: 0.7,
+    topP: 0.85,
+    frequencyPenalty: 0.35,
+    presencePenalty: 0.1,
+    allowEmoji,
+  });
+
+  try {
+    const { object: evalResult } = await generateObject({
+      model: grok(MODEL_REASONING_FAST),
+      system: `ตรวจสอบว่าร่างเนื้อหานี้ยังคงรักษาความถูกต้องตามข้อมูลข้อเท็จจริง (Fact Sheet) หรือไม่
+ส่งค่า passed=true เฉพาะเมื่อร่างเนื้อหานี้อ้างอิงจากข้อเท็จจริงและมีโทนที่ถูกต้องเท่านั้น
+ถ้าไม่ผ่าน ให้ระบุเหตุผลสั้นๆ`,
+      prompt: `[FACT SHEET]\n${factSheet}\n\n[DRAFT]\n${contentDraft}`,
+      schema: z.object({
+        passed: z.boolean(),
+        reason: z.string().optional(),
+      }),
+    });
+
+    if (!evalResult.passed) {
+      return cleanMarkdown(
+        await callGrok({
+          modelName: MODEL_WRITER,
+          system: draftSystemPrompt,
+          prompt: `[ข้อมูลข้อเท็จจริง]\n${factSheet}\n\n[ร่างเนื้อหาปัจจุบัน]\n${contentDraft}\n\n[ข้อเสนอแนะจากบรรณาธิการ]\n${evalResult.reason || 'กรุณาปรับปรุงความถูกต้องและโทนของเนื้อหา'
+            }\n\nกรุณาเขียนเนื้อหาใหม่เพื่อให้สอดคล้องกับข้อเท็จจริงทั้งหมด`,
+          temperature: 0.4,
+          allowEmoji,
+        }),
+      );
+    }
+  } catch (error) {
+    console.warn('[GrokService] Editor pass skipped:', error);
+  }
+
+  return cleanGeneratedContent(contentDraft, { allowEmoji });
+};
+
+export const generateStructuredContentV2 = async (
+  factSheet,
+  length,
+  tone,
+  format,
+  onStreamChunk,
+  options = {},
+) => {
+  const { allowEmoji = false, customInstructions = '', intentProfile = null, rawUserInput = '' } = options;
+  // Temperature matrix: format sets the base creative range, tone fine-tunes within it
+  const FORMAT_BASE_TEMP: Record<string, number> = {
+    'โพสต์โซเชียล': 0.82,
+    'สคริปต์วิดีโอสั้น': 0.85,
+    'บทความ SEO / บล็อก': 0.68,
+    'โพสต์ให้ความรู้ (Thread)': 0.75,
+  };
+  const TONE_TEMP_DELTA: Record<string, number> = {
+    'ให้ข้อมูล/ปกติ': 0,
+    'กระตือรือร้น/ไวรัล': 0.07,
+    'ทางการ/วิชาการ': -0.09,
+    'เป็นกันเอง/เพื่อนเล่าให้ฟัง': 0.04,
+    'ตลก/มีอารมณ์ขัน': 0.1,
+    'ดุดัน/วิจารณ์เชิงลึก': 0.03,
+    'ฮาร์ดเซลล์/ขายของ': -0.03,
+  };
+  const writerTemperature = Math.min(0.95, Math.max(0.56, (FORMAT_BASE_TEMP[format] ?? 0.76) + (TONE_TEMP_DELTA[tone] ?? 0)));
+  const isViralTone = tone === 'กระตือรือร้น/ไวรัล';
+  // Lower frequency penalty: Thai writing naturally repeats key terms for clarity;
+  // over-penalising causes unnatural vocabulary substitutions that break flow
+  const writerFrequencyPenalty = isViralTone ? 0.12 : 0.18;
+  const lengthInstruction = getLengthInstruction(length);
+  const profile = buildFormatProfile(format);
+  const brief = await buildContentBrief({ factSheet, length, tone, format, customInstructions, intentProfile });
+  const activeFactSheet = compressFactSheetForFormat(factSheet, format);
+  const skipReviewPass = shouldSkipReviewPass({ format, tone, intentProfile, customInstructions, factSheet: activeFactSheet });
+  const adaptiveStyleDirectives = buildAdaptiveWritingDirectives({
+    format,
+    tone,
+    length,
+    customInstructions,
+    rawUserInput,
+  });
+
+  const draftSystemPrompt = `You are a senior Thai writer — not an AI assistant, not a content template engine. You write the way skilled Thai journalists and editors write: specific, grounded, with a distinct voice shaped by the requested tone and format.
+
+Core craft principles:
+- Specificity beats vagueness: "1.2 แสนตัน" is better than "ปริมาณมหาศาล", "แพทย์ 3 คน" is better than "ผู้เชี่ยวชาญหลายราย"
+- Show through facts, not adjectives: let the data and events carry the emotional weight
+- Rhythm is meaning: vary sentence length deliberately — a short sentence after a long one creates emphasis
+- The best opening line earns attention with a specific fact, a contradiction, or a number — never with "ในยุคที่...", "ปฏิเสธไม่ได้ว่า...", or a rhetorical question that the reader doesn't care about yet
+- The best closing line leaves the reader with something to think about, not a summary of what they just read
+
+Priority order (strict):
+1. Fact sheet verified facts and must-not-claim rules — these are absolute
+2. The user's raw request and raw instructions — follow these over everything else
+3. Normalized intent and structured brief — treat as creative guidance only
+
+Hard rules:
+- Do not state unsupported details as facts. Treat reported claims and open questions as softer context.
+- If uncertainty exists, acknowledge it naturally — do not force certainty or hedge with useless filler phrases.
+- Mention people and accounts only when they materially matter to the story.
+- Do not write like a news roundup that keeps re-attributing each paragraph to a publisher or website.
+- Do not mention publisher names, site names, or domains unless they materially matter to the story, the user explicitly asked for attribution, or a source conflict needs to be explained.
+- Follow the requested format and tone faithfully; do not substitute a "safer" house style.
+- Treat format profiles and brief guidance as flexible craft direction, not a rigid fill-in-the-blanks template.
+- Write natural Thai. Never literal translation. Never corporate jargon.
+- Never use the em dash character (Unicode U+2014) anywhere in the final output.
+- Forbidden phrases: "นั่นหมายความว่า...", "จะเห็นได้ว่า...", "ที่สำคัญกว่านั้น...", "ซึ่งทำให้เราเห็นว่า...", "นับว่าเป็น...", "เรียกได้ว่า...", "สิ่งที่น่าสนใจคือ..." - these are filler that adds no information.
+- No forced bold headline, hook line, or paragraph splits unless the content genuinely needs them.
+- No CTA or audience interaction unless the user explicitly asked for it.
+- For formats that do not use headings: never invent markdown headings as scaffolding.`;
+
+  const draftUserPrompt = [
+    `<format_rules>\nFormat: ${format} (${profile.label})\nLength: ${lengthInstruction}\nStructure: ${profile.structure}\nGoals: ${profile.goals}\nWriting skill for this format: ${profile.skill || ''}\n</format_rules>`,
+    `<raw_user_request>\n${rawUserInput || 'None'}\n</raw_user_request>`,
+    `<raw_user_instructions>\n${customInstructions || 'None'}\n</raw_user_instructions>`,
+    `<normalized_intent_guidance>\n${intentProfile ? JSON.stringify(intentProfile, null, 2) : 'None'}\n</normalized_intent_guidance>`,
+    `<structured_brief_guidance>\n${JSON.stringify(brief, null, 2)}\n</structured_brief_guidance>`,
+    `<adaptive_style_directives>\n- ${adaptiveStyleDirectives}\n</adaptive_style_directives>`,
+    `<fact_sheet>\n${activeFactSheet}\n</fact_sheet>`,
+    'If raw user instructions and normalized guidance differ, follow the raw user instructions unless they conflict with the fact sheet.',
+    brief?.openerStrategy ? `Use this opener strategy if it fits naturally: ${brief.openerStrategy}` : 'Choose the opening move that best fits the evidence. Do not force a hook.',
+    'Prefer the simplest structure that reads naturally. If one or two paragraphs are enough, do not pad the piece.',
+    'Avoid phrases that sound like filler or AI-generated social copy.',
+    'Write the final Thai content now.',
+  ].join('\n\n');
+
+  if (onStreamChunk) {
+    try {
+      const { textStream } = await streamText({
+        model: grok(MODEL_WRITER),
+        system: draftSystemPrompt,
+        prompt: draftUserPrompt,
+        temperature: writerTemperature,
+        topP: 0.85,
+        frequencyPenalty: writerFrequencyPenalty,
+        presencePenalty: 0.1,
+        abortSignal: options.signal,
+      });
+
+      let fullContent = '';
+      let nextPolishTime = Date.now() + 800; // Throttle heavy NLP regex down to ~1.2 FPS
+
+      for await (const textPart of textStream) {
+        fullContent += textPart;
+
+        if (Date.now() >= nextPolishTime) {
+          onStreamChunk(polishThaiContent(fullContent, { format, customInstructions, allowEmoji, tone }));
+          nextPolishTime = Date.now() + 800;
+        } else {
+          onStreamChunk(fullContent); // Just push unpolished raw text to UI to keep it smooth without O(N^2) CPU burn
+        }
+      }
+
+      const finalPolished = polishThaiContent(fullContent, { format, customInstructions, allowEmoji, tone });
+      onStreamChunk(finalPolished);
+      return { content: finalPolished, titleIdea: brief.titleIdea };
+    } catch (error) {
+      if (error.name === 'AbortError') throw error;
+      console.error('[GrokService] Streaming error (v2), falling back to non-streaming:', error);
+      const fallbackDraft = await callGrok({
+        modelName: MODEL_WRITER,
+        system: draftSystemPrompt,
+        prompt: draftUserPrompt,
+        temperature: writerTemperature,
+        topP: 0.85,
+        frequencyPenalty: writerFrequencyPenalty,
+        presencePenalty: 0.1,
+        allowEmoji,
+      });
+      const fallbackResult = polishThaiContent(fallbackDraft, { format, customInstructions, allowEmoji, tone });
+      onStreamChunk(fallbackResult);
+      return { content: fallbackResult, titleIdea: brief.titleIdea };
+    }
+  }
+
+  const contentDraft = await callGrok({
+    modelName: MODEL_WRITER,
+    system: draftSystemPrompt,
+    prompt: draftUserPrompt,
+    temperature: writerTemperature,
+    topP: 0.85,
+    frequencyPenalty: writerFrequencyPenalty,
+    presencePenalty: 0.1,
+    allowEmoji,
+  });
+
+  if (skipReviewPass && !shouldForceNaturalRewrite(contentDraft, { format, tone })) {
+    return { content: polishThaiContent(contentDraft, { format, customInstructions, allowEmoji, tone }), titleIdea: brief.titleIdea };
+  }
+
+  try {
+    const { object: evalResult } = await generateObject({
+      model: grok(MODEL_NEWS_FAST),
+      system: `Evaluate whether the Thai draft is safe to ship.
+Set passed=true only if:
+- it stays faithful to the fact sheet
+- it does not turn reported claims or open questions into hard facts
+- it follows the user's explicit request closely enough
+- it is natural Thai and broadly fits the requested format
+- it genuinely sounds like the selected tone, instead of drifting back to a generic house style
+- it does not use forced hooks, filler transitions, or unnecessary paragraph splits that make the draft feel templated
+- it does not lean on repeated publisher/site attribution as a writing crutch
+- it does not open with a lifeless data dump when the format or tone calls for a sharper opening
+
+Do not fail a draft just because it chose a different but valid narrative stance.`,
+      prompt: `[RAW USER REQUEST]\n${rawUserInput || 'None'}\n\n[RAW USER INSTRUCTIONS]\n${customInstructions || 'None'}\n\n[FORMAT]\n${format}\n\n[TONE]\n${tone}\n\n[NORMALIZED INTENT]\n${intentProfile ? JSON.stringify(intentProfile, null, 2) : 'None'}\n\n[FACT SHEET]\n${activeFactSheet}\n\n[BRIEF]\n${JSON.stringify(brief, null, 2)}\n\n[DRAFT]\n${contentDraft}`,
+      schema: CONTENT_REVIEW_SCHEMA,
+    });
+
+    const needsGroundingRewrite = !evalResult.groundingPassed || !evalResult.sourceDisciplinePassed;
+    const needsNaturalnessRewrite = !evalResult.thaiNaturalnessPassed || shouldForceNaturalRewrite(contentDraft, { format, tone });
+
+    if ((!evalResult.passed && (needsGroundingRewrite || needsNaturalnessRewrite)) || needsNaturalnessRewrite) {
+      const evalFeedback = evalResult.reason ||
+        'Revise the draft so it stays grounded in the fact sheet and reads like natural Thai written by a real person.';
+      const revisedDraft = await callGrok({
+        modelName: MODEL_WRITER,
+        system: draftSystemPrompt,
+        prompt: `[RAW USER REQUEST]\n${rawUserInput || 'None'}\n\n[RAW USER INSTRUCTIONS]\n${customInstructions || 'None'}\n\n[FACT SHEET]\n${activeFactSheet}\n\n[BRIEF]\n${JSON.stringify(brief, null, 2)}\n\n[CURRENT DRAFT]\n${contentDraft}\n\n[EDITOR FEEDBACK]\n${evalFeedback}\n\nRewrite only where needed.\n- Keep the facts intact.\n- Remove AI-sounding phrasing, forced hooks, and filler conclusions.\n- Remove repeated publisher/site attribution unless it is essential to understanding the story.\n- Replace weak data-dump openings with a sharper but still factual opening when the piece needs more momentum.\n- Make sure the voice still matches the selected format and tone instead of collapsing into generic news-summary prose.\n- Merge paragraphs if the draft feels over-segmented.\n- Keep the wording plain, natural, and specific.`,
+        temperature: 0.62,
+        allowEmoji,
+      });
+
+      return { content: polishThaiContent(revisedDraft, { format, customInstructions, allowEmoji, tone }), titleIdea: brief.titleIdea };
+    }
+  } catch (error) {
+    console.warn('[GrokService] Editor pass skipped (v2):', error);
+  }
+
+  return { content: polishThaiContent(contentDraft, { format, customInstructions, allowEmoji, tone }), titleIdea: brief.titleIdea };
+};
