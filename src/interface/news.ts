@@ -102,3 +102,16 @@ export interface AdvancedSearchBulkResponse {
     twitter_has_next?: boolean;
     search_query?: string;
 }
+
+export interface AdvancedSearchBulkPayload {
+    query?: string;
+    query_type?: string;
+    cursor?: string;
+    since_date?: string;
+    until_date?: string;
+    post_list_id?: number;
+    use_followed_users?: boolean;
+    specific_users?: string[];
+    fetch_rss_first?: boolean;
+    rss_limit_per_feed?: number;
+}

@@ -192,7 +192,7 @@ const PostList = ({
     };
 
     const getMemberSourceLabel = (member: PostListUser) => {
-        if (member.follow_user_follow_type === 'rss') return member.follow_user_source_url || 'RSS feed';
+        if ((member.follow_user_type || member.follow_user_follow_type) === 'rss') return member.follow_user_source_url || 'RSS feed';
         return `@${(member.follow_user_x_account || '').replace('@', '')}`;
     };
 

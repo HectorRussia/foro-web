@@ -1,5 +1,11 @@
 import api from './axiosInstance';
-import type { PaginatedNewsResponse, NewsAnalysisResponse, NewsItem } from '../interface/news';
+import type {
+    AdvancedSearchBulkPayload,
+    AdvancedSearchBulkResponse,
+    PaginatedNewsResponse,
+    NewsAnalysisResponse,
+    NewsItem
+} from '../interface/news';
 
 export const getNews = async (
     page = 1,
@@ -58,8 +64,11 @@ export const updateTriggerStatus = async (trigger: number, news_ids?: number[]):
     await api.patch('/news/trigger', { trigger, news_ids });
 };
 
-export const searchAndAnalyzeBulk = async (payload: any, signal?: AbortSignal): Promise<any> => {
-    const response = await api.post('/advanced-search/search-and-analyze-bulk', payload, { signal });
+export const searchAndAnalyzeBulk = async (
+    payload: AdvancedSearchBulkPayload,
+    signal?: AbortSignal
+): Promise<AdvancedSearchBulkResponse> => {
+    const response = await api.post<AdvancedSearchBulkResponse>('/advanced-search/search-and-analyze-bulk', payload, { signal });
     return response.data;
 };
 

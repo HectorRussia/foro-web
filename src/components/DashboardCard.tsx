@@ -9,7 +9,8 @@ import {
     HiOutlineChatBubbleLeft,
     HiOutlineArrowTopRightOnSquare,
     HiOutlineBookmark,
-    HiOutlinePencilSquare
+    HiOutlinePencilSquare,
+    HiOutlineDocumentText
 } from "react-icons/hi2";
 import { toast } from 'react-hot-toast';
 import type { NewsItem } from '../interface/news';
@@ -34,6 +35,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     const [isBookmarked, setIsBookmarked] = useState(false);
     const [isBookmarkLoading, setIsBookmarkLoading] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+    const [rssAvatarFailed, setRssAvatarFailed] = useState(false);
     const menuRef = useRef<HTMLDivElement>(null);
 
     const mediaUrls = post.media_urls ?? [];
@@ -47,6 +49,41 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     const avatarFallback = (sourceLabel || post.title || 'N').charAt(0);
     const hasSocialMetrics = [post.view_count, post.like_count, post.retweet_count, post.reply_count]
         .some(value => Number(value) > 0);
+
+    const isUrlLike = (value?: string | null) => /^https?:\/\//i.test(String(value || '').trim());
+
+    const getHostname = (value?: string | null) => {
+        try {
+            return new URL(String(value || '')).hostname.replace(/^www\./, '');
+        } catch {
+            return '';
+        }
+    };
+
+    const formatHostnameName = (hostname: string) => {
+        const specialNames: Record<string, string> = {
+            'github.blog': 'GitHub Blog',
+            'seekingalpha.com': 'Seeking Alpha',
+            'bbc.com': 'BBC News',
+            'nytimes.com': 'The New York Times',
+            'theguardian.com': 'The Guardian',
+            'techcrunch.com': 'TechCrunch',
+        };
+        if (specialNames[hostname]) return specialNames[hostname];
+
+        const base = hostname.split('.')[0] || 'RSS';
+        return base
+            .replace(/[-_]+/g, ' ')
+            .replace(/\b\w/g, char => char.toUpperCase());
+    };
+
+    const rssSourceUrl = post.feed_url || (isUrlLike(post.source) ? post.source : '') || post.url;
+    const rssHostname = getHostname(rssSourceUrl) || getHostname(post.url);
+    const rssSourceName = post.source && !isUrlLike(post.source)
+        ? post.source
+        : formatHostnameName(rssHostname);
+    const rssAvatarUrl = post.tweet_profile_pic || (rssHostname ? `https://www.google.com/s2/favicons?domain=${rssHostname}&sz=128` : '');
+    const rssTitle = post.title || contentText || 'RSS Article';
 
     useEffect(() => {
         let cancelled = false;
@@ -101,6 +138,106 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
         if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
         return num.toString();
     };
+
+    if (isRss) {
+        return (
+            <div
+                className={`feed-card group relative flex min-h-[168px] flex-col overflow-hidden h-full font-card ${showMenu ? 'z-50' : 'z-auto'}`}
+                style={{
+                    padding: '20px 24px 16px',
+                    borderRadius: '28px',
+                }}
+            >
+                <div
+                    className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
+                    style={{ background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.1), transparent 70%)' }}
+                />
+
+                <div className="relative z-10 mb-5 flex items-start justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-3">
+                        <div className="flex h-10.5 w-10.5 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/8 bg-[#1a1a1c] shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+                            {rssAvatarUrl && !rssAvatarFailed ? (
+                                <img
+                                    src={rssAvatarUrl}
+                                    alt=""
+                                    className="h-full w-full object-cover"
+                                    onError={() => setRssAvatarFailed(true)}
+                                />
+                            ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-blue-600/20 text-sm font-black uppercase text-blue-300">
+                                    {(rssSourceName || rssTitle).charAt(0)}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="min-w-0">
+                            <h3 className="truncate text-[13px] font-black leading-tight text-white">
+                                {rssSourceName}
+                            </h3>
+                            <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-gray-500">
+                                {rssHostname || rssSourceUrl}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-1.5">
+                        <span className="flex h-6 items-center rounded-full border border-orange-400/28 bg-orange-400/14 px-2.5 text-[10px] font-black text-orange-300">
+                            RSS
+                        </span>
+                        <span className="flex h-6 items-center rounded-full border border-blue-400/24 bg-blue-500/14 px-2.5 text-[10px] font-black text-white">
+                            {dayjs(displayDate).isSame(dayjs(), 'day')
+                                ? dayjs(displayDate).fromNow(true)
+                                    .replace('วินาที', 's').replace('นาที', 'm').replace('ชั่วโมง', 'h').replace('วัน', 'd').replace('เดือน', 'mo').replace('ปี', 'y').replace(/\s+/g, '')
+                                : dayjs(displayDate).format('D MMM')}
+                        </span>
+                        <button
+                            onClick={handleToggleBookmark}
+                            disabled={isBookmarkLoading}
+                            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all hover:bg-white/5 ${
+                                isBookmarked ? 'text-yellow-400' : 'text-gray-500 hover:text-white'
+                            } ${isBookmarkLoading ? 'cursor-not-allowed opacity-50' : ''}`}
+                            title={isBookmarked ? 'ลบ Bookmark' : 'Bookmark'}
+                        >
+                            <HiOutlineBookmark className={`text-lg ${isBookmarked ? 'fill-yellow-400' : ''}`} />
+                        </button>
+
+                        <a
+                            href={post.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-all hover:bg-white/5 hover:text-blue-400"
+                            title="เปิดต้นทาง"
+                        >
+                            <HiOutlineArrowTopRightOnSquare className="text-lg" />
+                        </a>
+                    </div>
+                </div>
+
+                <div className="relative z-10 mb-5 grow">
+                    <p className="line-clamp-2 text-[15px] font-bold leading-relaxed tracking-tight text-gray-100">
+                        {rssTitle}
+                    </p>
+                </div>
+
+                <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-white/5 pt-3.5">
+                    <a
+                        href={post.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex h-8 items-center gap-2 rounded-full border border-blue-400/18 bg-blue-500/12 px-3.5 text-[10px] font-black text-blue-200 transition-all hover:border-blue-300/30 hover:bg-blue-500/18 hover:text-white"
+                    >
+                        <HiOutlineDocumentText className="text-sm" />
+                        <span>อ่านเนื้อหา</span>
+                    </a>
+
+                    <button className="inline-flex h-8 items-center gap-2 rounded-xl border border-white/7 bg-[#2a2a2c] px-4 text-[10px] font-black text-gray-300 shadow-lg transition-all hover:bg-white/10 hover:text-white">
+                        <HiOutlinePencilSquare className="text-sm" />
+                        <span>สร้างคอนเทนต์</span>
+                    </button>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className={`feed-card group relative flex flex-col overflow-hidden h-full font-card

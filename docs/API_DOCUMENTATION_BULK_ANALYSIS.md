@@ -80,7 +80,11 @@
   // 🔥 Users Source Options (Priority Order):
   "post_list_id": 123,                 // 🚀 NEW: ใช้ users จาก post_list_user (priority สูงสุด)
   "use_followed_users": true,          // ใช้ users ที่ติดตาม (default behavior)
-  "specific_users": ["username1", "username2"]  // users เฉพาะ (priority ต่ำสุด)
+  "specific_users": ["username1", "username2"],  // users เฉพาะ (priority ต่ำสุด)
+
+  // RSS options:
+  "fetch_rss_first": true,             // default true: fetch RSS ก่อน แล้วค่อยทำ X
+  "rss_limit_per_feed": 20             // default 20, max 100
 }
 ```
 
@@ -608,21 +612,27 @@ Frontend card ควร handle ตามนี้:
 | `tweet_id === null` | ห้าม assume ว่าเปิด x.com/status ได้ |
 | `tweet_profile_pic === null` | ใช้ fallback icon/avatar ของ source |
 
-### 5. Advanced bulk analysis ยังเป็น X เท่านั้น
+### 5. Advanced bulk analysis ทำ RSS ก่อน แล้วค่อย X
 
-`/advanced-search/search-and-analyze-bulk` ยังดึงจาก X/Twitter เหมือนเดิม และ backend จะใช้เฉพาะ follows ที่ `follow_type === "x"` เท่านั้น
+`/advanced-search/search-and-analyze-bulk` ตอนนี้ทำงานแบบ priority:
+
+1. Fetch RSS feeds ใน scope เดียวกันก่อน (`post_list_id` หรือ `use_followed_users`)
+2. Save ข่าว RSS ใหม่ลง `news_items` โดย dedupe ด้วย `source_item_id`/`url`
+3. ต่อด้วย X/Twitter bulk analysis จาก follows ที่ `follow_type === "x"`
+4. Response สุดท้ายยังเป็น news list format เดิม และสามารถมีข่าว RSS ที่เพิ่ง save รวมอยู่ด้วย
 
 ถ้า post list มีทั้ง X และ RSS:
 
-- `POST /advanced-search/search-and-analyze-bulk` จะ ignore RSS follows
-- `POST /news/rss/fetch` จะ ignore X follows
+- `POST /advanced-search/search-and-analyze-bulk` จะทำ RSS ก่อน แล้วต่อ X
+- `POST /news/rss/fetch` ยังใช้ได้ ถ้าต้องการ fetch RSS อย่างเดียว และจะ ignore X follows
 
-ดังนั้น frontend สามารถให้ post list เดียวมี source ปนกันได้ แต่ปุ่ม/flow ควรแยก:
+ดังนั้น frontend สามารถให้ post list เดียวมี source ปนกันได้:
 
 | action | endpoint |
 |---|---|
-| วิเคราะห์ข่าวจาก X | `/advanced-search/search-and-analyze-bulk` |
-| ดึงข่าวจาก RSS | `/news/rss/fetch` |
+| ทำทั้ง RSS -> X | `/advanced-search/search-and-analyze-bulk` |
+| ดึงเฉพาะ RSS | `/news/rss/fetch` |
+| ทำเฉพาะ X ไม่เอา RSS | `/advanced-search/search-and-analyze-bulk` พร้อม `fetch_rss_first: false` |
 
 ### 6. สิ่งที่ไม่เปลี่ยน
 

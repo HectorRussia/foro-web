@@ -18,6 +18,7 @@ export interface PostListUser {
     updated_at: string;
     follow_user_name: string;
     follow_user_x_account: string | null;
+    follow_user_type?: 'x' | 'rss' | string | null;
     follow_user_follow_type?: 'x' | 'rss' | string | null;
     follow_user_source_url?: string | null;
     follow_user_profile_image_url_https?: string | null;

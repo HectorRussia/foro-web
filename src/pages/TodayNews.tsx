@@ -13,7 +13,7 @@ import { LuSparkles, LuRefreshCw, LuFilter } from "react-icons/lu";
 import { AnimatePresence, motion } from 'framer-motion';
 import PostList from '../components/PostList';
 import { type NewsItem, type NewsResult } from '../interface/news';
-import { getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk, fetchRssNews } from '../api/news';
+import { getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk } from '../api/news';
 import { getCategories } from '../api/category';
 import { createCategoryNews } from '../api/categoryNews';
 import { toast } from 'react-hot-toast';
@@ -79,48 +79,14 @@ const mergeNewsResults = (current: NewsResult[], incoming: NewsResult[]) => {
 
 const fetchFeedSources = async (
     payload: any,
-    signal: AbortSignal,
-    selectedPostListId?: number,
-    shouldFetchRss = true
+    signal: AbortSignal
 ) => {
-    const requests = [
-        searchAndAnalyzeBulk(payload, signal),
-        ...(shouldFetchRss ? [fetchRssNews({
-            ...(selectedPostListId ? { post_list_id: selectedPostListId } : {}),
-            limit_per_feed: 20
-        }, signal)] : [])
-    ];
-
-    const [bulkResult, rssResult] = await Promise.allSettled(requests);
-    const errors: unknown[] = [];
-    const items: any[] = [];
-    let twitterCursor: string | undefined;
-    let twitterHasNext = false;
-
-    if (bulkResult.status === 'fulfilled') {
-        const result = bulkResult.value;
-        if (Array.isArray(result?.items)) items.push(...result.items);
-        twitterCursor = result?.twitter_cursor;
-        twitterHasNext = Boolean(result?.twitter_has_next && result?.twitter_cursor);
-    } else {
-        errors.push(bulkResult.reason);
-        console.error('Bulk analysis failed:', bulkResult.reason);
-    }
-
-    if (rssResult?.status === 'fulfilled') {
-        const rssItems = Array.isArray(rssResult.value?.items) ? rssResult.value.items : [];
-        items.push(...rssItems.map((item: any) => ({ ...item, source_type: item.source_type || 'rss' })));
-    } else if (rssResult?.status === 'rejected') {
-        errors.push(rssResult.reason);
-        console.error('RSS fetch failed:', rssResult.reason);
-    }
-
-    if (errors.length === requests.length) throw errors[0];
+    const result = await searchAndAnalyzeBulk(payload, signal);
 
     return {
-        items,
-        twitter_cursor: twitterCursor,
-        twitter_has_next: twitterHasNext
+        items: Array.isArray(result?.items) ? result.items : [],
+        twitter_cursor: result?.twitter_cursor,
+        twitter_has_next: Boolean(result?.twitter_has_next && result?.twitter_cursor)
     };
 };
 
@@ -263,17 +229,22 @@ const TodayNews = () => {
 
 
     // Start Bulk Analysis
-    const startBulkAnalysis = async (cursorOverride?: string) => {
+    const startBulkAnalysis = async (
+        cursorOverride?: string,
+        options: { preserveExisting?: boolean } = {}
+    ) => {
         if (isStreaming) return;
         setIsStreaming(true);
         setStatusMessage('กำลังเชื่อมต่อและวิเคราะห์ข่าว...');
 
         // If not loading more, clear previous results and cache
-        if (!cursorOverride || typeof cursorOverride !== 'string') {
+        if ((!cursorOverride || typeof cursorOverride !== 'string') && !options.preserveExisting) {
             setNewsResults([]);
             setNextCursor(null);
             localStorage.removeItem('today_news_twitter_cursor');
             localStorage.removeItem('today_news_is_cleared'); // Reset clear flag on new start
+            setHasStarted(true);
+        } else {
             setHasStarted(true);
         }
 
@@ -284,7 +255,9 @@ const TodayNews = () => {
             query_type: searchParams.query_type,
             since_date: searchParams.since_date,
             until_date: searchParams.until_date,
-            cursor: (typeof cursorOverride === 'string') ? cursorOverride : searchParams.cursor
+            cursor: (typeof cursorOverride === 'string') ? cursorOverride : searchParams.cursor,
+            fetch_rss_first: !(typeof cursorOverride === 'string' && cursorOverride),
+            rss_limit_per_feed: 20
         };
 
         if (searchParams.query) {
@@ -304,9 +277,7 @@ const TodayNews = () => {
         try {
             const result = await fetchFeedSources(
                 payload,
-                abortControllerRef.current.signal,
-                selectedPostList?.id,
-                !(typeof cursorOverride === 'string' && cursorOverride)
+                abortControllerRef.current.signal
             );
 
 
@@ -592,7 +563,7 @@ const TodayNews = () => {
                 .filter(Boolean)
                 .map(source => source.toLowerCase()));
             const hasRssMembers = selectedPostList.members.some(m =>
-                m.follow_user_follow_type === 'rss' || Boolean(m.follow_user_source_url)
+                (m.follow_user_type || m.follow_user_follow_type) === 'rss' || Boolean(m.follow_user_source_url)
             );
 
             filtered = filtered.filter(item => {
@@ -655,6 +626,7 @@ const TodayNews = () => {
     };
 
     const displayNews = getFilteredNews();
+    const canSearchMore = !isStreaming && hasStarted && displayNews.length > 0 && !aiFilteredIds;
 
     return (
         <div className="foro-page-shell">
@@ -1096,21 +1068,26 @@ const TodayNews = () => {
 
                         </div>
 
-                        {!isStreaming && nextCursor && !aiFilteredIds && (
+                        {canSearchMore && (
                             <div className="flex justify-center mt-10 mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
                                 <button
-                                    onClick={() => startBulkAnalysis(nextCursor)}
+                                    onClick={() => nextCursor
+                                        ? startBulkAnalysis(nextCursor)
+                                        : startBulkAnalysis(undefined, { preserveExisting: true })
+                                    }
 
                                     className="group relative flex items-center justify-center gap-4 px-12 py-5 rounded-4xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 w-full md:w-100 overflow-hidden shadow-2xl shadow-amber-500/5 active:scale-95"
-                                    title={`Next Signal: ${nextCursor}`}
+                                    title={nextCursor ? `Next Signal: ${nextCursor}` : 'ค้นหา RSS และข่าวล่าสุดเพิ่ม'}
                                 >
                                     <div className="absolute inset-0 bg-linear-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                                     <div className="p-3 rounded-2xl bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
                                         <HiOutlineClock className="text-2xl text-amber-500 animate-pulse" />
                                     </div>
                                     <div className="flex flex-col items-start">
-                                        <span className="text-amber-500 font-black text-xl tracking-tight">ข่าวต่อไป</span>
-                                        <span className="text-amber-500/40 text-[10px] uppercase font-bold tracking-[0.2em]">Load More Signals</span>
+                                        <span className="text-amber-500 font-black text-xl tracking-tight">ค้นหาเพิ่มเติม</span>
+                                        <span className="text-amber-500/40 text-[10px] uppercase font-bold tracking-[0.2em]">
+                                            {nextCursor ? 'Load More Signals' : 'Fetch Latest RSS'}
+                                        </span>
                                     </div>
                                 </button>
                             </div>
