@@ -8,6 +8,24 @@ import type { FollowedUser } from '../interface/userTarget';
 
 const BASE_URL = import.meta.env.VITE_API_URL;
 
+const normalizeXAccount = (account?: string | null) => (account || '').replace(/^@/, '').trim().toLowerCase();
+
+const getSourceLabel = (user: FollowedUser) => {
+    if (user.follow_type === 'rss') return user.source_url || 'RSS feed';
+    return `@${normalizeXAccount(user.x_account)}`;
+};
+
+const getSourceHref = (user: FollowedUser) => {
+    if (user.follow_type === 'rss') return user.source_url || '#';
+    return `https://twitter.com/${normalizeXAccount(user.x_account)}`;
+};
+
+const getAvatar = (user: FollowedUser) => {
+    if (user.profile_image_url_https) return user.profile_image_url_https;
+    if (user.x_account) return `https://unavatar.io/twitter/${normalizeXAccount(user.x_account)}`;
+    return '';
+};
+
 export const UserFollow = () => {
     const [users, setUsers] = useState<FollowedUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -78,10 +96,10 @@ export const UserFollow = () => {
     }, []);
 
     return (
-        <div className="flex min-h-screen w-full gap-3 bg-[#121212] p-3 font-sans text-gray-100 overflow-x-hidden">
+        <div className="foro-page-shell">
             <Sidebar />
-            <div className="flex-1 flex min-w-0 overflow-hidden">
-                <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen relative">
+            <div className="foro-center-stage">
+                <main className="foro-workspace-main">
                     <header className="mb-6 animate-fade-in-down">
                         <h1 className="text-2xl md:text-3xl font-extrabold bg-clip-text text-gray-100 bg-linear-to-r ">
                             บัญชีที่คุณกำลังติดตาม
@@ -134,11 +152,17 @@ export const UserFollow = () => {
                                     {/* Avatar */}
                                     <div className="relative mb-3">
                                         <div className="absolute -inset-1 bg-linear-to-r from-blue-600 to-purple-600 rounded-full blur opacity-25 group-hover:opacity-75 transition duration-500 w-20 h-20 mx-auto"></div>
-                                        <img
-                                            src={user.profile_image_url_https}
-                                            alt={user.name}
-                                            className="relative w-15 h-15 rounded-full border-2 border-[#0f172a] shadow-lg object-cover mx-auto"
-                                        />
+                                        {getAvatar(user) ? (
+                                            <img
+                                                src={getAvatar(user)}
+                                                alt={user.name}
+                                                className="relative w-15 h-15 rounded-full border-2 border-[#0f172a] shadow-lg object-cover mx-auto"
+                                            />
+                                        ) : (
+                                            <div className="relative w-15 h-15 rounded-full border-2 border-[#0f172a] shadow-lg mx-auto bg-blue-600/20 flex items-center justify-center text-blue-400 font-black">
+                                                {user.name.charAt(0)}
+                                            </div>
+                                        )}
                                     </div>
 
                                     {/* Names */}
@@ -146,19 +170,19 @@ export const UserFollow = () => {
                                         {user.name}
                                     </h2>
                                     <p className="text-gray-500 text-xs mb-3 truncate w-full">
-                                        {user.x_account.startsWith('@') ? user.x_account : `@${user.x_account}`}
+                                        {getSourceLabel(user)}
                                     </p>
 
                                     {/* Actions */}
                                     <div className="mt-auto w-full">
                                         <a
-                                            href={`https://twitter.com/${user.x_account.replace('@', '')}`}
+                                            href={getSourceHref(user)}
                                             target="_blank"
                                             rel="noreferrer"
                                             className="flex items-center justify-center gap-1.5 bg-[#1e293b] hover:bg-[#2ae0d6]/10 text-gray-400 hover:text-[#2ae0d6] py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border border-transparent hover:border-[#2ae0d6]/30"
                                         >
                                             <FaTwitter />
-                                            Profile
+                                            {user.follow_type === 'rss' ? 'Source' : 'Profile'}
                                         </a>
                                     </div>
                                 </div>
@@ -173,9 +197,9 @@ export const UserFollow = () => {
                         </div>
                     )}
                 </main>
-                <div className="hidden xl:block">
+                <aside className="foro-right-rail">
                     <PostList />
-                </div>
+                </aside>
             </div>
 
             {/* Confirmation Modal */}
@@ -188,7 +212,7 @@ export const UserFollow = () => {
                             </div>
                             <h3 className="text-xl font-bold text-white mb-2">Unfollow {userToDelete.name}?</h3>
                             <p className="text-gray-400 text-sm mb-6">
-                                Are you sure you want to stop following @{userToDelete.x_account.replace('@', '')}? This action cannot be undone immediately.
+                                Are you sure you want to stop following {getSourceLabel(userToDelete)}? This action cannot be undone immediately.
                             </p>
                             <div className="flex gap-3">
                                 <button

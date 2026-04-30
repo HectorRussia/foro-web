@@ -24,9 +24,11 @@ export interface UserTweetSearch {
 
 export interface FollowedUser {
     id: number;
-    x_account: string;
+    x_account: string | null;
+    follow_type?: 'x' | 'rss' | string | null;
+    source_url?: string | null;
     name: string;
-    profile_image_url_https: string;
+    profile_image_url_https: string | null;
     status: number;
     user_id: number;
     created_at: string;

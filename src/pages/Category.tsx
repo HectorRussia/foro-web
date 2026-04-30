@@ -121,10 +121,10 @@ const Category = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full gap-3 bg-[#0a0a0b] p-3 font-sans text-gray-100 overflow-x-hidden">
+        <div className="foro-page-shell">
             <Sidebar />
-            <div className="flex-1 flex min-w-0 overflow-hidden">
-                <main className="flex-1 p-4 lg:p-8 overflow-y-auto h-screen relative">
+            <div className="foro-center-stage">
+                <main className="foro-workspace-main">
                 <div className="space-y-6">
                     {/* Header Section */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#1e293b]/50 p-6 rounded-2xl backdrop-blur-sm border border-slate-700/50 shadow-xl">
@@ -217,9 +217,9 @@ const Category = () => {
 
                 </div>
                 </main>
-                <div className="hidden xl:block">
+                <aside className="foro-right-rail">
                     <PostList />
-                </div>
+                </aside>
             </div>
 
             {/* Form Modal */}

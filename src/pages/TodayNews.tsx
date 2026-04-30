@@ -13,7 +13,7 @@ import { LuSparkles, LuRefreshCw, LuFilter } from "react-icons/lu";
 import { AnimatePresence, motion } from 'framer-motion';
 import PostList from '../components/PostList';
 import { type NewsItem, type NewsResult } from '../interface/news';
-import { getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk } from '../api/news';
+import { getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk, fetchRssNews } from '../api/news';
 import { getCategories } from '../api/category';
 import { createCategoryNews } from '../api/categoryNews';
 import { toast } from 'react-hot-toast';
@@ -23,6 +23,106 @@ import HomeCanvas from '../components/Canvas/HomeCanvas';
 import { getPresets, createPreset, deletePreset, type PresetSearch } from '../api/preset';
 
 
+
+const getNewsTimestamp = (item: Pick<NewsResult, 'tweet_created_at' | 'published_at' | 'created_at'>) =>
+    item.tweet_created_at || item.published_at || item.created_at;
+
+const isRssNewsItem = (item: any) =>
+    item?.source_type === 'rss' ||
+    item?.item_type === 'rss' ||
+    (!!item?.source_item_id && !item?.tweet_id) ||
+    !!item?.feed_url;
+
+const toNewsResult = (item: any): NewsResult => {
+    const isRss = isRssNewsItem(item);
+    const createdAt = item?.tweet_created_at || item?.published_at || item?.created_at || new Date().toISOString();
+
+    return {
+        id: item?.id ?? item?.tweet_id ?? item?.source_item_id ?? item?.url ?? crypto.randomUUID(),
+        title: item?.title || item?.tweet_name || item?.name || (isRss ? 'RSS News' : 'Twitter News'),
+        content: item?.llm_analysis || item?.content || item?.summary || item?.title || '',
+        source: item?.tweet_name || item?.username || item?.source || item?.feed_title || item?.feed_url || (isRss ? 'RSS' : 'Twitter'),
+        url: item?.url || '#',
+        tweet_id: item?.tweet_id || undefined,
+        tweet_profile_pic: item?.tweet_profile_pic || item?.profile_image_url_https || null,
+        created_at: createdAt,
+        tweet_created_at: item?.tweet_created_at || undefined,
+        published_at: item?.published_at || undefined,
+        source_type: item?.source_type || (isRss ? 'rss' : undefined),
+        source_item_id: item?.source_item_id || undefined,
+        feed_url: item?.feed_url || item?.source_url || undefined,
+        retweet_count: Number(item?.retweet_count) || 0,
+        reply_count: Number(item?.reply_count) || 0,
+        like_count: Number(item?.like_count) || 0,
+        quote_count: Number(item?.quote_count) || 0,
+        view_count: Number(item?.view_count) || 0,
+        media_urls: Array.isArray(item?.media_urls) ? item.media_urls : [],
+        media_type: item?.media_type ?? null
+    };
+};
+
+const getNewsResultKey = (item: NewsResult) =>
+    String(item.tweet_id || item.source_item_id || item.url || item.id);
+
+const mergeNewsResults = (current: NewsResult[], incoming: NewsResult[]) => {
+    const merged = new Map<string, NewsResult>();
+
+    current.forEach(item => merged.set(getNewsResultKey(item), item));
+    incoming.forEach(item => {
+        const key = getNewsResultKey(item);
+        merged.set(key, { ...merged.get(key), ...item });
+    });
+
+    return Array.from(merged.values())
+        .sort((a, b) => dayjs(getNewsTimestamp(b)).valueOf() - dayjs(getNewsTimestamp(a)).valueOf());
+};
+
+const fetchFeedSources = async (
+    payload: any,
+    signal: AbortSignal,
+    selectedPostListId?: number,
+    shouldFetchRss = true
+) => {
+    const requests = [
+        searchAndAnalyzeBulk(payload, signal),
+        ...(shouldFetchRss ? [fetchRssNews({
+            ...(selectedPostListId ? { post_list_id: selectedPostListId } : {}),
+            limit_per_feed: 20
+        }, signal)] : [])
+    ];
+
+    const [bulkResult, rssResult] = await Promise.allSettled(requests);
+    const errors: unknown[] = [];
+    const items: any[] = [];
+    let twitterCursor: string | undefined;
+    let twitterHasNext = false;
+
+    if (bulkResult.status === 'fulfilled') {
+        const result = bulkResult.value;
+        if (Array.isArray(result?.items)) items.push(...result.items);
+        twitterCursor = result?.twitter_cursor;
+        twitterHasNext = Boolean(result?.twitter_has_next && result?.twitter_cursor);
+    } else {
+        errors.push(bulkResult.reason);
+        console.error('Bulk analysis failed:', bulkResult.reason);
+    }
+
+    if (rssResult?.status === 'fulfilled') {
+        const rssItems = Array.isArray(rssResult.value?.items) ? rssResult.value.items : [];
+        items.push(...rssItems.map((item: any) => ({ ...item, source_type: item.source_type || 'rss' })));
+    } else if (rssResult?.status === 'rejected') {
+        errors.push(rssResult.reason);
+        console.error('RSS fetch failed:', rssResult.reason);
+    }
+
+    if (errors.length === requests.length) throw errors[0];
+
+    return {
+        items,
+        twitter_cursor: twitterCursor,
+        twitter_has_next: twitterHasNext
+    };
+};
 
 const TodayNews = () => {
 
@@ -98,24 +198,9 @@ const TodayNews = () => {
 
             // 4. Decision: Show news IF (Run is Active) OR (User hasn't explicitly clicked Clear)
             if (hasNews && (triggerData.trigger === 1 || !isCleared)) {
-                const dbResults: NewsResult[] = newsResponse.items.map(item => ({
-                    id: item.id,
-                    title: item.title,
-                    content: item.content,
-                    source: item.source || item.title || 'Twitter',
-                    url: item.url,
-                    tweet_id: item.tweet_id,
-                    created_at: item.tweet_created_at || item.created_at, // Prioritize tweet time for display
-                    tweet_created_at: item.tweet_created_at,
-                    retweet_count: item.retweet_count || 0,
-                    reply_count: item.reply_count || 0,
-                    like_count: item.like_count || 0,
-                    quote_count: item.quote_count || 0,
-                    view_count: item.view_count || 0,
-                    tweet_profile_pic: item.tweet_profile_pic,
-                    media_urls: item.media_urls ?? [],
-                    media_type: item.media_type ?? null
-                })).sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
+                const dbResults: NewsResult[] = newsResponse.items
+                    .map(toNewsResult)
+                    .sort((a, b) => dayjs(getNewsTimestamp(b)).valueOf() - dayjs(getNewsTimestamp(a)).valueOf());
                 setNewsResults(dbResults);
                 setHasStarted(true);
             } else {
@@ -196,8 +281,9 @@ const TodayNews = () => {
         abortControllerRef.current = new AbortController();
 
         const payload: any = {
-            query_type: "Latest",
+            query_type: searchParams.query_type,
             since_date: searchParams.since_date,
+            until_date: searchParams.until_date,
             cursor: (typeof cursorOverride === 'string') ? cursorOverride : searchParams.cursor
         };
 
@@ -216,45 +302,25 @@ const TodayNews = () => {
 
 
         try {
-            const result = await searchAndAnalyzeBulk(payload, abortControllerRef.current.signal);
+            const result = await fetchFeedSources(
+                payload,
+                abortControllerRef.current.signal,
+                selectedPostList?.id,
+                !(typeof cursorOverride === 'string' && cursorOverride)
+            );
 
 
             if (result && result.items) {
-                const mappedResults: NewsResult[] = result.items.map((item: any) => ({
-                    id: item.id,
-                    title: item.title || item.tweet_name || 'Twitter News',
-                    content: item.llm_analysis || item.content,
-                    source: item.tweet_name || item.source || 'Twitter',
-                    url: item.url || '#',
-                    tweet_id: item.tweet_id,
-                    tweet_profile_pic: item.tweet_profile_pic,
-                    created_at: item.tweet_created_at || item.created_at || new Date().toISOString(),
-                    tweet_created_at: item.tweet_created_at,
-                    retweet_count: item.retweet_count || 0,
-                    reply_count: item.reply_count || 0,
-                    like_count: item.like_count || 0,
-                    quote_count: item.quote_count || 0,
-                    view_count: item.view_count || 0,
-                    media_urls: item.media_urls ?? [],
-                    media_type: item.media_type ?? null
-                }));
+                const mappedResults: NewsResult[] = result.items.map(toNewsResult);
 
-                setNewsResults(prev => {
-                    // Update or Add items
-                    const existingIds = new Set(prev.map(p => String(p.tweet_id || p.id)));
-                    const newItems = mappedResults.filter(m => !existingIds.has(String(m.tweet_id || m.id)));
-                    const updatedItems = prev.map(p => {
-                        const match = mappedResults.find(m => String(m.tweet_id || m.id) === String(p.tweet_id || p.id));
-                        return match ? match : p;
-                    });
-
-                    return [...updatedItems, ...newItems]
-                        .sort((a, b) => dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf());
-                });
+                setNewsResults(prev => mergeNewsResults(prev, mappedResults));
 
                 if (result.twitter_cursor) {
                     localStorage.setItem('today_news_twitter_cursor', result.twitter_cursor);
                     setNextCursor(result.twitter_cursor);
+                } else if (!result.twitter_has_next) {
+                    localStorage.removeItem('today_news_twitter_cursor');
+                    setNextCursor(null);
                 }
 
                 setStatusMessage('วิเคราะห์เสร็จสิ้น');
@@ -476,10 +542,15 @@ const TodayNews = () => {
         content: typeof res.content === 'string' ? res.content : JSON.stringify(res.content),
         url: res.url,
         user_id: 0,
-        tweet_profile_pic: res.tweet_profile_pic || '',
+        tweet_profile_pic: res.tweet_profile_pic || null,
         created_at: res.created_at,
-        tweet_id: res.tweet_id || '',
+        tweet_id: res.tweet_id || undefined,
         tweet_created_at: res.tweet_created_at,
+        published_at: res.published_at,
+        source_type: res.source_type,
+        source_item_id: res.source_item_id,
+        feed_url: res.feed_url,
+        source: res.source,
         retweet_count: res.retweet_count,
         reply_count: res.reply_count,
         like_count: res.like_count,
@@ -515,9 +586,24 @@ const TodayNews = () => {
             const memberAccounts = new Set(selectedPostList.members.map(m => {
                 const handle = m.follow_user_x_account || "";
                 return handle.startsWith('@') ? handle.slice(1).toLowerCase() : handle.toLowerCase();
-            }));
+            }).filter(Boolean));
+            const memberSources = new Set(selectedPostList.members
+                .map(m => m.follow_user_source_url || '')
+                .filter(Boolean)
+                .map(source => source.toLowerCase()));
+            const hasRssMembers = selectedPostList.members.some(m =>
+                m.follow_user_follow_type === 'rss' || Boolean(m.follow_user_source_url)
+            );
 
             filtered = filtered.filter(item => {
+                if (item.source_type === 'rss') {
+                    const rssSource = (item.feed_url || item.source_item_id || item.url || '').toLowerCase();
+                    if (!rssSource) return hasRssMembers;
+                    return memberSources.size > 0
+                        ? [...memberSources].some(source => rssSource.includes(source) || source.includes(rssSource))
+                        : hasRssMembers;
+                }
+
                 // Try to extract handle from URL: https://x.com/BBCBreaking/status/123 -> BBCBreaking
                 const urlMatch = item.url?.toLowerCase().match(/x\.com\/([^/]+)/);
                 const handleFromUrl = urlMatch ? urlMatch[1] : null;
@@ -554,7 +640,7 @@ const TodayNews = () => {
             }
 
             // Default: Most Recent
-            return dayjs(b.tweet_created_at || b.created_at).valueOf() - dayjs(a.tweet_created_at || a.created_at).valueOf();
+            return dayjs(getNewsTimestamp(b)).valueOf() - dayjs(getNewsTimestamp(a)).valueOf();
         });
 
         // Apply AI Filter if active
@@ -571,10 +657,10 @@ const TodayNews = () => {
     const displayNews = getFilteredNews();
 
     return (
-        <div className="flex h-screen w-full gap-4 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_28%),linear-gradient(180deg,#070708_0%,#09090a_45%,#060607_100%)] p-4 font-sans text-gray-100">
+        <div className="foro-page-shell">
             <Sidebar />
-            <div className="flex flex-1 min-w-0 gap-3">
-                <section className="relative flex min-w-0 flex-1 flex-col overflow-y-auto rounded-[36px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.52)] h-[calc(100dvh-2rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="foro-center-stage">
+                <section className="foro-workspace-panel relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.04),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.06),transparent_30%)]" />
                     {/* Header Section */}
                     <header className="relative shrink-0 mb-6 px-6 pt-6 sm:px-8 sm:pt-8">
@@ -589,7 +675,7 @@ const TodayNews = () => {
 
                         {/* Search & Actions Bar */}
                         <div className="relative z-10">
-                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0d] border border-white/6 p-2 pl-4 pr-3.5 ounded-3xl min-h-17 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0d] border border-white/6 p-2 pl-4 pr-3.5 rounded-3xl min-h-17 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
 
                                 {/* Left Section: Trash or Back or Empty */}
                                 <div className="flex items-center gap-3">
@@ -1060,7 +1146,7 @@ const TodayNews = () => {
                     .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
                 `}</style>
                 </section>
-                <aside className="hidden xl:flex w-85 shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] overflow-hidden rounded-[22px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
+                <aside className="foro-right-rail">
                     <PostList
                         activeId={selectedPostList?.id}
                         onSelect={(list) => setSelectedPostList(list)}

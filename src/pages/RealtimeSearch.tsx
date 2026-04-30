@@ -266,11 +266,11 @@ const RealtimeSearch = () => {
     });
 
     return (
-        <div className="flex min-h-screen w-full gap-3 bg-[#030e17] p-3 font-sans text-gray-100 overflow-x-hidden">
+        <div className="foro-page-shell">
             <Sidebar />
 
-            <div className="flex-1 flex min-w-0 overflow-hidden">
-                <main className="flex-1 p-6 flex flex-col h-screen overflow-hidden">
+            <div className="foro-center-stage">
+                <main className="foro-workspace-main flex flex-col !overflow-hidden">
 
                 {/* Header Section */}
                 <header className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 mb-8 shrink-0">
@@ -466,9 +466,9 @@ const RealtimeSearch = () => {
                     </div>
                 )}
                 </main>
-                <div className="hidden xl:block">
+                <aside className="foro-right-rail">
                     <PostList />
-                </div>
+                </aside>
             </div>
 
             <style>{`

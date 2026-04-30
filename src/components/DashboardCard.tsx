@@ -39,6 +39,14 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     const mediaUrls = post.media_urls ?? [];
     const mediaType = post.media_type ?? null;
     const hasMedia = mediaUrls.length > 0;
+    const isRss = post.source_type === 'rss';
+    const contentText = String(post.content ?? '');
+    const displayDate = post.tweet_created_at || post.published_at || post.created_at;
+    const sourceLabel = post.source || post.username || (isRss ? 'RSS' : 'news');
+    const sourceHandle = isRss ? sourceLabel : `@${sourceLabel.replace(/\s+/g, '').replace(/^@/, '').toLowerCase()}`;
+    const avatarFallback = (sourceLabel || post.title || 'N').charAt(0);
+    const hasSocialMetrics = [post.view_count, post.like_count, post.retweet_count, post.reply_count]
+        .some(value => Number(value) > 0);
 
     useEffect(() => {
         let cancelled = false;
@@ -95,14 +103,11 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     };
 
     return (
-        <div className={`group relative flex flex-col rounded-[30px] transition-all overflow-hidden h-full font-card
+        <div className={`feed-card group relative flex flex-col overflow-hidden h-full font-card
             ${showMenu ? 'z-50' : 'z-auto'}
-            border border-white/6 hover:border-blue-500/20
         `}
             style={{
-                background: 'linear-gradient(145deg, #111112 0%, #181819 100%)',
                 padding: '20px 24px 16px',
-                transition: '0.5s cubic-bezier(0.16, 1, 0.3, 1)'
             }}>
             {/* Hover Glow Effect */}
             <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
@@ -119,7 +124,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                                 <img src={post.tweet_profile_pic} alt="owner" className="w-full h-full object-cover" />
                             ) : (
                                 <div className='w-full h-full bg-blue-600/20 flex items-center justify-center text-blue-400 font-black text-sm uppercase'>
-                                    {post.title.charAt(0)}
+                                    {avatarFallback}
                                 </div>
                             )}
                         </div>
@@ -130,7 +135,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                             {post.title}
                         </h3>
                         <span className="text-gray-500 font-medium text-[13px] tracking-tight truncate opacity-80 mt-1">
-                            @{(post.source || 'news').replace(/\s+/g, '').toLowerCase()}
+                            {sourceHandle}
                         </span>
                     </div>
                 </div>
@@ -138,10 +143,10 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                 {/* Right Header Actions */}
                 <div className="flex items-center gap-1 shrink-0">
                         <div className="px-3 py-1 bg-[#0f1419]/80 rounded-full text-white text-[11px] font-bold tracking-tight mr-2 flex items-center justify-center border border-white/5">
-                        {dayjs(post.tweet_created_at || post.created_at).isSame(dayjs(), 'day')
-                            ? dayjs(post.tweet_created_at || post.created_at).fromNow(true)
+                        {dayjs(displayDate).isSame(dayjs(), 'day')
+                            ? dayjs(displayDate).fromNow(true)
                                 .replace('วินาที', 's').replace('นาที', 'm').replace('ชั่วโมง', 'h').replace('วัน', 'd').replace('เดือน', 'mo').replace('ปี', 'y').replace(/\s+/g, '')
-                            : dayjs(post.tweet_created_at || post.created_at).format('D MMM')}
+                            : dayjs(displayDate).format('D MMM')}
                     </div>
 
                     <button
@@ -162,11 +167,11 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
             </div>
 
             {/* Reply Badge Component */}
-            {post.content.toLowerCase().includes('http') && (
+            {!isRss && contentText.toLowerCase().includes('http') && (
                 <div className="mb-5 flex relative z-10">
                     <div className="bg-blue-500/10 border border-blue-400/10 px-3.5 py-1.5 rounded-full flex items-center gap-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest cursor-default hover:bg-blue-500/20 transition-colors">
                         <HiOutlineChatBubbleLeft className="text-xs" />
-                        <span>ตอบกลับ @{(post.source || 'news').split(' ')[0]}</span>
+                        <span>ตอบกลับ {sourceHandle}</span>
                     </div>
                 </div>
             )}
@@ -177,7 +182,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                     ${isCompact ? 'text-[13px] line-clamp-3' : 'text-[15px]'}
                     grow min-w-0
                 `} style={{ fontFamily: 'var(--font-card)', fontWeight: 500 }}>
-                    {post.content}
+                    {contentText}
                 </div>
 
                 {/* Inline thumbnail */}
@@ -227,24 +232,31 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
 
             {/* Action Footer */}
             <div className="flex items-center justify-between mt-auto pt-4.5 border-t border-white/5 relative z-10">
-                <div className="flex items-center gap-4 text-[11px] font-bold text-gray-500">
-                    <div className="flex items-center gap-1.5 hover:text-blue-400 transition-colors cursor-default">
-                        <HiOutlineChartBar className="text-sm opacity-60" />
-                        <span>{formatNumber(post.view_count)}</span>
+                {isRss && !hasSocialMetrics ? (
+                    <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-gray-500">
+                        <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
+                        <span>RSS Article</span>
                     </div>
-                    <div className="flex items-center gap-1.5 hover:text-rose-500 transition-colors cursor-default">
-                        <HiOutlineHeart className="text-sm opacity-60" />
-                        <span>{formatNumber(post.like_count)}</span>
+                ) : (
+                    <div className="flex items-center gap-4 text-[11px] font-bold text-gray-500">
+                        <div className="flex items-center gap-1.5 hover:text-blue-400 transition-colors cursor-default">
+                            <HiOutlineChartBar className="text-sm opacity-60" />
+                            <span>{formatNumber(post.view_count)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 hover:text-rose-500 transition-colors cursor-default">
+                            <HiOutlineHeart className="text-sm opacity-60" />
+                            <span>{formatNumber(post.like_count)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 hover:text-emerald-500 transition-colors cursor-default">
+                            <HiOutlineArrowPathRoundedSquare className="text-sm opacity-60" />
+                            <span>{formatNumber(post.retweet_count)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 hover:text-cyan-500 transition-colors cursor-default">
+                            <HiOutlineChatBubbleLeft className="text-sm opacity-60" />
+                            <span>{formatNumber(post.reply_count)}</span>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-1.5 hover:text-emerald-500 transition-colors cursor-default">
-                        <HiOutlineArrowPathRoundedSquare className="text-sm opacity-60" />
-                        <span>{formatNumber(post.retweet_count)}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 hover:text-cyan-500 transition-colors cursor-default">
-                        <HiOutlineChatBubbleLeft className="text-sm opacity-60" />
-                        <span>{formatNumber(post.reply_count)}</span>
-                    </div>
-                </div>
+                )}
 
                 <button className="flex items-center gap-2 px-4 py-2 bg-[#2a2a2c] border border-white/5 rounded-xl text-[10px] font-black text-gray-300 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest group/action shadow-lg">
                     <HiOutlinePencilSquare className="text-sm group-hover/action:scale-110 transition-transform" />

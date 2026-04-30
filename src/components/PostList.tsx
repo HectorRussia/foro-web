@@ -177,13 +177,32 @@ const PostList = ({
         return followedUsers.filter(u => !memberUserIds.has(u.id));
     };
 
+    const getInitial = (value?: string | null) => (value || 'N').charAt(0);
+
+    const getFollowedAvatar = (user?: FollowedUser | null) => {
+        if (!user) return '';
+        if (user.profile_image_url_https) return user.profile_image_url_https;
+        if (user.x_account) return `https://unavatar.io/twitter/${user.x_account.replace('@', '')}`;
+        return '';
+    };
+
+    const getFollowedSourceLabel = (user: FollowedUser) => {
+        if (user.follow_type === 'rss') return user.source_url || 'RSS feed';
+        return `@${(user.x_account || '').replace('@', '')}`;
+    };
+
+    const getMemberSourceLabel = (member: PostListUser) => {
+        if (member.follow_user_follow_type === 'rss') return member.follow_user_source_url || 'RSS feed';
+        return `@${(member.follow_user_x_account || '').replace('@', '')}`;
+    };
+
     return (
-        <div className={`flex flex-col h-full bg-[#0f0f10] ${showBorder ? 'border-l border-white/5' : ''} w-85 shrink-0 transition-all duration-500`}>
+        <div className={`flex h-full w-full shrink-0 flex-col bg-[var(--bg-900)] ${showBorder ? 'border-l border-white/5' : ''} transition-all duration-500`}>
 
             {/* Header */}
             <div
                 ref={actionMenuRef}
-                className="relative border-b border-white/6 px-6 pt-8 pb-5"
+                className="relative border-b border-white/6 px-4 pt-7 pb-5"
             >
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -216,7 +235,7 @@ const PostList = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -6, scale: 0.96 }}
                             transition={{ duration: 0.16, ease: 'easeOut' }}
-                            className="absolute right-6 top-[calc(100%+10px)] z-30 w-53.5 overflow-hidden rounded-[18px] border border-white/8 bg-[#111112]/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl"
+                            className="absolute right-4 top-[calc(100%+10px)] z-30 w-53.5 overflow-hidden rounded-[18px] border border-white/8 bg-[#111112]/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl"
                         >
                             <button
                                 type="button"
@@ -262,7 +281,7 @@ const PostList = ({
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="px-6 mb-4 overflow-hidden"
+                        className="px-4 mb-4 overflow-hidden"
                     >
                         <div className="bg-[#1a1a1b] border border-white/10 rounded-2xl p-4 space-y-3">
                             <input
@@ -460,17 +479,17 @@ const PostList = ({
                                                                     <div key={member.id} className="flex items-center justify-between group/member animate-in slide-in-from-left duration-300">
                                                                         <div className="flex items-center gap-3">
                                                                             <div className="w-10 h-10 rounded-full bg-gray-800 border border-white/5 overflow-hidden">
-                                                                                {followedMatch ? (
-                                                                                    <img src={followedMatch.profile_image_url_https} alt="" className="w-full h-full object-cover" />
+                                                                                {getFollowedAvatar(followedMatch) ? (
+                                                                                    <img src={getFollowedAvatar(followedMatch)} alt="" className="w-full h-full object-cover" />
                                                                                 ) : (
                                                                                     <div className="w-full h-full flex items-center justify-center text-[10px] text-gray-500 capitalize">
-                                                                                        {member.follow_user_name.charAt(0)}
+                                                                                        {getInitial(member.follow_user_name)}
                                                                                     </div>
                                                                                 )}
                                                                             </div>
                                                                             <div className="min-w-0">
                                                                                 <div className="text-xs font-bold text-white truncate">{member.follow_user_name}</div>
-                                                                                <div className="text-[10px] text-gray-500 truncate">@{member.follow_user_x_account}</div>
+                                                                                <div className="text-[10px] text-gray-500 truncate">{getMemberSourceLabel(member)}</div>
                                                                             </div>
                                                                         </div>
                                                                         <button
@@ -495,14 +514,20 @@ const PostList = ({
                                                         {availableUsers.map((user) => (
                                                             <div key={user.id} className="flex items-center justify-between group/user animate-in slide-in-from-right duration-300">
                                                                 <div className="flex items-center gap-3">
-                                                                    <img
-                                                                        src={user.profile_image_url_https}
-                                                                        alt={user.name}
-                                                                        className="w-10 h-10 rounded-full border border-white/5 object-cover"
-                                                                    />
+                                                                    {getFollowedAvatar(user) ? (
+                                                                        <img
+                                                                            src={getFollowedAvatar(user)}
+                                                                            alt={user.name}
+                                                                            className="w-10 h-10 rounded-full border border-white/5 object-cover"
+                                                                        />
+                                                                    ) : (
+                                                                        <div className="w-10 h-10 rounded-full border border-white/5 bg-blue-600/20 flex items-center justify-center text-[10px] font-black text-blue-400">
+                                                                            {getInitial(user.name)}
+                                                                        </div>
+                                                                    )}
                                                                     <div className="min-w-0">
                                                                         <div className="text-xs font-bold text-white truncate">{user.name}</div>
-                                                                        <div className="text-[10px] text-gray-500 truncate">@{user.x_account}</div>
+                                                                        <div className="text-[10px] text-gray-500 truncate">{getFollowedSourceLabel(user)}</div>
                                                                     </div>
                                                                 </div>
                                                                 <button

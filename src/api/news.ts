@@ -1,5 +1,5 @@
 import api from './axiosInstance';
-import type { PaginatedNewsResponse, NewsAnalysisResponse } from '../interface/news';
+import type { PaginatedNewsResponse, NewsAnalysisResponse, NewsItem } from '../interface/news';
 
 export const getNews = async (
     page = 1,
@@ -63,3 +63,25 @@ export const searchAndAnalyzeBulk = async (payload: any, signal?: AbortSignal): 
     return response.data;
 };
 
+export interface RssFetchPayload {
+    post_list_id?: number | null;
+    limit_per_feed?: number;
+}
+
+export interface RssFetchResponse {
+    status: string;
+    total_feeds?: number;
+    saved_count?: number;
+    skipped_count?: number;
+    error_count?: number;
+    items?: NewsItem[];
+    errors?: unknown[];
+}
+
+export const fetchRssNews = async (
+    payload: RssFetchPayload = {},
+    signal?: AbortSignal
+): Promise<RssFetchResponse> => {
+    const response = await api.post<RssFetchResponse>('/news/rss/fetch', payload, { signal });
+    return response.data;
+};

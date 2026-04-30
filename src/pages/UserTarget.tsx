@@ -45,7 +45,7 @@ const UserTarget = () => {
         return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
     }
 
-    const normalizeXAccount = (account: string) => account.replace(/^@/, '').trim().toLowerCase();
+    const normalizeXAccount = (account?: string | null) => (account || '').replace(/^@/, '').trim().toLowerCase();
 
     const getRecommendationAvatar = (rec: Recommendation) => {
         return rec.profile_image_url_https || rec.profile_image || `https://unavatar.io/twitter/${normalizeXAccount(rec.x_account)}`;
@@ -59,7 +59,23 @@ const UserTarget = () => {
 
     const findFollowedUserByAccount = (account: string, list = followedUsers) => {
         const normalized = normalizeXAccount(account);
-        return list.find(user => normalizeXAccount(user.x_account) === normalized) || null;
+        return list.find(user => user.follow_type !== 'rss' && normalizeXAccount(user.x_account) === normalized) || null;
+    };
+
+    const getFollowedAvatar = (user: FollowedUser) => {
+        if (user.profile_image_url_https) return user.profile_image_url_https;
+        if (user.x_account) return `https://unavatar.io/twitter/${normalizeXAccount(user.x_account)}`;
+        return '';
+    };
+
+    const getFollowedSourceLabel = (user: FollowedUser) => {
+        if (user.follow_type === 'rss') return user.source_url || 'RSS feed';
+        return `@${normalizeXAccount(user.x_account)}`;
+    };
+
+    const getFollowedSourceHref = (user: FollowedUser) => {
+        if (user.follow_type === 'rss') return user.source_url || '#';
+        return `https://x.com/${normalizeXAccount(user.x_account)}`;
     };
 
     const fetchUsers = async () => {
@@ -316,10 +332,10 @@ const UserTarget = () => {
     };
 
     return (
-        <div className="flex h-screen w-full gap-4 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_28%),linear-gradient(180deg,#070708_0%,#09090a_45%,#060607_100%)] p-4 font-sans text-gray-100">
+        <div className="foro-page-shell">
             <Sidebar />
-            <div className="flex flex-1 min-w-0 gap-3">
-                <section className="relative flex min-w-0 flex-1 flex-col overflow-y-auto rounded-[18px] border border-white/5 bg-[#141414] p-8 h-[calc(100dvh-2rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="foro-center-stage">
+                <section className="foro-workspace-panel relative p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
                     {/* ── Header ── */}
                     <div className="mb-6">
@@ -731,12 +747,20 @@ const UserTarget = () => {
                                                 <div className="flex items-center gap-4">
                                                     {/* Avatar */}
                                                     <div className="shrink-0 relative">
-                                                        <img
-                                                            src={fuser.profile_image_url_https}
-                                                            alt={fuser.name}
-                                                            className="w-12 h-12 rounded-full border-2 border-white/5 object-cover"
-                                                            onError={(e) => (e.currentTarget.src = `https://unavatar.io/twitter/${fuser.x_account}`)}
-                                                        />
+                                                        {getFollowedAvatar(fuser) ? (
+                                                            <img
+                                                                src={getFollowedAvatar(fuser)}
+                                                                alt={fuser.name}
+                                                                className="w-12 h-12 rounded-full border-2 border-white/5 object-cover"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.style.display = 'none';
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-full border-2 border-white/5 bg-blue-600/20 flex items-center justify-center text-sm font-black text-blue-400">
+                                                                {fuser.name.charAt(0)}
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     {/* Info */}
@@ -745,15 +769,15 @@ const UserTarget = () => {
                                                             {fuser.name}
                                                         </h4>
                                                         <p className="text-xs font-bold text-gray-500 truncate mt-0.5">
-                                                            @{fuser.x_account.replace('@', '')}
+                                                            {getFollowedSourceLabel(fuser)}
                                                         </p>
                                                         <a
-                                                            href={`https://x.com/${fuser.x_account.replace('@', '')}`}
+                                                            href={getFollowedSourceHref(fuser)}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="inline-flex items-center gap-1 text-blue-500 font-bold text-[10px] mt-1.5 hover:underline group/link"
                                                         >
-                                                            X Profile
+                                                            {fuser.follow_type === 'rss' ? 'RSS Source' : 'X Profile'}
                                                             <HiArrowTopRightOnSquare className="text-[9px] transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
                                                         </a>
                                                     </div>
@@ -844,7 +868,7 @@ const UserTarget = () => {
                         </div>
                     )}
                 </section>
-                <aside className="hidden xl:flex w-[340px] shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] overflow-hidden rounded-[22px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
+                <aside className="foro-right-rail">
                     <PostList refreshKey={refreshSidebar} />
                 </aside>
             </div>
