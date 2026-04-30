@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, '..')
+const docsRegistryPath = path.join(repoRoot, 'docs', '.vitepress', 'data', 'featureRegistry.mjs')
 
 const children = []
 
@@ -41,7 +43,12 @@ const shutdown = (exitCode = 0) => {
   process.exit(exitCode)
 }
 
-startProcess(process.execPath, [path.join(repoRoot, 'scripts', 'watch-docs-data.mjs')])
+if (fs.existsSync(docsRegistryPath)) {
+  startProcess(process.execPath, [path.join(repoRoot, 'scripts', 'watch-docs-data.mjs')])
+} else {
+  console.log('[dev-with-docs] Docs registry not found; starting app dev server without docs watcher.')
+}
+
 startProcess('npm', ['run', 'dev:app', '--', '--host', '127.0.0.1'], { shell: true })
 
 process.on('SIGINT', () => shutdown(0))

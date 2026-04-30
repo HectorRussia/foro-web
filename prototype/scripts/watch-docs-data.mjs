@@ -6,6 +6,12 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const repoRoot = path.resolve(__dirname, '..')
+const docsRegistryPath = path.join(repoRoot, 'docs', '.vitepress', 'data', 'featureRegistry.mjs')
+
+if (!fs.existsSync(docsRegistryPath)) {
+  console.log('[docs-watch] Docs registry not found; docs data watcher disabled.')
+  process.exit(0)
+}
 
 const WATCH_DIRECTORIES = [
   'src',
