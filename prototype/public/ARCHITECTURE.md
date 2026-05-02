@@ -937,7 +937,7 @@ base: '/test/'  // ทุก asset URL prefix ด้วย /test/
 ### Deployment
 
 ```toml
-# Build: npm run build
+# Build: pnpm run build
 # Start: node server.cjs
 # Port: $PORT (default 8000)
 ```

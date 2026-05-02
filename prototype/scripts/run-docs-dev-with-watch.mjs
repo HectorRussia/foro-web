@@ -42,7 +42,7 @@ const shutdown = (exitCode = 0) => {
 }
 
 startProcess(process.execPath, [path.join(repoRoot, 'scripts', 'watch-docs-data.mjs')])
-startProcess('npm', ['run', 'docs:dev:app'], { shell: true })
+startProcess('pnpm', ['run', 'docs:dev:app'], { shell: true })
 
 process.on('SIGINT', () => shutdown(0))
 process.on('SIGTERM', () => shutdown(0))

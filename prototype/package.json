@@ -3,6 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "packageManager": "pnpm@10.33.2",
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
   },
@@ -10,7 +11,7 @@
     "dev": "node scripts/run-dev-with-docs-watch.mjs",
     "dev:app": "vite",
     "build:app": "vite build",
-    "build": "npm run build:app && npm run docs:build",
+    "build": "pnpm run build:app && pnpm run docs:build",
     "test": "node --test \"server/tests/**/*.test.cjs\"",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
@@ -20,13 +21,13 @@
     "docs:changelog": "node scripts/generate-docs-changelog.mjs",
     "docs:draft": "node scripts/generate-docs-draft.mjs",
     "docs:watch": "node scripts/watch-docs-data.mjs",
-    "docs:data": "npm run docs:status && npm run docs:changelog && npm run docs:draft",
-    "predocs:dev": "npm run docs:data",
+    "docs:data": "pnpm run docs:status && pnpm run docs:changelog && pnpm run docs:draft",
+    "predocs:dev": "pnpm run docs:data",
     "docs:dev": "node scripts/run-docs-dev-with-watch.mjs",
     "docs:dev:app": "vitepress dev docs",
-    "predocs:build": "npm run docs:data",
+    "predocs:build": "pnpm run docs:data",
     "docs:build": "vitepress build docs",
-    "predocs:preview": "npm run docs:data",
+    "predocs:preview": "pnpm run docs:data",
     "docs:preview": "vitepress preview docs"
   },
   "dependencies": {
