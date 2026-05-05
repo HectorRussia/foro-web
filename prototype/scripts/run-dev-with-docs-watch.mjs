@@ -49,7 +49,7 @@ if (fs.existsSync(docsRegistryPath)) {
   console.log('[dev-with-docs] Docs registry not found; starting app dev server without docs watcher.')
 }
 
-startProcess('pnpm', ['run', 'dev:app', '--', '--host', '127.0.0.1'], { shell: true })
+startProcess('pnpm', ['run', 'dev:app', '--host', '127.0.0.1'], { shell: true })
 
 process.on('SIGINT', () => shutdown(0))
 process.on('SIGTERM', () => shutdown(0))
