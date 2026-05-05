@@ -1,0 +1,7 @@
+interface:
+  display_name: "PM Prototype Vibe"
+  short_description: "PM-only prototype workflow"
+  default_prompt: "Use $pm-prototype-vibe to help a PM run, inspect, and lightly adjust the FORO prototype."
+
+policy:
+  allow_implicit_invocation: true
