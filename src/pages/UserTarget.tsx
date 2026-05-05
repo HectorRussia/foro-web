@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Toaster, toast } from 'react-hot-toast';
 import { FaMagnifyingGlass, FaUserPlus, FaWandMagicSparkles, FaTrash } from 'react-icons/fa6';
@@ -8,9 +8,12 @@ import Sidebar from '../components/Layouts/Sidebar';
 import PostList from '../components/PostList';
 import PresetUserTarget from '../components/PresetUserTarget';
 import AILoader from '../components/AILoader';
+import NewsSourcesTab from '../components/NewsSourcesTab';
 
 import api from '../api/axiosInstance';
 import * as postListApi from '../api/postList';
+import { followRssSource } from '../api/rssFollow';
+import { RSS_CATALOG, type RssSource } from '../config/rssCatalog';
 import type { PostList as IPostList, PostListUser } from '../api/postList';
 import type { UserTweetSearch, Recommendation, FollowedUser } from '../interface/userTarget';
 
@@ -23,11 +26,13 @@ const UserTarget = () => {
     const [isLoading, setIsLoading] = useState(false);
 
     // AI Recommendation states
-    const [activeTab, setActiveTab] = useState<'search' | 'recommend'>('recommend');
+    const [activeTab, setActiveTab] = useState<'search' | 'recommend' | 'sources'>('recommend');
     const [recommendQuery, setRecommendQuery] = useState("");
     const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
     const [isRecommending, setIsRecommending] = useState(false);
     const [isSearchingMore, setIsSearchingMore] = useState(false);
+    const [rssActionSourceId, setRssActionSourceId] = useState<string | null>(null);
+    const [rssPostListActionKey, setRssPostListActionKey] = useState<string | null>(null);
 
     // Followed users state
     const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
@@ -45,7 +50,33 @@ const UserTarget = () => {
         return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
     }
 
-    const normalizeXAccount = (account: string) => account.replace(/^@/, '').trim().toLowerCase();
+    const normalizeXAccount = (account?: string | null) => (account || '').replace(/^@/, '').trim().toLowerCase();
+    const normalizeRssUrl = (url?: string | null) => String(url || '').trim().toLowerCase().replace(/\/$/, '');
+
+    const allRssSources = useMemo(() => Object.values(RSS_CATALOG).flat(), []);
+    const rssSourcesByUrl = useMemo(
+        () => new Map(allRssSources.map(source => [normalizeRssUrl(source.url), source])),
+        [allRssSources]
+    );
+    const rssFollowedUsers = useMemo(
+        () => followedUsers.filter(user => user.follow_type === 'rss' || Boolean(user.source_url)),
+        [followedUsers]
+    );
+    const subscribedSources = useMemo<RssSource[]>(() => (
+        rssFollowedUsers
+            .filter(user => Boolean(user.source_url))
+            .map(user => rssSourcesByUrl.get(normalizeRssUrl(user.source_url)) || {
+                id: `follow-${user.id}`,
+                name: user.name,
+                url: user.source_url || '',
+                siteUrl: user.source_url || '',
+                description: 'แหล่งข่าว RSS ที่ติดตามอยู่',
+                frequency: 'RSS feed',
+                lang: 'th',
+                type: 'news',
+                topic: 'news',
+            })
+    ), [rssFollowedUsers, rssSourcesByUrl]);
 
     const getRecommendationAvatar = (rec: Recommendation) => {
         return rec.profile_image_url_https || rec.profile_image || `https://unavatar.io/twitter/${normalizeXAccount(rec.x_account)}`;
@@ -59,7 +90,48 @@ const UserTarget = () => {
 
     const findFollowedUserByAccount = (account: string, list = followedUsers) => {
         const normalized = normalizeXAccount(account);
-        return list.find(user => normalizeXAccount(user.x_account) === normalized) || null;
+        return list.find(user => user.follow_type !== 'rss' && normalizeXAccount(user.x_account) === normalized) || null;
+    };
+
+    const findFollowedRssBySource = (source: RssSource, list = followedUsers) => {
+        const normalized = normalizeRssUrl(source.url);
+        return list.find(user => normalizeRssUrl(user.source_url) === normalized) || null;
+    };
+
+    const getListMembershipForRssSource = (
+        source: RssSource,
+        list: IPostList & { members: PostListUser[] },
+        followedUser?: FollowedUser | null
+    ) => {
+        const normalized = normalizeRssUrl(source.url);
+        return list.members.some(member =>
+            (followedUser && member.follower_user_id === followedUser.id) ||
+            normalizeRssUrl(member.follow_user_source_url) === normalized
+        );
+    };
+
+    const findRssPostListMember = (
+        source: RssSource,
+        list: IPostList & { members: PostListUser[] }
+    ) => {
+        const normalized = normalizeRssUrl(source.url);
+        return list.members.find(member => normalizeRssUrl(member.follow_user_source_url) === normalized) || null;
+    };
+
+    const getFollowedAvatar = (user: FollowedUser) => {
+        if (user.profile_image_url_https) return user.profile_image_url_https;
+        if (user.x_account) return `https://unavatar.io/twitter/${normalizeXAccount(user.x_account)}`;
+        return '';
+    };
+
+    const getFollowedSourceLabel = (user: FollowedUser) => {
+        if (user.follow_type === 'rss') return user.source_url || 'RSS feed';
+        return `@${normalizeXAccount(user.x_account)}`;
+    };
+
+    const getFollowedSourceHref = (user: FollowedUser) => {
+        if (user.follow_type === 'rss') return user.source_url || '#';
+        return `https://x.com/${normalizeXAccount(user.x_account)}`;
     };
 
     const fetchUsers = async () => {
@@ -170,6 +242,41 @@ const UserTarget = () => {
         }
     };
 
+    const ensureRssSourceInWatchlist = async (source: RssSource) => {
+        const existing = findFollowedRssBySource(source);
+        if (existing) return existing;
+
+        const followed = await followRssSource(source);
+        const refreshedUsers = await fetchFollowedUsers();
+        return findFollowedRssBySource(source, refreshedUsers) || followed;
+    };
+
+    const handleToggleRssSource = async (source: RssSource) => {
+        const existing = findFollowedRssBySource(source);
+        setRssActionSourceId(source.id);
+
+        try {
+            if (existing) {
+                await api.delete(`${BASE_URL}/follow/users/${existing.id}`);
+                setFollowedUsers(prev => prev.filter(user => user.id !== existing.id));
+                await fetchPostLists();
+                toast.success(`นำ ${source.name} ออกจาก Watchlist แล้ว`);
+            } else {
+                await followRssSource(source);
+                await fetchFollowedUsers();
+                toast.success(`เพิ่ม ${source.name} เข้า Watchlist แล้ว`);
+            }
+            setRefreshSidebar(prev => prev + 1);
+        } catch (error: any) {
+            console.error('Failed to toggle RSS source:', error);
+            const detailMessage = error.response?.data?.detail?.data?.message || error.response?.data?.detail;
+            toast.error(detailMessage || 'ไม่สามารถอัปเดตแหล่งข่าวได้');
+            fetchFollowedUsers();
+        } finally {
+            setRssActionSourceId(null);
+        }
+    };
+
     const fetchPostLists = async (): Promise<(IPostList & { members: PostListUser[] })[]> => {
         try {
             setIsFetchingLists(true);
@@ -187,6 +294,46 @@ const UserTarget = () => {
             return [];
         } finally {
             setIsFetchingLists(false);
+        }
+    };
+
+    const handleToggleRssPostList = async (
+        source: RssSource,
+        list: IPostList & { members: PostListUser[] }
+    ) => {
+        const actionKey = `${source.id}-${list.id}`;
+        setRssPostListActionKey(actionKey);
+
+        try {
+            const existingMember = findRssPostListMember(source, list);
+            const existingFollowedUser = findFollowedRssBySource(source);
+            const isMember = Boolean(existingMember) || getListMembershipForRssSource(source, list, existingFollowedUser);
+
+            if (isMember) {
+                const followerUserId = existingMember?.follower_user_id || existingFollowedUser?.id;
+                if (!followerUserId) {
+                    toast.error('ไม่พบข้อมูลสมาชิก RSS ใน Post List นี้');
+                    return;
+                }
+                await postListApi.deletePostListUserRelation(list.id, followerUserId);
+                toast.success(`นำ ${source.name} ออกจาก ${list.name} แล้ว`);
+            } else {
+                const followedUser = await ensureRssSourceInWatchlist(source);
+                if (!followedUser?.id) {
+                    toast.error('ต้องเพิ่มแหล่งข่าวเข้า Watchlist ก่อนจึงจะเพิ่มเข้า Post List ได้');
+                    return;
+                }
+                await postListApi.createPostListUser(list.id, followedUser.id);
+                toast.success(`เพิ่ม ${source.name} เข้า ${list.name} แล้ว`);
+            }
+
+            await fetchPostLists();
+            setRefreshSidebar(prev => prev + 1);
+        } catch (error) {
+            console.error('Failed to toggle RSS source in post list:', error);
+            toast.error('ไม่สามารถอัปเดต Post List ได้');
+        } finally {
+            setRssPostListActionKey(null);
         }
     };
 
@@ -310,16 +457,16 @@ const UserTarget = () => {
         e.preventDefault();
         if (activeTab === 'search') {
             fetchUsers();
-        } else {
+        } else if (activeTab === 'recommend') {
             fetchRecommendations();
         }
     };
 
     return (
-        <div className="flex h-screen w-full gap-4 overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.08),transparent_28%),linear-gradient(180deg,#070708_0%,#09090a_45%,#060607_100%)] p-4 font-sans text-gray-100">
+        <div className="foro-page-shell">
             <Sidebar />
-            <div className="flex flex-1 min-w-0 gap-3">
-                <section className="relative flex min-w-0 flex-1 flex-col overflow-y-auto rounded-[18px] border border-white/5 bg-[#141414] p-8 h-[calc(100dvh-2rem)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="foro-center-stage">
+                <section className="foro-workspace-panel relative p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
 
                     {/* ── Header ── */}
                     <div className="mb-6">
@@ -350,11 +497,17 @@ const UserTarget = () => {
                         </button>
 
                         <button
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs text-gray-500 hover:text-gray-300 transition-all duration-300"
+                            onClick={() => setActiveTab('sources')}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'sources'
+                                ? 'bg-linear-to-r from-blue-600 to-indigo-500 text-white shadow-lg shadow-blue-600/25 border border-white/15'
+                                : 'text-gray-500 hover:text-gray-300'
+                                }`}
                         >
-                            <HiOutlineNewspaper className="text-lg text-gray-600" />
+                            <HiOutlineNewspaper className={`text-lg transition-colors ${activeTab === 'sources' ? 'text-white' : 'text-gray-600'}`} />
                             <span>แหล่งข่าว</span>
-                            <span className="bg-blue-600/20 text-blue-400 px-1.5 py-0.5 rounded-full text-[10px] font-black">6</span>
+                            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${activeTab === 'sources' ? 'bg-white/20 text-white' : 'bg-blue-600/20 text-blue-400'}`}>
+                                {rssFollowedUsers.length}
+                            </span>
                         </button>
 
                         <button
@@ -369,58 +522,60 @@ const UserTarget = () => {
                         </button>
                     </div>
 
-                    {/* ── Search Bar ── */}
-                    <div className="w-full max-w-[620px] mb-7">
-                        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row sm:items-center gap-3">
-                            {/* Input Container */}
-                            <div className="flex min-h-[52px] flex-1 items-center gap-4 bg-[#1a1a1b] border border-white/8 rounded-2xl px-5 py-3.5 transition-all duration-300 focus-within:border-white/15 focus-within:bg-[#202021]">
-                                <FaMagnifyingGlass className="text-gray-500 text-base" />
-                                <input
-                                    type="text"
-                                    value={activeTab === 'search' ? searchQuery : recommendQuery}
-                                    onChange={(e) => activeTab === 'search' ? setSearchQuery(e.target.value) : setRecommendQuery(e.target.value)}
-                                    placeholder={activeTab === 'search' ? "กรอก X Username (เช่น elonmusk)..." : "เช่น นักวิเคราะห์ตลาดเกม, ครีเอเตอร์สาย AI, ผู้ก่อตั้งสตาร์ทอัพสุขภาพ"}
-                                    className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-500 outline-none text-sm font-bold min-w-0"
-                                />
-                                {activeTab === 'recommend' && recommendQuery && (
+                    {activeTab !== 'sources' && (
+                        <>
+                            {/* ── Search Bar ── */}
+                            <div className="w-full max-w-[620px] mb-7">
+                                <form onSubmit={handleSearch} className="flex flex-col sm:flex-row sm:items-center gap-3">
+                                    {/* Input Container */}
+                                    <div className="flex min-h-[52px] flex-1 items-center gap-4 bg-[#1a1a1b] border border-white/8 rounded-2xl px-5 py-3.5 transition-all duration-300 focus-within:border-white/15 focus-within:bg-[#202021]">
+                                        <FaMagnifyingGlass className="text-gray-500 text-base" />
+                                        <input
+                                            type="text"
+                                            value={activeTab === 'search' ? searchQuery : recommendQuery}
+                                            onChange={(e) => activeTab === 'search' ? setSearchQuery(e.target.value) : setRecommendQuery(e.target.value)}
+                                            placeholder={activeTab === 'search' ? "กรอก X Username (เช่น elonmusk)..." : "เช่น นักวิเคราะห์ตลาดเกม, ครีเอเตอร์สาย AI, ผู้ก่อตั้งสตาร์ทอัพสุขภาพ"}
+                                            className="flex-1 bg-transparent border-none focus:ring-0 text-white placeholder-gray-500 outline-none text-sm font-bold min-w-0"
+                                        />
+                                        {activeTab === 'recommend' && recommendQuery && (
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setRecommendQuery("");
+                                                    setRecommendations([]);
+                                                    setSelectedRecommendationForList(null);
+                                                }}
+                                                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition-all hover:bg-white/5 hover:text-white"
+                                                title="ล้างคำค้นหา"
+                                            >
+                                                <HiXMark className="text-base" />
+                                            </button>
+                                        )}
+                                    </div>
+                                    {/* Submit Button */}
                                     <button
-                                        type="button"
-                                        onClick={() => {
-                                            setRecommendQuery("");
-                                            setRecommendations([]);
-                                            setSelectedRecommendationForList(null);
-                                        }}
-                                        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-gray-500 transition-all hover:bg-white/5 hover:text-white"
-                                        title="ล้างคำค้นหา"
+                                        type="submit"
+                                        disabled={isLoading || isRecommending || isSearchingMore}
+                                        className={`flex min-h-[49px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-3.5 font-black text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-r from-blue-500 to-violet-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-95 whitespace-nowrap sm:w-[132px]`}
                                     >
-                                        <HiXMark className="text-base" />
+                                        {(isLoading || isRecommending) ? (
+                                            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <span>ค้นหา</span>
+                                        )}
                                     </button>
-                                )}
+                                </form>
+                                <p className="mt-3 text-[11px] font-bold text-gray-500">
+                                    {activeTab === 'search'
+                                        ? 'ค้นหาจากชื่อบัญชี X แล้วเพิ่มเข้า Watchlist ได้ทันที'
+                                        : 'ยังไม่มีอินฟลูฯที่ใกล้เคียงกัน ลองเพิ่มคำเฉพาะหรือเปลี่ยนมุมค้นหา'}
+                                </p>
                             </div>
-                            {/* Submit Button */}
-                            <button
-                                type="submit"
-                                disabled={isLoading || isRecommending || isSearchingMore}
-                                className={`flex min-h-[49px] w-full shrink-0 items-center justify-center gap-2 rounded-2xl px-8 py-3.5 font-black text-sm text-white transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed bg-linear-to-r from-blue-500 to-violet-500 hover:shadow-[0_0_20px_rgba(99,102,241,0.4)] active:scale-95 whitespace-nowrap sm:w-[132px]`}
-                            >
-                                {(isLoading || isRecommending) ? (
-                                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                                ) : (
-                                    <span>ค้นหา</span>
-                                )}
-                            </button>
-                        </form>
-                        <p className="mt-3 text-[11px] font-bold text-gray-500">
-                            {activeTab === 'search'
-                                ? 'ค้นหาจากชื่อบัญชี X แล้วเพิ่มเข้า Watchlist ได้ทันที'
-                                : 'ยังไม่มีอินฟลูฯที่ใกล้เคียงกัน ลองเพิ่มคำเฉพาะหรือเปลี่ยนมุมค้นหา'}
-                        </p>
-                    </div>
 
-                    {/* ── Results ── */}
-                    <div className="relative">
-                        <AnimatePresence mode="wait">
-                            {activeTab === 'search' ? (
+                            {/* ── Results ── */}
+                            <div className="relative">
+                                <AnimatePresence mode="wait">
+                                    {activeTab === 'search' ? (
                                 /* Search Results */
                                 <motion.div
                                     key="search-results"
@@ -688,8 +843,22 @@ const UserTarget = () => {
                                     )}
                                 </motion.div>
                             )}
-                        </AnimatePresence>
-                    </div>
+                                </AnimatePresence>
+                            </div>
+                        </>
+                    )}
+
+                    {activeTab === 'sources' && (
+                        <NewsSourcesTab
+                            subscribedSources={subscribedSources}
+                            postLists={postLists}
+                            isFetchingPostLists={isFetchingLists}
+                            busySourceId={rssActionSourceId}
+                            busyPostListKey={rssPostListActionKey}
+                            onToggleSource={handleToggleRssSource}
+                            onTogglePostList={handleToggleRssPostList}
+                        />
+                    )}
 
                     {/* ── Followed Accounts Section ── */}
                     {activeTab === 'search' && (
@@ -731,12 +900,20 @@ const UserTarget = () => {
                                                 <div className="flex items-center gap-4">
                                                     {/* Avatar */}
                                                     <div className="shrink-0 relative">
-                                                        <img
-                                                            src={fuser.profile_image_url_https}
-                                                            alt={fuser.name}
-                                                            className="w-12 h-12 rounded-full border-2 border-white/5 object-cover"
-                                                            onError={(e) => (e.currentTarget.src = `https://unavatar.io/twitter/${fuser.x_account}`)}
-                                                        />
+                                                        {getFollowedAvatar(fuser) ? (
+                                                            <img
+                                                                src={getFollowedAvatar(fuser)}
+                                                                alt={fuser.name}
+                                                                className="w-12 h-12 rounded-full border-2 border-white/5 object-cover"
+                                                                onError={(e) => {
+                                                                    e.currentTarget.style.display = 'none';
+                                                                }}
+                                                            />
+                                                        ) : (
+                                                            <div className="w-12 h-12 rounded-full border-2 border-white/5 bg-blue-600/20 flex items-center justify-center text-sm font-black text-blue-400">
+                                                                {fuser.name.charAt(0)}
+                                                            </div>
+                                                        )}
                                                     </div>
 
                                                     {/* Info */}
@@ -745,15 +922,15 @@ const UserTarget = () => {
                                                             {fuser.name}
                                                         </h4>
                                                         <p className="text-xs font-bold text-gray-500 truncate mt-0.5">
-                                                            @{fuser.x_account.replace('@', '')}
+                                                            {getFollowedSourceLabel(fuser)}
                                                         </p>
                                                         <a
-                                                            href={`https://x.com/${fuser.x_account.replace('@', '')}`}
+                                                            href={getFollowedSourceHref(fuser)}
                                                             target="_blank"
                                                             rel="noopener noreferrer"
                                                             className="inline-flex items-center gap-1 text-blue-500 font-bold text-[10px] mt-1.5 hover:underline group/link"
                                                         >
-                                                            X Profile
+                                                            {fuser.follow_type === 'rss' ? 'RSS Source' : 'X Profile'}
                                                             <HiArrowTopRightOnSquare className="text-[9px] transition-transform group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5" />
                                                         </a>
                                                     </div>
@@ -844,7 +1021,7 @@ const UserTarget = () => {
                         </div>
                     )}
                 </section>
-                <aside className="hidden xl:flex w-[340px] shrink-0 self-start sticky top-4 h-[calc(100dvh-2rem)] overflow-hidden rounded-[22px] border border-white/6 bg-[#0f0f10] shadow-[0_28px_100px_rgba(0,0,0,0.42)]">
+                <aside className="foro-right-rail">
                     <PostList refreshKey={refreshSidebar} />
                 </aside>
             </div>

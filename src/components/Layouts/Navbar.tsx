@@ -38,21 +38,21 @@ const NavbarStruct = ({ id, icon, label, active = false, path, mobileOnly }: Nav
     }
 
     return (
-        <div
+        <button
+            type="button"
             onClick={() => pathNave(path)}
             className=
-            {`flex items-center gap-4 px-4 py-4 rounded-xl cursor-pointer transition-all duration-200 group 
+            {`relative mx-3 my-[3px] flex w-[calc(100%-24px)] items-center gap-3 overflow-hidden rounded-xl px-[18px] py-3 text-left transition-all duration-300 group 
                 ${active
-                    ? 'bg-blue-600/10 text-blue-400'
-                    : 'text-gray-400 hover:bg-[#1e293b] hover:text-gray-100'
+                    ? 'bg-[linear-gradient(90deg,rgba(21,44,71,0.78),rgba(16,28,42,0.96))] text-white shadow-[inset_0_0_0_1px_rgba(113,170,234,0.06),0_8px_22px_rgba(0,0,0,0.18)] before:absolute before:left-0 before:top-[16%] before:h-[68%] before:w-0.5 before:rounded-r before:bg-[linear-gradient(180deg,rgba(120,190,255,0.92),rgba(41,151,255,0.98))]'
+                    : 'text-slate-300 hover:bg-white/[0.035] hover:text-white'
                 } ${mobileOnly ? 'lg:hidden' : ''}`
             }>
-            <div className={`${active ? 'text-blue-400' : 'text-gray-400 group-hover:text-gray-200'} text-xl`}>
+            <div className={`${active ? 'text-white translate-x-px' : 'text-slate-200 group-hover:text-white'} z-10 flex h-6 w-6 shrink-0 items-center justify-center text-[20px] transition-all`}>
                 {icon}
             </div>
-            <span className={`text-base font-medium hidden lg:block`}>{label}</span>
-            {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-blue-500 hidden lg:block shadow-[0_0_8px_rgba(59,130,246,0.8)]" />}
-        </div>
+            <span className="z-10 hidden min-w-0 flex-1 truncate text-[15px] font-bold leading-[1.35] lg:block">{label}</span>
+        </button>
     )
 }
 

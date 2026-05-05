@@ -1,5 +1,11 @@
 import api from './axiosInstance';
-import type { PaginatedNewsResponse, NewsAnalysisResponse } from '../interface/news';
+import type {
+    AdvancedSearchBulkPayload,
+    AdvancedSearchBulkResponse,
+    PaginatedNewsResponse,
+    NewsAnalysisResponse,
+    NewsItem
+} from '../interface/news';
 
 export const getNews = async (
     page = 1,
@@ -58,8 +64,33 @@ export const updateTriggerStatus = async (trigger: number, news_ids?: number[]):
     await api.patch('/news/trigger', { trigger, news_ids });
 };
 
-export const searchAndAnalyzeBulk = async (payload: any, signal?: AbortSignal): Promise<any> => {
-    const response = await api.post('/advanced-search/search-and-analyze-bulk', payload, { signal });
+export const searchAndAnalyzeBulk = async (
+    payload: AdvancedSearchBulkPayload,
+    signal?: AbortSignal
+): Promise<AdvancedSearchBulkResponse> => {
+    const response = await api.post<AdvancedSearchBulkResponse>('/advanced-search/search-and-analyze-bulk', payload, { signal });
     return response.data;
 };
 
+export interface RssFetchPayload {
+    post_list_id?: number | null;
+    limit_per_feed?: number;
+}
+
+export interface RssFetchResponse {
+    status: string;
+    total_feeds?: number;
+    saved_count?: number;
+    skipped_count?: number;
+    error_count?: number;
+    items?: NewsItem[];
+    errors?: unknown[];
+}
+
+export const fetchRssNews = async (
+    payload: RssFetchPayload = {},
+    signal?: AbortSignal
+): Promise<RssFetchResponse> => {
+    const response = await api.post<RssFetchResponse>('/news/rss/fetch', payload, { signal });
+    return response.data;
+};

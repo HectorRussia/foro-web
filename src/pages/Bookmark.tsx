@@ -259,10 +259,10 @@ const Bookmark = () => {
     };
 
     return (
-        <div className="flex h-screen w-full gap-3 overflow-hidden bg-[#0a0a0b] p-3 font-sans text-gray-100">
+        <div className="foro-page-shell">
             <Sidebar />
-            <div className="flex flex-1 min-w-0 gap-3">
-                <section className="flex min-w-0 flex-1 flex-col overflow-y-auto rounded-4xl border border-white/5 bg-[#111112] shadow-[0_24px_90px_rgba(0,0,0,0.45)] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+            <div className="foro-center-stage">
+                <section className="foro-workspace-panel [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     <div className="flex flex-col w-full px-6 py-6 sm:px-8 lg:px-10">
                         {/* Header */}
                         <div className="mb-6">
@@ -350,7 +350,7 @@ const Bookmark = () => {
                     </div>
                 </section>
 
-                <aside className="hidden xl:flex w-[320px] shrink-0 overflow-hidden rounded-4xl border border-white/5 bg-[#111112] shadow-[0_24px_90px_rgba(0,0,0,0.35)]">
+                <aside className="foro-right-rail">
                     <PostList showBorder={false} />
                 </aside>
             </div>

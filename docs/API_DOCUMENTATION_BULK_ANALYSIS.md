@@ -80,7 +80,11 @@
   // 🔥 Users Source Options (Priority Order):
   "post_list_id": 123,                 // 🚀 NEW: ใช้ users จาก post_list_user (priority สูงสุด)
   "use_followed_users": true,          // ใช้ users ที่ติดตาม (default behavior)
-  "specific_users": ["username1", "username2"]  // users เฉพาะ (priority ต่ำสุด)
+  "specific_users": ["username1", "username2"],  // users เฉพาะ (priority ต่ำสุด)
+
+  // RSS options:
+  "fetch_rss_first": true,             // default true: fetch RSS ก่อน แล้วค่อยทำ X
+  "rss_limit_per_feed": 20             // default 20, max 100
 }
 ```
 
@@ -436,6 +440,205 @@ if (firstResult.twitter_has_next) {
 - ✅ **ใช้ `/search-and-analyze-bulk`** สำหรับ production (แนะนำ)
 - 🔄 ใช้ `/search-and-analyze` เมื่อต้องการ individual analysis เฉพาะ  
 - 🔄 ใช้ `/search-and-analyze-stream` เมื่อต้องการ realtime UI feedback เท่านั้น
+
+---
+
+## Frontend Update: RSS Source Support
+
+ส่วนนี้เป็นสิ่งที่ frontend ต้องปรับหลัง backend รองรับข่าวจาก RSS/Atom feed เพิ่มเติม โดยไม่เปลี่ยน logic `trigger_news` เดิม
+
+### 1. Follow item มี type แล้ว
+
+`GET /follow` จะคืน field เพิ่ม:
+
+```json
+{
+  "id": 12,
+  "x_account": null,
+  "follow_type": "rss",
+  "source_url": "https://example.com/rss.xml",
+  "name": "Example News",
+  "profile_image_url_https": null,
+  "status": 1,
+  "user_id": 456,
+  "created_at": "2026-04-30T10:00:00Z",
+  "updated_at": "2026-04-30T10:00:00Z"
+}
+```
+
+Frontend ต้องแยก display จาก `follow_type`:
+
+| `follow_type` | ใช้ field ไหน | หมายเหตุ |
+|---|---|---|
+| `"x"` | `x_account`, `name`, `profile_image_url_https` | behavior เดิม |
+| `"rss"` | `source_url`, `name`, `profile_image_url_https` | `x_account` จะเป็น `null` |
+
+### 2. เพิ่ม RSS follow
+
+ใช้ endpoint นี้เพื่อเพิ่ม RSS feed เข้า follow list:
+
+```http
+POST /follow/rss
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "rss_url": "https://example.com/rss.xml",
+  "name": "Example News",
+  "profile_image_url_https": null
+}
+```
+
+Response: `FollowUserResponse` เหมือน `GET /follow` โดย `follow_type` จะเป็น `"rss"` และ `source_url` จะเป็น feed URL
+
+ก่อนเพิ่มจริงสามารถ preview feed ได้:
+
+```http
+GET /follow/rss/preview?rss_url=https%3A%2F%2Fexample.com%2Frss.xml
+Authorization: Bearer <token>
+```
+
+Response:
+
+```json
+{
+  "status": "success",
+  "data": {
+    "feed_url": "https://example.com/rss.xml",
+    "feed_title": "Example News",
+    "items": [
+      {
+        "title": "Article title",
+        "url": "https://example.com/article",
+        "summary": "Short summary from RSS",
+        "source_item_id": "https://example.com/article",
+        "published_at": "Thu, 30 Apr 2026 10:00:00 GMT",
+        "author": null,
+        "media_urls": []
+      }
+    ]
+  }
+}
+```
+
+### 3. Fetch RSS news เข้า `news_items`
+
+หลัง user follow RSS แล้ว ให้เรียก:
+
+```http
+POST /news/rss/fetch
+Authorization: Bearer <token>
+Content-Type: application/json
+```
+
+Request:
+
+```json
+{
+  "post_list_id": 1,
+  "limit_per_feed": 20
+}
+```
+
+Field:
+
+| field | required | default | notes |
+|---|---:|---:|---|
+| `post_list_id` | no | `null` | ถ้าส่งมา จะ fetch เฉพาะ RSS follows ใน post list นั้น |
+| `limit_per_feed` | no | `20` | 1-100 |
+
+Response:
+
+```json
+{
+  "status": "success",
+  "total_feeds": 3,
+  "saved_count": 12,
+  "skipped_count": 8,
+  "error_count": 0,
+  "items": [
+    {
+      "id": 1001,
+      "title": "Article title",
+      "url": "https://example.com/article",
+      "feed_url": "https://example.com/rss.xml",
+      "source_item_id": "https://example.com/article",
+      "published_at": "Thu, 30 Apr 2026 10:00:00 GMT"
+    }
+  ],
+  "errors": []
+}
+```
+
+`skipped_count` คือข่าวที่ backend เจอซ้ำจาก `source_item_id` หรือ `url` เดิม จึงไม่ insert ซ้ำ
+
+หลัง fetch สำเร็จ ให้ frontend refresh news list ด้วย endpoint เดิม เช่น `GET /news` เพราะข่าว RSS ถูก save ลง `news_items` แล้ว
+
+### 4. News item response มี RSS metadata เพิ่ม
+
+`GET /news` และ news response อื่น ๆ จะมี field เพิ่ม:
+
+```json
+{
+  "id": 1001,
+  "title": "Article title",
+  "content": "Short summary from RSS",
+  "url": "https://example.com/article",
+  "source_type": "rss",
+  "source_item_id": "https://example.com/article",
+  "published_at": "Thu, 30 Apr 2026 10:00:00 GMT",
+  "tweet_id": null,
+  "tweet_profile_pic": null,
+  "tweet_created_at": null,
+  "retweet_count": 0,
+  "reply_count": 0,
+  "like_count": 0,
+  "quote_count": 0,
+  "view_count": 0,
+  "trigger_news": 0
+}
+```
+
+Frontend card ควร handle ตามนี้:
+
+| case | UI behavior |
+|---|---|
+| `source_type === "rss"` | แสดงเป็น article/RSS card, ใช้ `published_at`, ซ่อน X metrics ถ้าเป็น 0/null |
+| `source_type !== "rss"` หรือ `null` | ใช้ UI X/news เดิม |
+| `tweet_id === null` | ห้าม assume ว่าเปิด x.com/status ได้ |
+| `tweet_profile_pic === null` | ใช้ fallback icon/avatar ของ source |
+
+### 5. Advanced bulk analysis ทำ RSS ก่อน แล้วค่อย X
+
+`/advanced-search/search-and-analyze-bulk` ตอนนี้ทำงานแบบ priority:
+
+1. Fetch RSS feeds ใน scope เดียวกันก่อน (`post_list_id` หรือ `use_followed_users`)
+2. Save ข่าว RSS ใหม่ลง `news_items` โดย dedupe ด้วย `source_item_id`/`url`
+3. ต่อด้วย X/Twitter bulk analysis จาก follows ที่ `follow_type === "x"`
+4. Response สุดท้ายยังเป็น news list format เดิม และสามารถมีข่าว RSS ที่เพิ่ง save รวมอยู่ด้วย
+
+ถ้า post list มีทั้ง X และ RSS:
+
+- `POST /advanced-search/search-and-analyze-bulk` จะทำ RSS ก่อน แล้วต่อ X
+- `POST /news/rss/fetch` ยังใช้ได้ ถ้าต้องการ fetch RSS อย่างเดียว และจะ ignore X follows
+
+ดังนั้น frontend สามารถให้ post list เดียวมี source ปนกันได้:
+
+| action | endpoint |
+|---|---|
+| ทำทั้ง RSS -> X | `/advanced-search/search-and-analyze-bulk` |
+| ดึงเฉพาะ RSS | `/news/rss/fetch` |
+| ทำเฉพาะ X ไม่เอา RSS | `/advanced-search/search-and-analyze-bulk` พร้อม `fetch_rss_first: false` |
+
+### 6. สิ่งที่ไม่เปลี่ยน
+
+- `trigger_news` ยังใช้สำหรับการแสดงข่าวหน้าบ้านตาม flow เดิม ไม่ได้ใช้แยก RSS/X
+- RSS dedupe ใช้ `source_item_id` ภายใน backend frontend ไม่ต้องสร้างเอง
+- Endpoint อ่านข่าวหลักยังใช้ `GET /news` ได้เหมือนเดิม
 
 ---
 

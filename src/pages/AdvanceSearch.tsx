@@ -320,11 +320,11 @@ const AdvancedSearchStream = () => {
     };
 
     return (
-        <div className="flex min-h-screen w-full gap-3 bg-[#030e17] p-3 font-sans text-gray-100 overflow-x-hidden">
+        <div className="foro-page-shell">
             <Sidebar />
 
-            <div className="flex-1 flex min-w-0 overflow-hidden">
-                <main className="flex-1 flex flex-col h-screen overflow-hidden">
+            <div className="foro-center-stage">
+                <main className="foro-workspace-main flex flex-col !overflow-hidden !p-0">
                     {/* Header Section */}
                     <header className="px-6 py-6 border-b border-white/5 bg-[#030e17]/80 backdrop-blur-xl z-10">
                         <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -604,9 +604,9 @@ const AdvancedSearchStream = () => {
                         </div>
                     </div>
                 </main>
-                <div className="hidden xl:block">
+                <aside className="foro-right-rail">
                     <PostList />
-                </div>
+                </aside>
             </div>
 
             <style>{`

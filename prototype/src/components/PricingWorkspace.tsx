@@ -1,0 +1,350 @@
+import { createElement, useEffect, useRef, useState } from 'react';
+import { Check, CreditCard, Shield, Sparkles, X } from 'lucide-react';
+import {
+  FEATURE_LABELS,
+  HOME_FEED_CARD_LIMITS,
+  PLAN_DEFINITIONS,
+  formatCardLimit,
+  formatPlanLimit,
+  type MeteredFeature,
+  type PlanId,
+} from '../config/pricingPlans';
+import PlanPanel from './PlanPanel';
+
+type PricingWorkspaceProps = {
+  isVisible: boolean;
+  activePlanId: PlanId;
+  dailyUsage: Record<MeteredFeature, number>;
+  remainingUsage: Record<MeteredFeature, number>;
+  onSelectPlan: (planId: PlanId) => void;
+  isCheckoutLoading?: boolean;
+  usageLimits: Record<MeteredFeature, number>;
+  plusAccess?: {
+    activatedAt: string;
+    expiresAt: string;
+    source?: 'checkout' | 'manual';
+  } | null;
+  profileSectionEventName?: string;
+};
+
+const FEATURE_ORDER: MeteredFeature[] = ['feed', 'search', 'generate'];
+const PUBLIC_PLAN_IDS: PlanId[] = ['free', 'plus'];
+const OBJECT_KEYS = ['watchlist', 'postLists'] as const;
+const STRIPE_BUY_BUTTON_ID = 'buy_btn_1TIdPdCGBiAw3E86dhqAoTWe';
+const STRIPE_BUY_BUTTON_SCRIPT_ID = 'stripe-buy-button-script';
+
+const PLAN_PILL_ICON: Record<PlanId, typeof Shield> = {
+  free: CreditCard,
+  plus: Sparkles,
+  admin: Shield,
+};
+
+const PLAN_FEATURES: Record<'free' | 'plus', string[]> = {
+  free: [
+    'เริ่มใช้ Feed, Search และ Generate ได้ทันที',
+    'เหมาะกับการใช้ Foro จัดการแหล่งข้อมูลประจำวัน',
+    'บันทึก bookmarks และ drafts ได้ไม่จำกัด',
+  ],
+  plus: [
+    'เพิ่มโควตา Search และ Generate สำหรับงานโปร',
+    'เหมาะกับการสร้างคอนเทนต์ตลอดทั้งวัน',
+    'ขยายพื้นที่จัดการ Watchlist และ Post Lists',
+  ],
+};
+
+PLAN_FEATURES.free.splice(2, 0, 'Home Feed + AI Filter สูงสุด 30 cards');
+PLAN_FEATURES.plus.splice(2, 0, 'Home Feed + AI Filter สูงสุด 100 cards');
+
+const ensureStripeBuyButtonScript = () => {
+  if (typeof document === 'undefined') return;
+  if (document.getElementById(STRIPE_BUY_BUTTON_SCRIPT_ID)) return;
+
+  const script = document.createElement('script');
+  script.id = STRIPE_BUY_BUTTON_SCRIPT_ID;
+  script.async = true;
+  script.src = 'https://js.stripe.com/v3/buy-button.js';
+  document.body.appendChild(script);
+};
+
+const PricingWorkspace = ({
+  isVisible,
+  activePlanId,
+  dailyUsage,
+  remainingUsage,
+  onSelectPlan,
+  isCheckoutLoading = false,
+  usageLimits,
+  plusAccess = null,
+  profileSectionEventName,
+}: PricingWorkspaceProps) => {
+  const [isBuyModalOpen, setIsBuyModalOpen] = useState(false);
+  const profileHeaderRef = useRef<HTMLElement | null>(null);
+  const pricingPlansRef = useRef<HTMLElement | null>(null);
+  const currentPlan = PLAN_DEFINITIONS[activePlanId];
+  const CurrentPlanIcon = PLAN_PILL_ICON[activePlanId] ?? CreditCard;
+  const publishableKey = import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY?.trim() ?? '';
+  const isBuyModalVisible = isVisible && isBuyModalOpen;
+
+  useEffect(() => {
+    if (!isBuyModalVisible) return undefined;
+
+    ensureStripeBuyButtonScript();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [isBuyModalVisible]);
+
+  useEffect(() => {
+    if (isVisible || !isBuyModalOpen) return undefined;
+
+    const closeTimer = window.setTimeout(() => {
+      setIsBuyModalOpen(false);
+    }, 0);
+
+    return () => {
+      window.clearTimeout(closeTimer);
+    };
+  }, [isBuyModalOpen, isVisible]);
+
+  useEffect(() => {
+    if (!profileSectionEventName || typeof window === 'undefined') return undefined;
+
+    const handleProfileSection = (event: Event) => {
+      const customEvent = event as CustomEvent<string>;
+
+      // Robust scroll targeting for internal containers
+      window.setTimeout(() => {
+        const targetSection = customEvent.detail;
+        let el: HTMLElement | null = null;
+        
+        if (targetSection === 'pricing') el = pricingPlansRef.current;
+        else el = profileHeaderRef.current;
+
+        if (el) {
+          // Find the nearest scrollable parent (usually .foro-main-scroll)
+          const scrollParent = el.closest('.foro-main-scroll') || el.parentElement;
+          if (scrollParent) {
+            const elTop = el.offsetTop;
+            scrollParent.scrollTo({ top: elTop - 20, behavior: 'smooth' });
+          } else {
+            el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }
+      }, 300);
+    };
+
+    window.addEventListener(profileSectionEventName, handleProfileSection as EventListener);
+    return () => window.removeEventListener(profileSectionEventName, handleProfileSection as EventListener);
+  }, [profileSectionEventName]);
+
+  const openBuyModal = () => {
+    setIsBuyModalOpen(true);
+  };
+
+  const handlePlanAction = (planId: PlanId) => {
+    if (planId === activePlanId) {
+      return;
+    }
+
+    if (planId === 'plus') {
+      openBuyModal();
+      return;
+    }
+
+    onSelectPlan(planId);
+  };
+
+  return (
+    <>
+      <div
+        className="pricing-shell pricing-shell-minimal animate-fade-in"
+        style={{ display: isVisible ? 'block' : 'none' }}
+      >
+        <div className="mobile-only-block pricing-mobile-profile-panel">
+          <PlanPanel
+            activePlanId={activePlanId}
+            plusAccess={plusAccess}
+            remainingUsage={remainingUsage}
+            usageLimits={usageLimits}
+            onSwitchPlan={onSelectPlan}
+            onOpenPricing={() => {
+              if (typeof window === 'undefined') return;
+              window.dispatchEvent(
+                new CustomEvent(profileSectionEventName || 'foro:profile-section', {
+                  detail: 'pricing',
+                }),
+              );
+            }}
+            onClearPlanNotice={() => {}}
+            forceOpen
+            defaultOpen
+          />
+        </div>
+
+        <section
+          className="pricing-band pricing-band-tinted pricing-minimal-header desktop-only"
+          ref={profileHeaderRef}
+        >
+          <div className="pricing-minimal-topline">
+            <span className="pricing-section-kicker">โปรไฟล์ FORO</span>
+            <span className="pricing-current-plan-pill">
+              <CurrentPlanIcon size={14} />
+              {currentPlan.name}
+            </span>
+          </div>
+
+          <div className="pricing-minimal-head" style={{ marginBottom: '16px' }}>
+            <div className="pricing-minimal-copy">
+              <h1 className="pricing-minimal-title">โปรไฟล์และการใช้งาน</h1>
+              <p className="pricing-minimal-subtitle">
+                ดูแพ็กปัจจุบัน โควต้าที่เหลือในวันนี้ และพื้นที่จัดการงานของบัญชีคุณได้จากหน้านี้
+              </p>
+            </div>
+          </div>
+
+          <div className="pricing-usage-strip" style={{ marginTop: '0' }}>
+            {FEATURE_ORDER.map((feature) => {
+              const limit = currentPlan.usage[feature];
+              const remaining = remainingUsage[feature];
+              const used = dailyUsage[feature];
+              const progress = Number.isFinite(limit)
+                ? Math.min(100, Math.round((used / Math.max(limit, 1)) * 100))
+                : 0;
+
+              return (
+                <div key={feature} className="pricing-usage-tile">
+                  <div className="pricing-usage-tile-top">
+                    <span>{FEATURE_LABELS[feature]}</span>
+                    <strong>
+                      {Number.isFinite(remaining)
+                        ? `${remaining}/${formatPlanLimit(limit)}`
+                        : 'Unlimited'}
+                    </strong>
+                  </div>
+                  <div className="pricing-meter-track compact">
+                    <div className="pricing-meter-fill" style={{ width: `${progress}%` }} />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+
+        <section
+          className="pricing-band pricing-band-plain"
+          ref={pricingPlansRef}
+        >
+          <div className="pricing-plan-grid">
+            {PUBLIC_PLAN_IDS.map((planId) => {
+              const plan = PLAN_DEFINITIONS[planId];
+              const isCurrent = activePlanId === planId;
+
+              return (
+                <article
+                  key={planId}
+                  className={`pricing-plan-card ${planId === 'plus' ? 'is-plus' : ''} ${
+                    isCurrent ? 'is-current' : ''
+                  }`}
+                >
+                  <div className="pricing-plan-top">
+                    <div>
+                      <div className="pricing-plan-name">{plan.name}</div>
+                      <div className="pricing-plan-price">{plan.priceLabel}</div>
+                    </div>
+                    {isCurrent && <div className="pricing-plan-current-badge">แพ็กปัจจุบัน</div>}
+                  </div>
+
+                  <p className="pricing-plan-description">{plan.description}</p>
+
+                  <div className="pricing-mini-heading">ต่อวัน</div>
+                  <div className="pricing-plan-usage">
+                    {FEATURE_ORDER.map((feature) => (
+                      <div key={feature} className="pricing-plan-usage-row">
+                        <span>{FEATURE_LABELS[feature]}</span>
+                        <strong>{formatPlanLimit(plan.usage[feature])} / วัน</strong>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="pricing-plan-divider" />
+
+                  <div className="pricing-mini-heading">พื้นที่จัดการงาน</div>
+                  <div className="pricing-plan-objects">
+                    {OBJECT_KEYS.map((key) => (
+                      <div key={key} className="pricing-plan-usage-row">
+                        <span>{key === 'watchlist' ? 'Watchlist' : 'Post Lists'}</span>
+                        <strong>{formatPlanLimit(plan.objects[key])}</strong>
+                      </div>
+                    ))}
+                    <div className="pricing-plan-usage-row">
+                      <span>Home Feed + AI Filter</span>
+                      <strong>{formatCardLimit(HOME_FEED_CARD_LIMITS[planId])}</strong>
+                    </div>
+                  </div>
+
+                  <div className="pricing-plan-divider" />
+
+                  <div className="pricing-checklist">
+                    {PLAN_FEATURES[planId].map((item) => (
+                      <div key={item} className="pricing-feature-item">
+                        <Check size={15} />
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    className={`btn-pill ${planId === 'plus' ? 'primary' : ''}`}
+                    style={{ width: '100%', justifyContent: 'center', marginTop: 'auto' }}
+                    onClick={() => handlePlanAction(planId)}
+                    disabled={isCurrent || (planId === 'plus' && isCheckoutLoading)}
+                  >
+                    {isCurrent ? 'แพ็กปัจจุบัน' : `เลือก ${plan.name}`}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        </section>
+      </div>
+
+      {isBuyModalVisible && (
+        <div className="pricing-buy-modal-layer" role="dialog" aria-modal="true">
+          <button
+            className="pricing-buy-modal-backdrop"
+            aria-label="ปิดหน้าต่างซื้อแพ็ก"
+            onClick={() => setIsBuyModalOpen(false)}
+          />
+          <div className="pricing-buy-modal">
+            <button
+              className="pricing-buy-modal-close"
+              onClick={() => setIsBuyModalOpen(false)}
+              aria-label="ปิด"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="pricing-buy-modal-body">
+              {publishableKey ? (
+                createElement('stripe-buy-button', {
+                  'buy-button-id': STRIPE_BUY_BUTTON_ID,
+                  'publishable-key': publishableKey,
+                })
+              ) : (
+                <div className="pricing-buy-modal-fallback">
+                  ไม่พบ VITE_STRIPE_PUBLISHABLE_KEY สำหรับแสดง Buy Button
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+};
+
+export default PricingWorkspace;

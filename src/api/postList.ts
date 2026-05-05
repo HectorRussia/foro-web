@@ -17,7 +17,11 @@ export interface PostListUser {
     created_at: string;
     updated_at: string;
     follow_user_name: string;
-    follow_user_x_account: string;
+    follow_user_x_account: string | null;
+    follow_user_type?: 'x' | 'rss' | string | null;
+    follow_user_follow_type?: 'x' | 'rss' | string | null;
+    follow_user_source_url?: string | null;
+    follow_user_profile_image_url_https?: string | null;
     post_list_name: string | null;
 }
 

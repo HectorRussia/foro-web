@@ -1,18 +1,24 @@
 export interface NewsItem {
     id: number,
+    item_type?: string | null,
     title: string,
     content: string,
     url: string,
     user_id: number,
-    tweet_profile_pic: string
+    tweet_profile_pic?: string | null
     created_at: string
     tweet_id?: string
+    username?: string | null
     retweet_count?: number
     reply_count?: number
     like_count?: number
     quote_count?: number
     view_count?: number
     source?: string
+    source_type?: string | null
+    source_item_id?: string | null
+    feed_url?: string | null
+    published_at?: string | null
     tweet_created_at?: string
     media_urls?: string[]
     media_type?: string | null
@@ -39,10 +45,14 @@ export interface NewsResult {
     source: string;
     url: string;
     tweet_id?: string;
-    tweet_profile_pic?: string;
+    tweet_profile_pic?: string | null;
     current?: number;
     total?: number;
     created_at: string;
+    source_type?: string | null;
+    source_item_id?: string | null;
+    feed_url?: string | null;
+    published_at?: string | null;
     retweet_count?: number
     reply_count?: number
     like_count?: number
@@ -91,4 +101,17 @@ export interface AdvancedSearchBulkResponse {
     twitter_cursor?: string;
     twitter_has_next?: boolean;
     search_query?: string;
+}
+
+export interface AdvancedSearchBulkPayload {
+    query?: string;
+    query_type?: string;
+    cursor?: string;
+    since_date?: string;
+    until_date?: string;
+    post_list_id?: number;
+    use_followed_users?: boolean;
+    specific_users?: string[];
+    fetch_rss_first?: boolean;
+    rss_limit_per_feed?: number;
 }
