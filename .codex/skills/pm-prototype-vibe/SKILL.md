@@ -21,9 +21,10 @@ Help PMs use the FORO prototype as a fast product-vibe workspace. Keep the work 
 - Work inside `prototype/` by default.
 - Run commands from `prototype/` unless the user explicitly asks for root-level work.
 - Do not edit the main web app (`src/`, root `package.json`, root `vite.config.ts`, production API contracts, or auth logic) for PM vibe work.
-- Do not edit `codex.md`; that file is for dev-facing implementation work.
+- Do not edit `codex-dev.md`; that file is for dev-facing implementation work.
+- `codex.md` is only the role router; update it only when changing agent-mode routing.
 - Do not expose `.env` values or API keys in responses, screenshots, docs, or examples.
-- If the PM asks for a production implementation, pause and switch to the dev instruction in `codex.md`.
+- If the PM asks for a production implementation, pause and switch to the dev instruction in `codex-dev.md`.
 
 ## PM Workflow
 

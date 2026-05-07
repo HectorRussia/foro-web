@@ -11,9 +11,10 @@
 - ทำงานใน `prototype/` เป็นหลัก
 - คำสั่ง run, test, build, preview ให้เข้า `prototype` ก่อนเสมอ
 - ห้ามแก้ main web app ที่ root เช่น `src/`, root `package.json`, root `vite.config.ts`, API contract, auth, หรือ production logic ถ้าผู้ใช้ไม่ได้สั่งชัด
-- ห้ามแก้ `codex.md` เพราะไฟล์นั้นเป็น instruction สำหรับ dev
+- ห้ามแก้ `codex-dev.md` เพราะไฟล์นั้นเป็น instruction สำหรับ dev
+- `codex.md` เป็น role router เท่านั้น แก้เฉพาะตอนต้องเปลี่ยน logic การเลือก agent mode
 - ห้าม copy หรือเปิดเผยค่า `.env`, API key, token, secret
-- ถ้างานเริ่มกลายเป็น production implementation ให้บอกให้ชัดว่าอยู่นอก PM vibe mode และค่อยใช้ `codex.md`
+- ถ้างานเริ่มกลายเป็น production implementation ให้บอกให้ชัดว่าอยู่นอก PM vibe mode และค่อยใช้ `codex-dev.md`
 
 ## Files To Read First
 

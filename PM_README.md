@@ -159,17 +159,23 @@ pnpm dev
 
 ## ถ้าให้ Codex ช่วย PM
 
-ให้บอก Codex ว่า:
+ตั้งค่า agent mode ใน `.env`:
 
-```text
-ใช้ codex-pm.md และ skill pm-prototype-vibe ช่วย PM vibe on prototype เท่านั้น
+```env
+VITE_COWORK_AGENT=PM
 ```
 
-Codex ควรอ่านไฟล์เหล่านี้ก่อนเริ่ม:
+จากนั้นให้ Codex เริ่มจาก `codex.md` ซึ่งเป็น role router กลาง แล้ว Codex จะโหลด:
 
 - `codex-pm.md`
 - `.codex/skills/pm-prototype-vibe/SKILL.md`
 - `prototype/package.json`
+
+ถ้าจะให้ Codex กลับไปทำงานฝั่ง dev ให้เปลี่ยนเป็น:
+
+```env
+VITE_COWORK_AGENT=DEV
+```
 
 ## ข้อควรจำ
 
