@@ -84,7 +84,8 @@
 
   // RSS options:
   "fetch_rss_first": true,             // default true: fetch RSS ก่อน แล้วค่อยทำ X
-  "rss_limit_per_feed": 20             // default 20, max 100
+  "rss_limit_per_feed": 20,            // default 20, max 100
+  "analyze_rss_with_ai": true          // default true: แปล/สรุป RSS เป็นไทยก่อน save
 }
 ```
 
@@ -95,10 +96,12 @@
 3. **`specific_users`** (ต่ำสุด) - ระบุ users เฉพาะ
 
 ### 🔍 Query Types:
-- `"latest"` - ข่าวล่าสุด
-- `"top"` - ข่าวยอดนิยม
-- `"people"` - ค้นหาจากผู้คน
-- `"media"` - ข่าวที่มีสื่อ
+- `"latest"` หรือ `"Latest"` - ข่าวล่าสุด
+- `"top"` หรือ `"Top"` - ข่าวยอดนิยม
+- `"people"` หรือ `"People"` - ค้นหาจากผู้คน
+- `"media"` หรือ `"Media"` - ข่าวที่มีสื่อ
+
+Backend จะ normalize `query_type` ให้เอง ดังนั้น frontend ส่ง lowercase ได้
 
 ---
 
@@ -332,6 +335,8 @@ else:
 }
 ```
 
+หมายเหตุ: ถ้า `fetch_rss_first` เป็น `true` และมี RSS feed อยู่ใน scope (`post_list_id` หรือ followed users) แล้ว X/Twitter search ล้มหลัง RSS fetch สำเร็จ endpoint จะ fallback เป็น `200` พร้อม news list ล่าสุดแทน `400` ดังนั้น `400` จาก X search จะเกิดกับเคสที่ไม่มี RSS fallback หรือปิด RSS ด้วย `fetch_rss_first: false` เป็นหลัก
+
 ### 403 Forbidden - API Key ไม่มีสิทธิ์
 ```json
 {
@@ -540,7 +545,8 @@ Request:
 ```json
 {
   "post_list_id": 1,
-  "limit_per_feed": 20
+  "limit_per_feed": 20,
+  "analyze_with_ai": true
 }
 ```
 
@@ -550,6 +556,7 @@ Field:
 |---|---:|---:|---|
 | `post_list_id` | no | `null` | ถ้าส่งมา จะ fetch เฉพาะ RSS follows ใน post list นั้น |
 | `limit_per_feed` | no | `20` | 1-100 |
+| `analyze_with_ai` | no | `true` | ให้ RSS ผ่าน LLM เพื่อแปล/สรุปไทยก่อน save ลง `news_items` |
 
 Response:
 
@@ -558,23 +565,28 @@ Response:
   "status": "success",
   "total_feeds": 3,
   "saved_count": 12,
+  "updated_count": 2,
   "skipped_count": 8,
   "error_count": 0,
   "items": [
     {
       "id": 1001,
-      "title": "Article title",
+      "title": "สรุปหัวข้อภาษาไทยจาก AI",
       "url": "https://example.com/article",
       "feed_url": "https://example.com/rss.xml",
       "source_item_id": "https://example.com/article",
-      "published_at": "Thu, 30 Apr 2026 10:00:00 GMT"
+      "published_at": "Thu, 30 Apr 2026 10:00:00 GMT",
+      "media_urls": ["https://example.com/article-image.jpg"],
+      "analyzed_with_ai": true
     }
   ],
+  "updated_items": [],
   "errors": []
 }
 ```
 
 `skipped_count` คือข่าวที่ backend เจอซ้ำจาก `source_item_id` หรือ `url` เดิม จึงไม่ insert ซ้ำ
+`updated_count` คือข่าว RSS เดิมที่ถูก update เพิ่ม เช่น แปล/สรุปไทยย้อนหลัง หรือเติมรูปที่ parser รอบใหม่หาเจอ
 
 หลัง fetch สำเร็จ ให้ frontend refresh news list ด้วย endpoint เดิม เช่น `GET /news` เพราะข่าว RSS ถูก save ลง `news_items` แล้ว
 
@@ -585,14 +597,16 @@ Response:
 ```json
 {
   "id": 1001,
-  "title": "Article title",
-  "content": "Short summary from RSS",
+  "title": "สรุปหัวข้อภาษาไทยจาก AI",
+  "content": "สรุปข่าวภาษาไทย 1-2 ประโยคจาก AI",
   "url": "https://example.com/article",
   "source_type": "rss",
   "source_item_id": "https://example.com/article",
   "published_at": "Thu, 30 Apr 2026 10:00:00 GMT",
   "tweet_id": null,
   "tweet_profile_pic": null,
+  "media_urls": ["https://example.com/article-image.jpg"],
+  "media_type": "photo",
   "tweet_created_at": null,
   "retweet_count": 0,
   "reply_count": 0,
@@ -608,6 +622,8 @@ Frontend card ควร handle ตามนี้:
 | case | UI behavior |
 |---|---|
 | `source_type === "rss"` | แสดงเป็น article/RSS card, ใช้ `published_at`, ซ่อน X metrics ถ้าเป็น 0/null |
+| RSS card title/body | ใช้ `title` และ/หรือ `content` ที่ผ่าน AI แล้วเป็นภาษาไทย เมื่อ `analyze_with_ai=true` |
+| RSS article image | ใช้รูปแรกจาก `media_urls` เป็น thumbnail/cover ของ card ถ้ามี |
 | `source_type !== "rss"` หรือ `null` | ใช้ UI X/news เดิม |
 | `tweet_id === null` | ห้าม assume ว่าเปิด x.com/status ได้ |
 | `tweet_profile_pic === null` | ใช้ fallback icon/avatar ของ source |
@@ -619,12 +635,27 @@ Frontend card ควร handle ตามนี้:
 1. Fetch RSS feeds ใน scope เดียวกันก่อน (`post_list_id` หรือ `use_followed_users`)
 2. Save ข่าว RSS ใหม่ลง `news_items` โดย dedupe ด้วย `source_item_id`/`url`
 3. ต่อด้วย X/Twitter bulk analysis จาก follows ที่ `follow_type === "x"`
-4. Response สุดท้ายยังเป็น news list format เดิม และสามารถมีข่าว RSS ที่เพิ่ง save รวมอยู่ด้วย
+4. ถ้า X query แบบรวมหลาย account ล้ม backend จะ retry แบบแบ่ง account เป็นกลุ่มเล็ก ๆ ก่อน fallback
+5. Response สุดท้ายยังเป็น news list format เดิม และสามารถมีข่าว RSS ที่เพิ่ง save รวมอยู่ด้วย
+
+#### X search fallback หลัง RSS
+
+ถ้า request มี RSS feed ใน scope และระบบ fetch RSS ก่อนแล้ว แต่ขั้นตอน X/Twitter search ล้ม backend จะไม่ตอบ `400` ทันที แต่จะ fallback เป็น `200` พร้อม `AdvancedSearchNewsResponse` จากข่าวล่าสุดแทน เพื่อให้ frontend ยังแสดงข่าว RSS/ข่าวล่าสุดได้
+
+Frontend ควร handle แบบนี้:
+
+- ถ้า response เป็น `200` ให้ render `items` ตามปกติ แม้ X search จะไม่ได้ข่าวใหม่ในรอบนั้น
+- ใน fallback นี้ `twitter_cursor` จะเป็น `null` และ `twitter_has_next` จะเป็น `false`
+- ใช้ `source_type` แยก card: `"rss"` คือ RSS article, `"x"` หรือ `null` คือ flow X/news เดิม
+- อย่า assume ว่า `200` จาก endpoint นี้แปลว่ามี X analysis ใหม่เสมอ เพราะอาจเป็น latest news fallback หลัง RSS fetch
+- ถ้า backend ต้อง retry X แบบแบ่งกลุ่ม account อาจไม่มี unified `twitter_cursor` ให้ load more แม้มี X item กลับมา
 
 ถ้า post list มีทั้ง X และ RSS:
 
 - `POST /advanced-search/search-and-analyze-bulk` จะทำ RSS ก่อน แล้วต่อ X
 - `POST /news/rss/fetch` ยังใช้ได้ ถ้าต้องการ fetch RSS อย่างเดียว และจะ ignore X follows
+- RSS ที่ save ใหม่จะผ่าน AI เป็นภาษาไทยโดย default (`analyze_rss_with_ai: true`)
+- RSS ที่เคย save เป็นภาษาอังกฤษแล้ว ถ้า fetch รอบใหม่เจอ item เดิม จะ update ของเดิมให้เป็นสรุปไทยและเติมรูปได้ โดยไม่ insert ซ้ำ
 
 ดังนั้น frontend สามารถให้ post list เดียวมี source ปนกันได้:
 

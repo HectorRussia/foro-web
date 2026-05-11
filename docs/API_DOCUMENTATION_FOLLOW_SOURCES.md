@@ -291,10 +291,13 @@ Backend แยก source ให้แล้ว:
 - Advanced bulk analysis จะ fetch RSS ก่อนโดย default แล้วค่อยทำ X
 - `fetch_rss_first` default เป็น `true`
 - `rss_limit_per_feed` default เป็น `20`
+- `analyze_rss_with_ai` default เป็น `true` สำหรับ bulk endpoint เพื่อแปล/สรุป RSS เป็นภาษาไทยก่อน save
+- `query_type` ส่ง lowercase เช่น `"latest"` ได้ backend จะ normalize เป็น format ที่ X API ต้องการ
 - ถ้าไม่ต้องการ fetch RSS ในรอบนั้น ให้ส่ง `fetch_rss_first: false`
 - RSS fetch ใช้เฉพาะ `follow_type = "rss"`
 - X analysis ใช้เฉพาะ `follow_type = "x"`
 - `trigger_news` ไม่ได้ใช้แยก X/RSS และยังเป็น logic หน้าบ้านเดิม
+- ถ้า X query แบบรวมหลาย account ล้ม backend จะ retry แบบแบ่ง account เป็นกลุ่มเล็ก ๆ ก่อน fallback เป็น latest-news RSS
 
 ตัวอย่าง request แบบ priority RSS -> X:
 
@@ -304,9 +307,18 @@ Backend แยก source ให้แล้ว:
   "query_type": "latest",
   "post_list_id": 1,
   "fetch_rss_first": true,
-  "rss_limit_per_feed": 20
+  "rss_limit_per_feed": 20,
+  "analyze_rss_with_ai": true
 }
 ```
+
+RSS news ที่ frontend ได้จาก `GET /api/news`:
+
+- `source_type` เป็น `"rss"`
+- `title` และ `content` จะเป็นภาษาไทยจาก AI เมื่อเปิด `analyze_with_ai`/`analyze_rss_with_ai`
+- `media_urls` มีรูปบทความจาก RSS เช่น `media:thumbnail`, `media:content`, `enclosure image/*` หรือ `<img src>` ใน description
+- ใช้รูปแรกใน `media_urls` เป็น thumbnail/cover ของ RSS card ได้
+- ถ้า fetch เจอข่าว RSS เดิมที่เคย save เป็นอังกฤษ backend จะ update item เดิมให้เป็นไทยและเติมรูปแทนการ insert ซ้ำ
 
 ## UI Notes
 

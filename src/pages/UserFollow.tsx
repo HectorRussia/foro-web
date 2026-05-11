@@ -26,6 +26,9 @@ const getAvatar = (user: FollowedUser) => {
     return '';
 };
 
+const getDisplayName = (user: FollowedUser) =>
+    user.name || user.x_account || user.source_url || 'Follow source';
+
 export const UserFollow = () => {
     const [users, setUsers] = useState<FollowedUser[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -78,7 +81,7 @@ export const UserFollow = () => {
 
             await api.delete(`${BASE_URL}/follow/users/${userToDelete.id}`);
             setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
-            toast.success(`Unfollowed ${userToDelete.name}`);
+            toast.success(`Unfollowed ${getDisplayName(userToDelete)}`);
 
         } catch (error: any) {
             console.error("Error deleting user:", error);
@@ -155,19 +158,19 @@ export const UserFollow = () => {
                                         {getAvatar(user) ? (
                                             <img
                                                 src={getAvatar(user)}
-                                                alt={user.name}
+                                                alt={getDisplayName(user)}
                                                 className="relative w-15 h-15 rounded-full border-2 border-[#0f172a] shadow-lg object-cover mx-auto"
                                             />
                                         ) : (
                                             <div className="relative w-15 h-15 rounded-full border-2 border-[#0f172a] shadow-lg mx-auto bg-blue-600/20 flex items-center justify-center text-blue-400 font-black">
-                                                {user.name.charAt(0)}
+                                                {getDisplayName(user).charAt(0)}
                                             </div>
                                         )}
                                     </div>
 
                                     {/* Names */}
                                     <h2 className="text-base font-bold text-white mb-0.5 group-hover:text-blue-400 transition-colors truncate w-full">
-                                        {user.name}
+                                        {getDisplayName(user)}
                                     </h2>
                                     <p className="text-gray-500 text-xs mb-3 truncate w-full">
                                         {getSourceLabel(user)}

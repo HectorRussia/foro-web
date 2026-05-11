@@ -65,6 +65,8 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
             'github.blog': 'GitHub Blog',
             'seekingalpha.com': 'Seeking Alpha',
             'bbc.com': 'BBC News',
+            'bbc.co.uk': 'BBC News',
+            'feeds.bbci.co.uk': 'BBC News',
             'nytimes.com': 'The New York Times',
             'theguardian.com': 'The Guardian',
             'techcrunch.com': 'TechCrunch',
@@ -79,9 +81,14 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
 
     const rssSourceUrl = post.feed_url || (isUrlLike(post.source) ? post.source : '') || post.url;
     const rssHostname = getHostname(rssSourceUrl) || getHostname(post.url);
-    const rssSourceName = post.source && !isUrlLike(post.source)
+    const rssSourceFromPayload = String(post.source || '').trim();
+    const hasNamedRssSource = Boolean(rssSourceFromPayload) &&
+        !isUrlLike(rssSourceFromPayload) &&
+        !['rss', 'rss news'].includes(rssSourceFromPayload.toLowerCase());
+    const rssSourceName = hasNamedRssSource
         ? post.source
         : formatHostnameName(rssHostname);
+    const rssSubtitle = post.feed_url || (isUrlLike(post.source) ? post.source : '') || rssHostname || post.url;
     const rssAvatarUrl = post.tweet_profile_pic || (rssHostname ? `https://www.google.com/s2/favicons?domain=${rssHostname}&sz=128` : '');
     const rssTitle = post.title || contentText || 'RSS Article';
 
@@ -175,7 +182,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                                 {rssSourceName}
                             </h3>
                             <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-gray-500">
-                                {rssHostname || rssSourceUrl}
+                                {rssSubtitle}
                             </p>
                         </div>
                     </div>
@@ -213,11 +220,45 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                     </div>
                 </div>
 
-                <div className="relative z-10 mb-5 grow">
-                    <p className="line-clamp-2 text-[15px] font-bold leading-relaxed tracking-tight text-gray-100">
-                        {rssTitle}
-                    </p>
+                <div className="relative z-10 mb-5 flex grow gap-4">
+                    {hasMedia && (
+                        <button
+                            type="button"
+                            onClick={() => setLightboxIndex(0)}
+                            className="group/media relative h-24 w-28 shrink-0 overflow-hidden rounded-[18px] border border-white/6 bg-white/5 text-left shadow-[0_12px_26px_rgba(0,0,0,0.18)]"
+                        >
+                            <img
+                                src={mediaUrls[0]}
+                                alt=""
+                                className="h-full w-full object-cover transition-transform duration-300 group-hover/media:scale-105"
+                            />
+                            <span className="absolute inset-0 bg-black/0 transition-colors duration-200 group-hover/media:bg-black/15" />
+                        </button>
+                    )}
+
+                    <div className="min-w-0 grow">
+                        <p className="line-clamp-2 text-[15px] font-bold leading-relaxed tracking-tight text-gray-100">
+                            {rssTitle}
+                        </p>
+                        {contentText && contentText !== rssTitle ? (
+                            <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-relaxed text-slate-400">
+                                {contentText}
+                            </p>
+                        ) : null}
+                    </div>
                 </div>
+
+                {lightboxIndex !== null && hasMedia && (
+                    <MediaLightbox
+                        urls={mediaUrls}
+                        mediaType={mediaType}
+                        currentIndex={lightboxIndex}
+                        onClose={() => setLightboxIndex(null)}
+                        onPrev={() => setLightboxIndex(i => i !== null ? (i - 1 + mediaUrls.length) % mediaUrls.length : 0)}
+                        onNext={() => setLightboxIndex(i => i !== null ? (i + 1) % mediaUrls.length : 0)}
+                        tweetUrl={post.url}
+                    />
+                )}
 
                 <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-white/5 pt-3.5">
                     <a

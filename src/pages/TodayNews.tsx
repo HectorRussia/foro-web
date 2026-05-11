@@ -1,18 +1,15 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, type CSSProperties } from 'react';
 import dayjs from 'dayjs';
 import Sidebar from '../components/Layouts/Sidebar';
 import DashboardCard from '../components/DashboardCard';
 import SkeletonCard from '../components/SkeletonCard';
 import {
-    HiOutlineTrash,
-    HiOutlineClock,
     HiOutlineArrowUturnLeft
 } from "react-icons/hi2";
-import { RiLoader4Line } from "react-icons/ri";
-import { LuSparkles, LuRefreshCw, LuFilter } from "react-icons/lu";
+import { LuEraser, LuSparkles, LuRefreshCw, LuFilter } from "react-icons/lu";
 import { AnimatePresence, motion } from 'framer-motion';
 import PostList from '../components/PostList';
-import { type NewsItem, type NewsResult } from '../interface/news';
+import { type AdvancedSearchBulkPayload, type NewsItem, type NewsResult } from '../interface/news';
 import { getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk } from '../api/news';
 import { getCategories } from '../api/category';
 import { createCategoryNews } from '../api/categoryNews';
@@ -36,12 +33,14 @@ const isRssNewsItem = (item: any) =>
 const toNewsResult = (item: any): NewsResult => {
     const isRss = isRssNewsItem(item);
     const createdAt = item?.tweet_created_at || item?.published_at || item?.created_at || new Date().toISOString();
+    const source = item?.tweet_name || item?.username || item?.source || item?.feed_title || item?.name ||
+        (isRss ? item?.feed_url || item?.source_url || item?.url || '' : 'Twitter');
 
     return {
         id: item?.id ?? item?.tweet_id ?? item?.source_item_id ?? item?.url ?? crypto.randomUUID(),
         title: item?.title || item?.tweet_name || item?.name || (isRss ? 'RSS News' : 'Twitter News'),
         content: item?.llm_analysis || item?.content || item?.summary || item?.title || '',
-        source: item?.tweet_name || item?.username || item?.source || item?.feed_title || item?.feed_url || (isRss ? 'RSS' : 'Twitter'),
+        source,
         url: item?.url || '#',
         tweet_id: item?.tweet_id || undefined,
         tweet_profile_pic: item?.tweet_profile_pic || item?.profile_image_url_https || null,
@@ -57,12 +56,24 @@ const toNewsResult = (item: any): NewsResult => {
         quote_count: Number(item?.quote_count) || 0,
         view_count: Number(item?.view_count) || 0,
         media_urls: Array.isArray(item?.media_urls) ? item.media_urls : [],
-        media_type: item?.media_type ?? null
+        media_type: item?.media_type ?? null,
+        analyzed_with_ai: item?.analyzed_with_ai ?? null
     };
 };
 
 const getNewsResultKey = (item: NewsResult) =>
     String(item.tweet_id || item.source_item_id || item.url || item.id);
+
+const NEWS_PAGE_LIMIT = 40;
+const LOAD_MORE_SKELETON_COUNT = 5;
+const DB_HYDRATE_RETRY_DELAYS_MS = [0, 350, 700, 1200];
+
+type FeedNotice = {
+    variant: 'loading' | 'success' | 'error';
+    message: string;
+};
+
+const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
 const mergeNewsResults = (current: NewsResult[], incoming: NewsResult[]) => {
     const merged = new Map<string, NewsResult>();
@@ -78,7 +89,7 @@ const mergeNewsResults = (current: NewsResult[], incoming: NewsResult[]) => {
 };
 
 const fetchFeedSources = async (
-    payload: any,
+    payload: AdvancedSearchBulkPayload,
     signal: AbortSignal
 ) => {
     const result = await searchAndAnalyzeBulk(payload, signal);
@@ -90,9 +101,34 @@ const fetchFeedSources = async (
     };
 };
 
+const loadLatestNewsResults = async (options: { retryUntilFound?: boolean } = {}) => {
+    const delays = options.retryUntilFound ? DB_HYDRATE_RETRY_DELAYS_MS : [0];
+    let latestResults: NewsResult[] = [];
+
+    for (const delayMs of delays) {
+        if (delayMs > 0) {
+            await wait(delayMs);
+        }
+
+        const newsResponse = await getNews(1, NEWS_PAGE_LIMIT, 1);
+        latestResults = Array.isArray(newsResponse.items)
+            ? newsResponse.items
+                .map(toNewsResult)
+                .sort((a, b) => dayjs(getNewsTimestamp(b)).valueOf() - dayjs(getNewsTimestamp(a)).valueOf())
+            : [];
+
+        if (!options.retryUntilFound || latestResults.length > 0) {
+            break;
+        }
+    }
+
+    return latestResults;
+};
+
 const TodayNews = () => {
 
     const [isStreaming, setIsStreaming] = useState(false);
+    const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [layoutMode] = useState<'grid' | 'compact'>('grid');
 
     // Filter State
@@ -101,6 +137,7 @@ const TodayNews = () => {
     const filterDropdownRef = useRef<HTMLDivElement>(null);
 
     const [/* statusMessage */, setStatusMessage] = useState('ระบบพร้อมทำงาน');
+    const [feedNotice, setFeedNotice] = useState<FeedNotice | null>(null);
     const [nextCursor, setNextCursor] = useState<string | null>(() => localStorage.getItem('today_news_twitter_cursor'));
     const [hasStarted, setHasStarted] = useState(false);
     const [backupResults, setBackupResults] = useState<NewsResult[]>([]);
@@ -159,14 +196,11 @@ const TodayNews = () => {
             }
 
             // 3. Fetch items from DB
-            const newsResponse = await getNews(1, 40, 1);
-            const hasNews = newsResponse.items && newsResponse.items.length > 0;
+            const dbResults = await loadLatestNewsResults();
+            const hasNews = dbResults.length > 0;
 
             // 4. Decision: Show news IF (Run is Active) OR (User hasn't explicitly clicked Clear)
             if (hasNews && (triggerData.trigger === 1 || !isCleared)) {
-                const dbResults: NewsResult[] = newsResponse.items
-                    .map(toNewsResult)
-                    .sort((a, b) => dayjs(getNewsTimestamp(b)).valueOf() - dayjs(getNewsTimestamp(a)).valueOf());
                 setNewsResults(dbResults);
                 setHasStarted(true);
             } else {
@@ -205,6 +239,12 @@ const TodayNews = () => {
         };
     }, []);
 
+    useEffect(() => {
+        if (!feedNotice || feedNotice.variant === 'loading') return;
+        const timer = window.setTimeout(() => setFeedNotice(null), 4200);
+        return () => window.clearTimeout(timer);
+    }, [feedNotice]);
+
     // Handle click outside to close filter dropdown
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -234,8 +274,21 @@ const TodayNews = () => {
         options: { preserveExisting?: boolean } = {}
     ) => {
         if (isStreaming) return;
+        const isLoadingMoreRequest = Boolean(
+            (typeof cursorOverride === 'string' && cursorOverride) ||
+            options.preserveExisting
+        );
+
         setIsStreaming(true);
+        setIsLoadingMore(isLoadingMoreRequest);
         setStatusMessage('กำลังเชื่อมต่อและวิเคราะห์ข่าว...');
+        setFeedNotice({
+            variant: 'loading',
+            message: 'กำลังเชื่อมต่อฐานข้อมูล... ดึงฟีดข่าวล่าสุด',
+        });
+        if (isLoadingMoreRequest) {
+            setFeedNotice(null);
+        }
 
         // If not loading more, clear previous results and cache
         if ((!cursorOverride || typeof cursorOverride !== 'string') && !options.preserveExisting) {
@@ -251,13 +304,14 @@ const TodayNews = () => {
         setProgress({ current: 0, total: 0 }); // Hide progress bar for bulk call
         abortControllerRef.current = new AbortController();
 
-        const payload: any = {
+        const payload: AdvancedSearchBulkPayload = {
             query_type: searchParams.query_type,
             since_date: searchParams.since_date,
             until_date: searchParams.until_date,
             cursor: (typeof cursorOverride === 'string') ? cursorOverride : searchParams.cursor,
             fetch_rss_first: !(typeof cursorOverride === 'string' && cursorOverride),
-            rss_limit_per_feed: 20
+            rss_limit_per_feed: 20,
+            analyze_rss_with_ai: true
         };
 
         if (searchParams.query) {
@@ -281,29 +335,67 @@ const TodayNews = () => {
             );
 
 
-            if (result && result.items) {
+            const hasResponseItems = Array.isArray(result?.items) && result.items.length > 0;
+
+            if (hasResponseItems) {
                 const mappedResults: NewsResult[] = result.items.map(toNewsResult);
 
                 setNewsResults(prev => mergeNewsResults(prev, mappedResults));
-
-                if (result.twitter_cursor) {
-                    localStorage.setItem('today_news_twitter_cursor', result.twitter_cursor);
-                    setNextCursor(result.twitter_cursor);
-                } else if (!result.twitter_has_next) {
-                    localStorage.removeItem('today_news_twitter_cursor');
-                    setNextCursor(null);
-                }
 
                 setStatusMessage('วิเคราะห์เสร็จสิ้น');
             } else {
                 setStatusMessage('ไม่พบข้อมูลข่าวใหม่');
             }
+            if (result?.twitter_cursor) {
+                localStorage.setItem('today_news_twitter_cursor', result.twitter_cursor);
+                setNextCursor(result.twitter_cursor);
+            } else if (!result?.twitter_has_next) {
+                // Backend can return X items without a unified cursor after grouped retry.
+                localStorage.removeItem('today_news_twitter_cursor');
+                setNextCursor(null);
+            }
+
+            const dbResults = await loadLatestNewsResults({
+                retryUntilFound: !hasResponseItems,
+            });
+
+            if (dbResults.length > 0) {
+                setNewsResults(prev => mergeNewsResults(prev, dbResults));
+                setHasStarted(true);
+                setStatusMessage('\u0e27\u0e34\u0e40\u0e04\u0e23\u0e32\u0e30\u0e2b\u0e4c\u0e40\u0e2a\u0e23\u0e47\u0e08\u0e2a\u0e34\u0e49\u0e19');
+            }
+
+            const syncedCount = dbResults.length || result.items.length;
+            const rssCount = dbResults.filter(item => item.source_type === 'rss').length;
+            const rssText = rssCount > 0 ? `${rssCount} ข่าวจาก RSS + ` : '';
+            const moreText = result.twitter_cursor ? ' • มี cursor สำหรับโหลด X ต่อ' : ' • ค้นหา RSS + X แล้ว';
+            setFeedNotice({
+                variant: 'success',
+                message: `อัปเดตข้อมูลเรียบร้อย • ${rssText}${syncedCount} การ์ด${moreText}`,
+            });
+            if (isLoadingMoreRequest) {
+                setFeedNotice(null);
+            }
         } catch (error: any) {
+            if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+                setStatusMessage('หยุดการประมวลผลแล้ว');
+                setFeedNotice(null);
+                return;
+            }
+
             console.error('Bulk analysis failed:', error);
             setStatusMessage(`เกิดข้อผิดพลาด: ${error.message || 'Unknown error'}`);
+            setFeedNotice({
+                variant: 'error',
+                message: 'อัปเดตข้อมูลไม่สำเร็จ ลองฟีดข้อมูลอีกครั้ง',
+            });
+            if (isLoadingMoreRequest) {
+                setFeedNotice(null);
+            }
             toast.error('เกิดข้อผิดพลาดในการดึงข้อมูลข่าว');
         } finally {
             setIsStreaming(false);
+            setIsLoadingMore(false);
             setProgress({ current: 0, total: 0 });
         }
     };
@@ -311,7 +403,9 @@ const TodayNews = () => {
     const stopStream = () => {
         if (abortControllerRef.current) abortControllerRef.current.abort();
         setIsStreaming(false);
+        setIsLoadingMore(false);
         setStatusMessage('หยุดการประมวลผลแล้ว');
+        setFeedNotice(null);
     };
 
     const loadForoPresets = async () => {
@@ -528,7 +622,8 @@ const TodayNews = () => {
         quote_count: res.quote_count,
         view_count: res.view_count,
         media_urls: res.media_urls,
-        media_type: res.media_type
+        media_type: res.media_type,
+        analyzed_with_ai: res.analyzed_with_ai
     });
 
     const toggleFilter = (filter: string) => {
@@ -627,6 +722,53 @@ const TodayNews = () => {
 
     const displayNews = getFilteredNews();
     const canSearchMore = !isStreaming && hasStarted && displayNews.length > 0 && !aiFilteredIds;
+    const selectedHomeQuickPresets = homePresets.size > 0
+        ? foroPresets.filter(preset => homePresets.has(preset.id))
+        : foroPresets.slice(0, 3);
+    const homeQuickPresets = selectedHomeQuickPresets
+        .map(preset => ({
+            key: `preset-${preset.id}`,
+            label: preset.name,
+            presetId: preset.id,
+        }));
+    const visibleHomeQuickPresets = homeQuickPresets.slice(0, 3);
+    const activeListStyle = {
+        '--active-list-accent': selectedPostList?.color_list || '#2997ff',
+    } as CSSProperties;
+    const activeListName = selectedPostList?.name || '\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14';
+    const feedToolbar = (
+        <div className="col-span-full feed-section-header root-feed-section-header home-feed-toolbar">
+            <div className="feed-section-title-row">
+                <h3 className="section-title">
+                    โพสต์ล่าสุด
+                </h3>
+                <span className="home-feed-count-badge">{`${displayNews.length} \u0e01\u0e32\u0e23\u0e4c\u0e14`}</span>
+            </div>
+            <div className="feed-section-filters">
+                {hasStarted && displayNews.length > 0 && (
+                    <button
+                        onClick={handleClear}
+                        className="icon-btn-large header-secondary-action root-feed-maintenance-action"
+                        title={'\u0e25\u0e49\u0e32\u0e07\u0e02\u0e49\u0e2d\u0e21\u0e39\u0e25\u0e17\u0e31\u0e49\u0e07\u0e2b\u0e21\u0e14'}
+                    >
+                        <LuEraser className="text-[15px]" />
+                    </button>
+                )}
+                <button
+                    onClick={() => toggleFilter('mostView')}
+                    className={`btn-pill root-sort-pill ${activeFilters.includes('mostView') ? 'active' : ''}`.trim()}
+                >
+                    ยอดวิว
+                </button>
+                <button
+                    onClick={() => toggleFilter('mostLiked')}
+                    className={`btn-pill root-sort-pill ${activeFilters.includes('mostLiked') ? 'active' : ''}`.trim()}
+                >
+                    เอนเกจเมนต์
+                </button>
+            </div>
+        </div>
+    );
 
     return (
         <div className="foro-page-shell">
@@ -634,57 +776,91 @@ const TodayNews = () => {
             <div className="foro-center-stage">
                 <section className="foro-workspace-panel relative [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                     <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.04),transparent_22%),radial-gradient(circle_at_bottom_right,rgba(59,130,246,0.06),transparent_30%)]" />
+                    <AnimatePresence>
+                        {feedNotice && (
+                            <motion.div
+                                initial={{ opacity: 0, y: -14, scale: 0.96 }}
+                                animate={{ opacity: 1, y: 0, scale: 1 }}
+                                exit={{ opacity: 0, y: -10, scale: 0.96 }}
+                                transition={{ duration: 0.22, ease: 'easeOut' }}
+                                className={`home-feed-status-toast is-${feedNotice.variant}`}
+                            >
+                                <span className="home-feed-status-icon" aria-hidden="true">
+                                    <LuRefreshCw className={feedNotice.variant === 'loading' ? 'animate-spin' : ''} />
+                                </span>
+                                <span className="home-feed-status-copy">
+                                    <span className="home-feed-status-kicker">FORO</span>
+                                    <span className="home-feed-status-message">{feedNotice.message}</span>
+                                </span>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                     {/* Header Section */}
-                    <header className="relative shrink-0 mb-6 px-6 pt-6 sm:px-8 sm:pt-8">
-                        <div className="flex flex-col mb-8">
-                            <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight mb-2">
+                    <header className="root-home-header relative shrink-0 mb-5 px-6 pt-5 sm:px-8 sm:pt-6 lg:px-11">
+                        <div className="root-home-title-stack flex flex-col mb-2">
+                            <h1 className="root-home-title text-[40px] sm:text-[42px] font-black text-white tracking-tight leading-[1.05] mb-1">
                                 หน้าหลัก
                             </h1>
-                            <span className="text-gray-500 text-[10px] sm:text-[11px] font-black tracking-widest uppercase mb-1 opacity-70">
+                            <span className="root-home-subtitle text-gray-500 text-[10px] sm:text-[11px] font-black tracking-widest uppercase mb-1 opacity-70">
                                 WATCHLIST FEED
                             </span>
                         </div>
 
                         {/* Search & Actions Bar */}
                         <div className="relative z-10">
-                            <div className="flex items-center justify-between gap-4 bg-[#0c0c0d] border border-white/6 p-2 pl-4 pr-3.5 rounded-3xl min-h-17 shadow-[0_18px_50px_rgba(0,0,0,0.35)]">
+                            <div className="home-control-panel root-home-control-panel">
 
                                 {/* Left Section: Trash or Back or Empty */}
-                                <div className="flex items-center gap-3">
+                                <div
+                                    className={`home-selected-list-bar ${selectedPostList ? 'is-active-list home-active-list-accent' : ''}`.trim()}
+                                    style={activeListStyle}
+                                >
+                                    <div className="home-selected-list-bar-copy">
+                                        <span className="home-selected-list-bar-text">{activeListName}</span>
+                                    </div>
                                     {!hasStarted && isRestorable ? (
                                         <button
                                             onClick={handleRestore}
-                                            className="p-3 bg-[#1a1a1c] text-gray-500 hover:text-white border border-white/5 transition-all rounded-2xl"
+                                            className="icon-btn-large header-secondary-action root-home-maintenance-action"
                                             title="ย้อนกลับ"
                                         >
                                             <HiOutlineArrowUturnLeft className="text-lg" />
                                         </button>
-                                    ) : hasStarted && displayNews.length > 0 ? (
-                                        <button
-                                            onClick={handleClear}
-                                            className="p-3 bg-[#1a1a1c] text-gray-500 hover:text-rose-400 hover:bg-rose-400/10 border border-white/5 transition-all rounded-2xl"
-                                            title="ล้างข้อมูลทั้งหมด"
-                                        >
-                                            <HiOutlineTrash className="text-lg" />
-                                        </button>
-                                    ) : (
-                                        <div className="w-10" /> // Placeholder
-                                    )}
+                                    ) : null}
                                 </div>
 
                                 {/* Right Section: Search/AI/Sync */}
-                                <div className="flex items-center gap-2.5">
+                                <div className="home-ai-filter-cluster root-home-ai-filter-cluster">
+                                    <div className="home-ai-quick-presets">
+                                        {visibleHomeQuickPresets.map(preset => {
+                                            const isActive = aiFilteredIds !== null && selectedPresetId === preset.presetId;
+                                            const isDisabled = newsResults.length === 0 || isAIProcessing;
+
+                                            return (
+                                                <button
+                                                    key={preset.key}
+                                                    onClick={() => {
+                                                        if (isDisabled) return;
+                                                        setAiPrompt(preset.label);
+                                                        setSelectedPresetId(preset.presetId);
+                                                        handleAIFilter(preset.label);
+                                                    }}
+                                                    disabled={isDisabled}
+                                                    className={`home-ai-quick-preset-btn ${isActive ? 'is-active' : ''}`.trim()}
+                                                >
+                                                    {preset.label}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
                                     {/* FORO Filter Button */}
                                     <div className="relative" ref={aiFilterRef}>
                                         <button
                                             onClick={openForoFilter}
-                                            className={`flex items-center gap-2 px-4.5 py-2.5 rounded-full font-bold border transition-all text-xs
-                                                ${isAIFilterOpen
-                                                    ? 'bg-blue-600/20 text-blue-400 border-blue-500/50 shadow-[0_0_0_1px_rgba(59,130,246,0.08)]'
-                                                    : 'bg-[#121214] border-white/6 text-gray-200 hover:text-white hover:bg-white/5'}`}
+                                            className={`btn-pill home-ai-filter-btn root-home-filter-btn ${isAIFilterOpen ? 'active' : ''}`.trim()}
                                         >
-                                            <LuFilter className={`text-[15px] ${isAIFilterOpen ? 'text-blue-400' : 'text-blue-400'}`} />
-                                            <span>FORO Filter</span>
+                                            <span className={`home-ai-filter-btn-signal ${isAIFilterOpen ? 'is-visible is-active' : ''}`.trim()} aria-hidden="true" />
+                                            <span className="home-ai-filter-btn-label">FORO Filter</span>
                                         </button>
                                     </div>
 
@@ -693,7 +869,7 @@ const TodayNews = () => {
                                         <button
                                             onClick={() => startBulkAnalysis()}
                                             disabled={isStreaming}
-                                            className="flex items-center gap-2 px-5 py-2.5 rounded-full font-bold transition-all shadow-xl active:scale-95 bg-linear-to-r from-blue-600 to-indigo-500 text-white hover:from-blue-500 hover:to-indigo-400 shadow-blue-600/30 text-xs"
+                                            className="btn-pill primary root-home-sync-btn"
                                         >
                                             <LuRefreshCw className={`text-[15px] ${isStreaming ? 'animate-spin' : ''}`} />
                                             <span>ฟีดข้อมูล</span>
@@ -701,10 +877,10 @@ const TodayNews = () => {
                                     ) : (
                                         <button
                                             onClick={stopStream}
-                                            className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-blue-600/10 text-blue-400 font-bold border border-blue-500/20 text-xs"
+                                            className="btn-pill root-home-sync-btn is-streaming"
                                         >
-                                            <RiLoader4Line className="text-[15px] animate-spin" />
-                                            <span>กำลังฟีด...</span>
+                                            <LuRefreshCw className="text-[15px] animate-spin" />
+                                            <span>ฟีดข้อมูล</span>
                                         </button>
                                     )}
                                 </div>
@@ -718,31 +894,6 @@ const TodayNews = () => {
                                 </span>
                             </div> */}
 
-                            {/* Home Preset Quick Chips */}
-                            {foroPresets.filter(p => homePresets.has(p.id)).length > 0 && (
-                                <div className="flex items-center gap-2 mt-3 flex-wrap">
-                                    {foroPresets.filter(p => homePresets.has(p.id)).map(preset => {
-                                        const isActive = aiFilteredIds !== null && selectedPresetId === preset.id;
-                                        return (
-                                            <button
-                                                key={preset.id}
-                                                onClick={() => {
-                                                    setAiPrompt(preset.name);
-                                                    setSelectedPresetId(preset.id);
-                                                    handleAIFilter(preset.name);
-                                                }}
-                                                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-black border transition-all
-                                                    ${isActive
-                                                        ? 'bg-blue-600/20 text-blue-300 border-blue-500/40'
-                                                        : 'bg-white/4 text-gray-400 border-white/8 hover:bg-white/8 hover:text-white hover:border-white/15'}`}
-                                            >
-                                                <LuSparkles className="text-[10px] text-blue-400" />
-                                                <span>{preset.name}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
                         </div>
                     </header>
 
@@ -918,19 +1069,6 @@ const TodayNews = () => {
                         )}
                     </AnimatePresence>
 
-                    {/* Warning Banner */}
-                    {isStreaming && (
-                        <div className="mb-6 flex items-center gap-4 px-6 py-4 bg-orange-500/10 border border-orange-500/20 rounded-2xl animate-in fade-in slide-in-from-top-4">
-                            <div className="p-2.5 bg-orange-500/20 rounded-xl">
-                                <HiOutlineClock className="text-orange-500 text-xl" />
-                            </div>
-                            <div>
-                                <h4 className="text-sm font-bold text-orange-500 uppercase tracking-wide">กำลังประมวลผลข้อมูลสด</h4>
-                                <p className="text-xs text-orange-400/80">กรุณาอย่าเปลี่ยนหน้าหรือปิดเบราว์เซอร์ จนกว่าระบบจะวิเคราะห์ข่าวครบตามจำนวน เพื่อป้องกันข้อมูลขาดหาย</p>
-                            </div>
-                        </div>
-                    )}
-
                     {/* AI Summary Section */}
                     {aiSummary && (
                         <div className="mb-6 mx-1">
@@ -965,47 +1103,35 @@ const TodayNews = () => {
                         </div>
                     )}
 
-                    <div className="relative flex-1 overflow-y-auto px-6 pr-4 pb-8 sm:px-8 scrollbar-hide">
+                    <div className="root-home-feed-body relative flex-1 overflow-y-auto px-6 pb-8 sm:px-8 lg:px-11 lg:pr-9 scrollbar-hide">
                         {/* News Stream Grid */}
                         <div className={`
                         ${layoutMode === 'grid'
                                 ? 'grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-20'
                                 : 'flex flex-col space-y-4 pb-20'}
                     `}>
-                            {newsResults.length === 0 && isStreaming && (
+                            {newsResults.length === 0 ? (
                                 <>
-                                    <SkeletonCard variant={layoutMode} />
-                                    <SkeletonCard variant={layoutMode} />
-                                    <SkeletonCard variant={layoutMode} />
-                                </>
-                            )}
-
-                            {newsResults.length === 0 && !isStreaming ? (
-                                <div className="col-span-full py-64 flex flex-col items-center justify-center text-center relative overflow-hidden">
-                                    <HomeCanvas />
-
-                                    {/* Radial Glow Effect in the Center */}
-                                    <motion.div
-                                        initial={{ opacity: 0, scale: 0.8 }}
-                                        animate={{ opacity: [0.25, 0.55, 0.25], scale: [0.98, 1.02, 0.98] }}
-                                        transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
-                                        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-250 h-112.5 pointer-events-none rounded-[100%]"
-                                        style={{
-                                            background: 'radial-gradient(ellipse at center, rgba(59, 130, 246, 0.28) 0%, rgba(37, 99, 235, 0.12) 40%, transparent 60%)',
-                                            filter: 'blur(80px)'
+                                    {isStreaming ? feedToolbar : null}
+                                    <div
+                                        className={`home-splash ${isStreaming ? 'is-loading' : ''}`.trim()}
+                                        onMouseMove={(event) => {
+                                            const bounds = event.currentTarget.getBoundingClientRect();
+                                            event.currentTarget.style.setProperty('--mx', `${((event.clientX - bounds.left) / bounds.width) * 100}%`);
+                                            event.currentTarget.style.setProperty('--my', `${((event.clientY - bounds.top) / bounds.height) * 100}%`);
                                         }}
-                                    />
-
-                                    <motion.div
-                                        animate={{ opacity: [0.3, 0.7, 0.3] }}
-                                        transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                                        className="relative z-10"
                                     >
-                                        <h3 className="text-[28px] md:text-[38px] font-black text-transparent bg-clip-text bg-linear-to-b from-white via-white/90 to-white/30 tracking-tight uppercase">
-                                            FORO ติดตามทุกเรื่องที่คุณสนใจ
-                                        </h3>
-                                    </motion.div>
-                                </div>
+                                        <HomeCanvas />
+
+                                        {!isStreaming && (
+                                            <div className="home-splash-inner">
+                                                <h3 className="home-splash-title no-select-ui">
+                                                    FORO ติดตามทุกเรื่องที่คุณสนใจ
+                                                </h3>
+                                            </div>
+                                        )}
+                                    </div>
+                                </>
                             ) : aiFilteredIds && displayNews.length === 0 ? (
                                 <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white/5 rounded-[40px] border border-white/10 text-gray-400 text-center animate-in fade-in">
                                     <LuSparkles className="text-5xl mb-4 text-blue-500/30" />
@@ -1024,32 +1150,7 @@ const TodayNews = () => {
                                 </div>
                             ) : (
                                 <>
-                                    {/* Content Header (Only when data present) */}
-                                    <div className="col-span-full flex items-center justify-between mb-2 px-1">
-                                        <h3 className="text-[13px] font-black text-white uppercase tracking-widest">
-                                            โพสต์ล่าสุด
-                                        </h3>
-                                        <div className="flex items-center gap-1.5">
-                                            <button
-                                                onClick={() => toggleFilter('mostView')}
-                                                className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all border
-                                                    ${activeFilters.includes('mostView')
-                                                        ? 'bg-white text-black border-white'
-                                                        : 'bg-transparent text-gray-500 border-white/10 hover:border-white/20'}`}
-                                            >
-                                                ยอดวิว
-                                            </button>
-                                            <button
-                                                onClick={() => toggleFilter('mostLiked')}
-                                                className={`px-4 py-1.5 rounded-full text-[10px] font-black transition-all border
-                                                    ${activeFilters.includes('mostLiked')
-                                                        ? 'bg-white text-black border-white'
-                                                        : 'bg-transparent text-gray-500 border-white/10 hover:border-white/20'}`}
-                                            >
-                                                เอนเกจเมนต์
-                                            </button>
-                                        </div>
-                                    </div>
+                                    {feedToolbar}
 
                                     {displayNews.map((res) => (
                                         <div key={res.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -1062,6 +1163,12 @@ const TodayNews = () => {
                                             />
                                         </div>
                                     ))}
+
+                                    {isLoadingMore && Array.from({ length: LOAD_MORE_SKELETON_COUNT }).map((_, index) => (
+                                        <div key={`load-more-skeleton-${index}`} className="home-load-more-skeleton animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                            <SkeletonCard variant={layoutMode} />
+                                        </div>
+                                    ))}
                                 </>
                             )}
 
@@ -1069,26 +1176,17 @@ const TodayNews = () => {
                         </div>
 
                         {canSearchMore && (
-                            <div className="flex justify-center mt-10 mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                            <div className="home-load-more-wrap animate-in fade-in slide-in-from-bottom-4 duration-700">
                                 <button
                                     onClick={() => nextCursor
                                         ? startBulkAnalysis(nextCursor)
                                         : startBulkAnalysis(undefined, { preserveExisting: true })
                                     }
 
-                                    className="group relative flex items-center justify-center gap-4 px-12 py-5 rounded-4xl bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 hover:border-amber-500/40 transition-all duration-300 w-full md:w-100 overflow-hidden shadow-2xl shadow-amber-500/5 active:scale-95"
-                                    title={nextCursor ? `Next Signal: ${nextCursor}` : 'ค้นหา RSS และข่าวล่าสุดเพิ่ม'}
+                                    className="home-load-more-btn"
+                                    title={nextCursor ? `Next Signal: ${nextCursor}` : 'โหลดเพิ่มเติม'}
                                 >
-                                    <div className="absolute inset-0 bg-linear-to-r from-amber-500/0 via-amber-500/5 to-amber-500/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-                                    <div className="p-3 rounded-2xl bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
-                                        <HiOutlineClock className="text-2xl text-amber-500 animate-pulse" />
-                                    </div>
-                                    <div className="flex flex-col items-start">
-                                        <span className="text-amber-500 font-black text-xl tracking-tight">ค้นหาเพิ่มเติม</span>
-                                        <span className="text-amber-500/40 text-[10px] uppercase font-bold tracking-[0.2em]">
-                                            {nextCursor ? 'Load More Signals' : 'Fetch Latest RSS'}
-                                        </span>
-                                    </div>
+                                    โหลดเพิ่มเติม
                                 </button>
                             </div>
                         )}
