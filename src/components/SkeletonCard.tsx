@@ -1,67 +1,54 @@
-
 interface SkeletonCardProps {
     variant?: 'grid' | 'compact' | 'list';
 }
 
+const SkeletonBlock = ({ className }: { className: string }) => (
+    <div className={`rounded-full bg-white/8 ${className}`} />
+);
+
 const SkeletonCard = ({ variant = 'grid' }: SkeletonCardProps) => {
     const isCompact = variant === 'compact';
-    const isGrid = variant === 'grid';
 
     return (
-        <div className={`feed-card feed-card-skeleton-shimmer animate-pulse flex flex-col relative overflow-hidden
-            ${isCompact ? 'p-4' : 'p-6'}
-            ${isGrid ? 'h-full justify-between' : ''}
-        `}>
-            {/* Header Area */}
-            <div className={`flex items-start justify-between ${isCompact ? 'mb-2' : 'mb-4'}`}>
-                <div className="flex items-center gap-3 w-full">
-                    {/* Profile Circle */}
-                    <div className={`bg-white/8 rounded-full shrink-0 ${isCompact ? 'w-8 h-8' : 'w-10 h-10'}`} />
-
-                    <div className="min-w-0 flex-1 space-y-2">
-                        {/* Title Line */}
-                        <div className={`h-4 bg-white/8 rounded-md w-3/4 ${isCompact ? 'h-3.5' : 'h-4'}`} />
-                        {!isCompact && (
-                            /* Date Line */
-                            <div className="h-2 bg-white/8 rounded-md w-1/4" />
-                        )}
+        <div
+            className={`feed-card feed-card-skeleton-shimmer animate-pulse relative flex h-full min-h-[168px] flex-col overflow-hidden font-card ${
+                isCompact ? 'p-4' : 'p-5 md:p-6'
+            }`}
+        >
+            <div className="relative z-10 mb-5 flex items-start justify-between gap-4">
+                <div className="flex min-w-0 items-center gap-3.5">
+                    <div className={`${isCompact ? 'h-10 w-10' : 'h-12 w-12'} shrink-0 rounded-[14px] bg-white/8`} />
+                    <div className="min-w-0 space-y-2">
+                        <SkeletonBlock className={`${isCompact ? 'h-3 w-24' : 'h-3.5 w-[8.5rem]'}`} />
+                        <SkeletonBlock className={`${isCompact ? 'h-2.5 w-[4.5rem]' : 'h-3 w-24'} bg-white/6`} />
                     </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-2">
+                    <SkeletonBlock className={`${isCompact ? 'h-6 w-10' : 'h-7 w-14'} bg-white/7`} />
+                    <SkeletonBlock className={`${isCompact ? 'h-6 w-10' : 'h-7 w-14'} bg-white/7`} />
                 </div>
             </div>
 
-            {/* Content Area */}
-            <div className={`space-y-2 grow ${isCompact ? 'mb-3' : 'mb-4'}`}>
-                <div className="h-4 bg-white/8 rounded-md w-full" />
-                <div className="h-4 bg-white/8 rounded-md w-11/12" />
-                {isGrid && (
-                    <>
-                        <div className="h-4 bg-white/8 rounded-md w-full" />
-                        <div className="h-4 bg-white/8 rounded-md w-10/12" />
-                    </>
-                )}
-                {!isGrid && !isCompact && (
-                    <div className="h-4 bg-white/8 rounded-md w-8/12" />
-                )}
+            <div className={`relative z-10 flex grow gap-4 ${isCompact ? 'mb-4' : 'mb-5'}`}>
+                <div className={`${isCompact ? 'h-20 w-20' : 'h-28 w-28'} shrink-0 rounded-[18px] bg-white/8`} />
+
+                <div className="min-w-0 flex-1 space-y-3 pt-1">
+                    <SkeletonBlock className="h-3.5 w-[92%]" />
+                    <SkeletonBlock className="h-3.5 w-full bg-white/7" />
+                    <SkeletonBlock className="h-3.5 w-[72%] bg-white/7" />
+                    {!isCompact ? <SkeletonBlock className="h-3.5 w-[48%] bg-white/6" /> : null}
+                </div>
             </div>
 
-            {/* Interaction Stats Placeholder */}
-            <div className={`flex items-center gap-4 mb-4 ${isCompact ? 'px-1' : ''}`}>
-                <div className="flex items-center gap-1.5 w-12 h-3 bg-white/8 rounded-md" />
-                <div className="flex items-center gap-1.5 w-12 h-3 bg-white/8 rounded-md" />
-                <div className="flex items-center gap-1.5 w-12 h-3 bg-white/8 rounded-md" />
-                <div className="flex items-center gap-1.5 w-12 h-3 bg-white/8 rounded-md ml-auto" />
-            </div>
+            <div className="relative z-10 mt-auto flex items-center justify-between gap-4 border-t border-white/5 pt-4">
+                <div className="flex items-center gap-2">
+                    <SkeletonBlock className="h-3 w-10 bg-white/7" />
+                    <SkeletonBlock className="h-3 w-10 bg-white/7" />
+                    <SkeletonBlock className="h-3 w-10 bg-white/7" />
+                </div>
 
-            {/* Tags Placeholder */}
-            <div className="flex flex-wrap gap-2 mb-4">
-                <div className="h-6 bg-white/8 rounded-full w-16" />
-                <div className="h-6 bg-white/8 rounded-full w-20" />
-            </div>
-
-            {/* Footer Buttons */}
-            <div className={`flex items-center gap-2 border-t border-white/5 ${isCompact ? 'pt-2 mt-auto' : 'pt-4 mt-auto'}`}>
-                <div className={`flex-1 bg-white/8 rounded-lg ${isCompact ? 'h-7' : 'h-10'}`} />
-                <div className={`flex-1 bg-white/8 rounded-lg ${isCompact ? 'h-7' : 'h-10'}`} />
+                <div className={`${isCompact ? 'h-8 w-24' : 'h-9 w-[8.5rem]'} shrink-0 rounded-full bg-white/8`} />
             </div>
         </div>
     );

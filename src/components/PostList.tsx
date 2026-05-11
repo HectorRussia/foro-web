@@ -191,6 +191,9 @@ const PostList = ({
         return `@${(user.x_account || '').replace('@', '')}`;
     };
 
+    const getFollowedTitle = (user: FollowedUser) =>
+        user.name || user.x_account || user.source_url || 'Follow source';
+
     const getMemberSourceLabel = (member: PostListUser) => {
         if ((member.follow_user_type || member.follow_user_follow_type) === 'rss') return member.follow_user_source_url || 'RSS feed';
         return `@${(member.follow_user_x_account || '').replace('@', '')}`;
@@ -202,7 +205,7 @@ const PostList = ({
             {/* Header */}
             <div
                 ref={actionMenuRef}
-                className="relative border-b border-white/6 px-4 pt-7 pb-5"
+                className="relative border-b border-white/6 px-4 pt-6 pb-4"
             >
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -517,16 +520,16 @@ const PostList = ({
                                                                     {getFollowedAvatar(user) ? (
                                                                         <img
                                                                             src={getFollowedAvatar(user)}
-                                                                            alt={user.name}
+                                                                            alt={getFollowedTitle(user)}
                                                                             className="w-10 h-10 rounded-full border border-white/5 object-cover"
                                                                         />
                                                                     ) : (
                                                                         <div className="w-10 h-10 rounded-full border border-white/5 bg-blue-600/20 flex items-center justify-center text-[10px] font-black text-blue-400">
-                                                                            {getInitial(user.name)}
+                                                                            {getInitial(getFollowedTitle(user))}
                                                                         </div>
                                                                     )}
                                                                     <div className="min-w-0">
-                                                                        <div className="text-xs font-bold text-white truncate">{user.name}</div>
+                                                                        <div className="text-xs font-bold text-white truncate">{getFollowedTitle(user)}</div>
                                                                         <div className="text-[10px] text-gray-500 truncate">{getFollowedSourceLabel(user)}</div>
                                                                     </div>
                                                                 </div>

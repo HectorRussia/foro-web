@@ -27,7 +27,7 @@ export interface FollowedUser {
     x_account: string | null;
     follow_type?: 'x' | 'rss' | string | null;
     source_url?: string | null;
-    name: string;
+    name: string | null;
     profile_image_url_https: string | null;
     status: number;
     user_id: number;

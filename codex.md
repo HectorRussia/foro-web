@@ -1,17 +1,50 @@
-ฝากทำ frontend new ui หน่อย  โดยเอา codebase จากตัว web เรามาเป้นหลัก UI อะไรต่างๆยึดจาก ฝั่ง Prototype เรานะพี่ชาย ใน prototype คือเราเอาไว้ทำ แค่ frontend logic data อะไรเหมือนเดิมเลยนะห้ามยุ่งเราเปลี่ยนแค่หน้าตาโอเคมั้ย แต่ถ้าอันไหนเปน feature ที่ฝั่ง web frontend  เรายังไม่มี ทำ data mock ไว้ได้เลย ยุใน /api/mocks  
+# Cowork Agent Router
 
-สรุปนะ prototype คือ design ui demo ที่เราต้องทำตาม ส่วนฝั่ง web เราตอนนี้ data logic ทุกอย่างเหมือนเดิมหมดห้ามยุ่งเด็ดขาด
-ปรับได้แค่ design ui layyer ให้หน้าตาเหมือนกับ prototype  แต่ถ้า feature ที่ฝั่ง web frontend  เรายังไม่มี ทำ data mock ไว้ได้เลย ยุใน /api/mocks   
+ใช้ไฟล์นี้เป็น entrypoint กลางสำหรับ Codex ใน repo นี้ ก่อนเริ่มงานให้เลือก instruction ตาม role จาก env หรือจาก context ของคำขอ
 
-พวก part code ให้ใช้ฝั่ง web เรานะ พวก [package.json](package.json)  
-ไม่ใช่ package.json ฝั่ง prototype
+## Resolve Agent Mode
 
-เพราะฝั่ง prototype dependencies เขาอาจจะไม่เหมือนเรา
+1. อ่านค่า `VITE_COWORK_AGENT` จาก environment ถ้าเข้าถึงได้
+2. ถ้าไม่มีใน process env ให้อ่านจาก root `.env`, root `.env.local`, `prototype/.env`, หรือ `prototype/.env.local` แบบระวัง ไม่ต้องแสดงค่าทั้งไฟล์ และห้ามเปิดเผย secret/API key
+3. แปลงค่าเป็นตัวพิมพ์ใหญ่และ trim ช่องว่าง
+4. ถ้าผู้ใช้ระบุ role ชัดเจนใน prompt ให้ยึด prompt ล่าสุดก่อน env
 
-ฝัง prototype จะมีแต่ Frontend ไม่มี server
-เราจะเน้นให้ PM vibe design เปนหลัก
+## Mode Map
 
-ส่วนถ้า PM จะทำ data ให้ทำเปน data mock แทน
-โดยเก็บ data mock ไว้ที่ prototype/services/mock
-ทุกๆที่ทำ data mock ต้องเขียน docs ไว้ให้ด้วย อยู้ใน 
-prototype/services/mock เพื่อ backend หรือ ตัว web จริงจะนำไปใช้ implement ที่ถูกต้องต่อ
+- `VITE_COWORK_AGENT=DEV` ให้โหลดและทำตาม `codex-dev.md`
+- `VITE_COWORK_AGENT=PM` ให้โหลดและทำตาม `codex-pm.md`
+
+ถ้าเป็น `PM` และมีงานเกี่ยวกับ prototype ให้โหลด skill นี้เพิ่มด้วย:
+
+```text
+.codex/skills/pm-prototype-vibe/SKILL.md
+```
+
+## Fallback
+
+ถ้าไม่มี `VITE_COWORK_AGENT` หรือค่าที่ตั้งไว้ไม่รู้จัก:
+
+- ถ้าคำขอพูดถึง PM, prototype, vibe, demo, feedback, product flow ให้ใช้ `PM`
+- นอกนั้นให้ใช้ `DEV`
+
+## Rules
+
+- ต้องอ่าน instruction file ของ mode ที่เลือกก่อนลงมือ
+- ห้ามเดา mode จากไฟล์ที่เปิดอยู่ใน editor เพียงอย่างเดียว
+- ห้ามเปิดเผยค่า `.env`, token, API key, หรือ secret ในคำตอบ
+- ถ้า mode กับคำขอขัดกัน ให้ยึดคำขอผู้ใช้ล่าสุด และบอกสั้น ๆ ว่าเลือก mode ไหน
+- ถ้าต้องสลับ mode ระหว่างงาน ให้บอกผู้ใช้ก่อนว่ากำลังเปลี่ยนจาก mode ไหนไป mode ไหน
+
+## Quick Examples
+
+```env
+VITE_COWORK_AGENT=DEV
+```
+
+Codex ต้องอ่าน `codex-dev.md`
+
+```env
+VITE_COWORK_AGENT=PM
+```
+
+Codex ต้องอ่าน `codex-pm.md` และใช้ PM prototype skill เมื่อเกี่ยวข้องกับ prototype
