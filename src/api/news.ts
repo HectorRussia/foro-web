@@ -3,8 +3,7 @@ import type {
     AdvancedSearchBulkPayload,
     AdvancedSearchBulkResponse,
     PaginatedNewsResponse,
-    NewsAnalysisResponse,
-    NewsItem
+    NewsAnalysisResponse
 } from '../interface/news';
 
 export const getNews = async (
@@ -75,15 +74,29 @@ export const searchAndAnalyzeBulk = async (
 export interface RssFetchPayload {
     post_list_id?: number | null;
     limit_per_feed?: number;
+    analyze_with_ai?: boolean;
+}
+
+export interface RssFetchedNewsItem {
+    id: number;
+    title: string;
+    url: string;
+    feed_url: string;
+    source_item_id: string;
+    published_at: string | null;
+    media_urls?: string[] | null;
+    analyzed_with_ai?: boolean;
 }
 
 export interface RssFetchResponse {
     status: string;
     total_feeds?: number;
     saved_count?: number;
+    updated_count?: number;
     skipped_count?: number;
     error_count?: number;
-    items?: NewsItem[];
+    items?: RssFetchedNewsItem[];
+    updated_items?: RssFetchedNewsItem[];
     errors?: unknown[];
 }
 

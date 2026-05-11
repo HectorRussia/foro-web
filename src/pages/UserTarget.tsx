@@ -67,7 +67,7 @@ const UserTarget = () => {
             .filter(user => Boolean(user.source_url))
             .map(user => rssSourcesByUrl.get(normalizeRssUrl(user.source_url)) || {
                 id: `follow-${user.id}`,
-                name: user.name,
+                name: user.name || user.source_url || 'RSS feed',
                 url: user.source_url || '',
                 siteUrl: user.source_url || '',
                 description: 'แหล่งข่าว RSS ที่ติดตามอยู่',
@@ -133,6 +133,9 @@ const UserTarget = () => {
         if (user.follow_type === 'rss') return user.source_url || '#';
         return `https://x.com/${normalizeXAccount(user.x_account)}`;
     };
+
+    const getFollowedDisplayName = (user: FollowedUser) =>
+        user.name || user.x_account || user.source_url || 'Follow source';
 
     const fetchUsers = async () => {
         if (!searchQuery.trim()) return;
@@ -903,7 +906,7 @@ const UserTarget = () => {
                                                         {getFollowedAvatar(fuser) ? (
                                                             <img
                                                                 src={getFollowedAvatar(fuser)}
-                                                                alt={fuser.name}
+                                                                alt={getFollowedDisplayName(fuser)}
                                                                 className="w-12 h-12 rounded-full border-2 border-white/5 object-cover"
                                                                 onError={(e) => {
                                                                     e.currentTarget.style.display = 'none';
@@ -911,7 +914,7 @@ const UserTarget = () => {
                                                             />
                                                         ) : (
                                                             <div className="w-12 h-12 rounded-full border-2 border-white/5 bg-blue-600/20 flex items-center justify-center text-sm font-black text-blue-400">
-                                                                {fuser.name.charAt(0)}
+                                                                {getFollowedDisplayName(fuser).charAt(0)}
                                                             </div>
                                                         )}
                                                     </div>
@@ -919,7 +922,7 @@ const UserTarget = () => {
                                                     {/* Info */}
                                                     <div className="flex-1 min-w-0">
                                                         <h4 className="text-sm font-black text-white truncate leading-tight uppercase tracking-tight">
-                                                            {fuser.name}
+                                                            {getFollowedDisplayName(fuser)}
                                                         </h4>
                                                         <p className="text-xs font-bold text-gray-500 truncate mt-0.5">
                                                             {getFollowedSourceLabel(fuser)}
@@ -938,7 +941,7 @@ const UserTarget = () => {
                                                     {/* Actions */}
                                                     <div className="flex items-center gap-2 self-center">
                                                         <button
-                                                            onClick={() => handleUnfollow(fuser.id, fuser.name)}
+                                                            onClick={() => handleUnfollow(fuser.id, getFollowedDisplayName(fuser))}
                                                             className="w-8 h-8 flex items-center justify-center rounded-xl bg-[#251818] text-red-500 hover:bg-[#2d1c1c] transition-all"
                                                             title="Unfollow"
                                                         >
