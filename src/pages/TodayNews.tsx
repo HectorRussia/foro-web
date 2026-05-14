@@ -6,11 +6,11 @@ import SkeletonCard from '../components/SkeletonCard';
 import {
     HiOutlineArrowUturnLeft
 } from "react-icons/hi2";
-import { LuEraser, LuSparkles, LuRefreshCw, LuFilter } from "react-icons/lu";
+import { LuCopy, LuEraser, LuFileText, LuRefreshCw, LuFilter, LuSparkles, LuX } from "react-icons/lu";
 import { AnimatePresence, motion } from 'framer-motion';
 import PostList from '../components/PostList';
-import { type AdvancedSearchBulkPayload, type NewsItem, type NewsResult } from '../interface/news';
-import { getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk } from '../api/news';
+import { type AdvancedSearchBulkPayload, type ForoFilterSummary, type NewsFilterPayload, type NewsItem, type NewsResult } from '../interface/news';
+import { filterNews, getNews, getTriggerStatus, updateTriggerStatus, searchAndAnalyzeBulk } from '../api/news';
 import { getCategories } from '../api/category';
 import { createCategoryNews } from '../api/categoryNews';
 import { toast } from 'react-hot-toast';
@@ -24,11 +24,16 @@ import { getPresets, createPreset, deletePreset, type PresetSearch } from '../ap
 const getNewsTimestamp = (item: Pick<NewsResult, 'tweet_created_at' | 'published_at' | 'created_at'>) =>
     item.tweet_created_at || item.published_at || item.created_at;
 
+const getSourceType = (item: any) =>
+    String(item?.source_type || item?.item_type || '').trim().toLowerCase();
+
 const isRssNewsItem = (item: any) =>
-    item?.source_type === 'rss' ||
-    item?.item_type === 'rss' ||
+    getSourceType(item) === 'rss' ||
     (!!item?.source_item_id && !item?.tweet_id) ||
-    !!item?.feed_url;
+    !!item?.feed_url ||
+    !!item?.source_url ||
+    !!item?.rss_url ||
+    !!item?.rss_feed_url;
 
 const toNewsResult = (item: any): NewsResult => {
     const isRss = isRssNewsItem(item);
@@ -47,9 +52,9 @@ const toNewsResult = (item: any): NewsResult => {
         created_at: createdAt,
         tweet_created_at: item?.tweet_created_at || undefined,
         published_at: item?.published_at || undefined,
-        source_type: item?.source_type || (isRss ? 'rss' : undefined),
+        source_type: isRss ? 'rss' : getSourceType(item) || undefined,
         source_item_id: item?.source_item_id || undefined,
-        feed_url: item?.feed_url || item?.source_url || undefined,
+        feed_url: item?.feed_url || item?.source_url || item?.rss_url || item?.rss_feed_url || undefined,
         retweet_count: Number(item?.retweet_count) || 0,
         reply_count: Number(item?.reply_count) || 0,
         like_count: Number(item?.like_count) || 0,
@@ -57,7 +62,8 @@ const toNewsResult = (item: any): NewsResult => {
         view_count: Number(item?.view_count) || 0,
         media_urls: Array.isArray(item?.media_urls) ? item.media_urls : [],
         media_type: item?.media_type ?? null,
-        analyzed_with_ai: item?.analyzed_with_ai ?? null
+        analyzed_with_ai: item?.analyzed_with_ai ?? null,
+        citation_id: item?.citation_id || item?.citationId || null
     };
 };
 
@@ -67,13 +73,371 @@ const getNewsResultKey = (item: NewsResult) =>
 const NEWS_PAGE_LIMIT = 40;
 const LOAD_MORE_SKELETON_COUNT = 5;
 const DB_HYDRATE_RETRY_DELAYS_MS = [0, 350, 700, 1200];
+const FORO_FILTER_CITATION_PATTERN = /\[(?:F|W)\d+\]/gi;
+const TODAY_NEWS_CLEARED_KEY = 'today_news_is_cleared';
+const TODAY_NEWS_CLEARED_IDS_KEY = 'today_news_cleared_ids';
+
+const readClearedNewsKeys = () => {
+    try {
+        const parsed = JSON.parse(localStorage.getItem(TODAY_NEWS_CLEARED_IDS_KEY) || '[]');
+        return new Set(
+            Array.isArray(parsed)
+                ? parsed.map(item => String(item ?? '').trim()).filter(Boolean)
+                : [],
+        );
+    } catch {
+        return new Set<string>();
+    }
+};
+
+const clearTodayNewsClearedState = () => {
+    localStorage.removeItem(TODAY_NEWS_CLEARED_KEY);
+    localStorage.removeItem(TODAY_NEWS_CLEARED_IDS_KEY);
+};
 
 type FeedNotice = {
     variant: 'loading' | 'success' | 'error';
     message: string;
 };
 
+type FilterComparableItem = {
+    id?: string | number | null;
+    news_id?: string | number | null;
+    tweet_id?: string | number | null;
+    source_item_id?: string | null;
+    url?: string | null;
+};
+
+type FilterCitationMap = Record<string, string>;
+
+type NormalizedForoSummary = {
+    outputLabel: string;
+    title: string;
+    subtitle?: string;
+    dateLabel?: string;
+    bullets: string[];
+    note?: string;
+};
+
 const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
+
+const toCleanString = (value: unknown) =>
+    typeof value === 'string' ? value.trim() : '';
+
+const toCleanStringArray = (value: unknown) =>
+    Array.isArray(value)
+        ? value.map(item => String(item ?? '').trim()).filter(Boolean)
+        : [];
+
+const normalizeFilterText = (value: unknown) =>
+    String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/^@/, '')
+        .replace(/\s+/g, ' ');
+
+const normalizeFilterKey = (value: unknown) =>
+    normalizeFilterText(value).replace(/[^a-z0-9]/g, '');
+
+const normalizeFilterUrl = (value: unknown) =>
+    String(value ?? '')
+        .trim()
+        .toLowerCase()
+        .replace(/\/+$/, '');
+
+const isUrlLike = (value: unknown) =>
+    /^https?:\/\//i.test(String(value || '').trim());
+
+const getComparableHostname = (value: unknown) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+
+    try {
+        const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+        return url.hostname.toLowerCase().replace(/^www\./, '');
+    } catch {
+        return '';
+    }
+};
+
+const valuesOverlap = (left: string, right: string) => {
+    const normalizedLeft = normalizeFilterText(left);
+    const normalizedRight = normalizeFilterText(right);
+    if (!normalizedLeft || !normalizedRight) return false;
+    if (
+        normalizedLeft === normalizedRight ||
+        normalizedLeft.includes(normalizedRight) ||
+        normalizedRight.includes(normalizedLeft)
+    ) {
+        return true;
+    }
+
+    const leftKey = normalizeFilterKey(normalizedLeft);
+    const rightKey = normalizeFilterKey(normalizedRight);
+    const shortestKeyLength = Math.min(leftKey.length, rightKey.length);
+
+    return shortestKeyLength >= 3 && (
+        leftKey === rightKey ||
+        leftKey.includes(rightKey) ||
+        rightKey.includes(leftKey)
+    );
+};
+
+const getComparableRssSourceNames = (values: unknown[]) => {
+    const candidates = values.flatMap(value => {
+        const raw = String(value ?? '').trim();
+        if (!raw) return [];
+
+        if (!isUrlLike(raw) && !['rss', 'rss news'].includes(raw.toLowerCase())) {
+            return [normalizeFilterText(raw)];
+        }
+
+        const hostname = getComparableHostname(raw);
+        if (!hostname) return [];
+
+        const meaningfulParts = hostname
+            .split('.')
+            .filter(part => part && !['www', 'feed', 'feeds', 'rss', 'xml'].includes(part));
+
+        return [
+            hostname.replace(/[._-]+/g, ' '),
+            meaningfulParts.join(' '),
+            meaningfulParts[0],
+        ].map(normalizeFilterText).filter(Boolean);
+    });
+
+    return dedupeStrings(candidates);
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const getFilterComparableIds = (item: FilterComparableItem) =>
+    [item.id, item.news_id, item.tweet_id, item.source_item_id, item.url]
+        .map(value => String(value ?? '').trim())
+        .filter(Boolean);
+
+const normalizeCitationLabel = (value: unknown, fallbackIndex?: number) => {
+    const raw = String(value ?? '').trim();
+    const stripped = raw.replace(/^\[|\]$/g, '').toUpperCase();
+
+    if (/^[FW]\d+$/.test(stripped)) return stripped;
+    if (/^\d+$/.test(stripped)) return `F${stripped}`;
+    return typeof fallbackIndex === 'number' ? `F${fallbackIndex + 1}` : '';
+};
+
+const getFilterItemCitationLabel = (item: unknown, index: number) => {
+    if (!isRecord(item)) return `F${index + 1}`;
+
+    return normalizeCitationLabel(
+        item.citation_id ?? item.citationId ?? item.citation ?? item.reference_id,
+        index,
+    );
+};
+
+const buildFilterCitationMap = (items: FilterComparableItem[]) =>
+    items.reduce<FilterCitationMap>((citationMap, item, index) => {
+        const citationLabel = getFilterItemCitationLabel(item, index);
+        getFilterComparableIds(item).forEach(id => {
+            citationMap[id] = citationLabel;
+        });
+        return citationMap;
+    }, {});
+
+const getCitationLabelForNews = (item: NewsResult, citationMap: FilterCitationMap) => {
+    for (const id of getFilterComparableIds(item)) {
+        const citationLabel = citationMap[id];
+        if (citationLabel) return citationLabel;
+    }
+    return undefined;
+};
+
+const dedupeStrings = (values: string[]) =>
+    Array.from(new Set(values.map(value => value.trim()).filter(Boolean)));
+
+const parseForoBullet = (value: string) => {
+    const citations = Array.from(new Set(value.match(FORO_FILTER_CITATION_PATTERN) || []))
+        .map(citation => citation.replaceAll('[', '').replaceAll(']', ''));
+    const text = value
+        .replace(FORO_FILTER_CITATION_PATTERN, '')
+        .replace(/^[-•*]\s*/, '')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+    return { text, citations };
+};
+
+const normalizeForoFilterSummary = (summary: ForoFilterSummary | null): NormalizedForoSummary | null => {
+    if (!summary) return null;
+
+    if (typeof summary === 'string') {
+        const lines = summary.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+        const bullets = lines
+            .filter(line => /^[-•*]\s+/.test(line))
+            .map(line => line.replace(/^[-•*]\s+/, '').trim());
+        const plainLines = lines.filter(line => !/^[-•*]\s+/.test(line));
+
+        return {
+            outputLabel: 'สรุปภาพรวม',
+            title: plainLines[0] || 'ผลลัพธ์จาก FORO Filter',
+            subtitle: plainLines.slice(1).join(' ') || undefined,
+            bullets,
+        };
+    }
+
+    if (!isRecord(summary)) return null;
+
+    const sectionItems = Array.isArray(summary.sections)
+        ? summary.sections.flatMap(section => isRecord(section) ? toCleanStringArray(section.items) : [])
+        : [];
+    const mainSummary = toCleanString(summary.main_summary);
+    const title = toCleanString(summary.title) || toCleanString(summary.headline) || mainSummary || 'ผลลัพธ์จาก FORO Filter';
+    const bulletCandidates = [
+        ...toCleanStringArray(summary.bullet_points),
+        ...toCleanStringArray(summary.bullets),
+        ...toCleanStringArray(summary.matchedSignals),
+        ...sectionItems,
+    ];
+    const bullets = dedupeStrings(
+        mainSummary && mainSummary !== title
+            ? [mainSummary, ...bulletCandidates]
+            : bulletCandidates,
+    );
+
+    return {
+        outputLabel: toCleanString(summary.outputLabel) || 'สรุปภาพรวม',
+        title,
+        subtitle: toCleanString(summary.subtitle) || toCleanString(summary.whyNow) || undefined,
+        dateLabel: toCleanString(summary.dateLabel) || toCleanString(summary.date_range) || toCleanString(summary.dateRange) || undefined,
+        bullets,
+        note: toCleanString(summary.foro_note) || undefined,
+    };
+};
+
+const buildForoSummaryClipboardText = (summary: ForoFilterSummary | null) => {
+    const normalizedSummary = normalizeForoFilterSummary(summary);
+    if (!normalizedSummary) return '';
+
+    return [
+        normalizedSummary.title,
+        normalizedSummary.subtitle,
+        normalizedSummary.bullets.map(bullet => `- ${parseForoBullet(bullet).text}`).join('\n'),
+        normalizedSummary.note,
+    ]
+        .filter(Boolean)
+        .join('\n\n')
+        .trim();
+};
+
+const ForoFilterSummarySkeleton = () => (
+    <div className="foro-filter-summary-card foro-filter-summary-skeleton col-span-full" aria-hidden="true">
+        <div className="foro-filter-summary-skeleton-header">
+            <div className="foro-filter-summary-skeleton-icon foro-filter-summary-shimmer" />
+            <div className="foro-filter-summary-skeleton-heading">
+                <div className="foro-filter-summary-skeleton-line foro-filter-summary-shimmer w-32" />
+                <div className="foro-filter-summary-skeleton-line foro-filter-summary-shimmer w-52" />
+            </div>
+        </div>
+        <div className="foro-filter-summary-skeleton-pill-row">
+            <div className="foro-filter-summary-skeleton-pill foro-filter-summary-shimmer" />
+            <div className="foro-filter-summary-skeleton-pill foro-filter-summary-shimmer w-100 max-w-full" />
+        </div>
+        <div className="foro-filter-summary-skeleton-title foro-filter-summary-shimmer" />
+        <div className="foro-filter-summary-skeleton-list">
+            <div className="foro-filter-summary-skeleton-line foro-filter-summary-shimmer" />
+            <div className="foro-filter-summary-skeleton-line foro-filter-summary-shimmer w-10/12" />
+            <div className="foro-filter-summary-skeleton-line foro-filter-summary-shimmer w-11/12" />
+            <div className="foro-filter-summary-skeleton-line foro-filter-summary-shimmer w-8/12" />
+        </div>
+    </div>
+);
+
+const ForoFilterSummaryCard = ({
+    summary,
+    citationLabels = [],
+    onCopy,
+}: {
+    summary: ForoFilterSummary;
+    citationLabels?: string[];
+    onCopy: () => void;
+}) => {
+    const normalizedSummary = normalizeForoFilterSummary(summary);
+    if (!normalizedSummary) return null;
+
+    const parsedBullets = normalizedSummary.bullets.map((bullet, index) => ({
+        ...parseForoBullet(bullet),
+        key: `${bullet}-${index}`,
+    }));
+    const inlineCitationLabels = dedupeStrings(parsedBullets.flatMap(item => item.citations));
+    const summaryCitationLabels = dedupeStrings(
+        inlineCitationLabels.length > 0 ? inlineCitationLabels : citationLabels,
+    );
+
+    return (
+        <div className="foro-filter-summary-card col-span-full">
+            <div className="foro-filter-summary-glow" aria-hidden="true" />
+            <div className="foro-filter-summary-header">
+                <div className="foro-filter-summary-brand">
+                    <span className="foro-filter-summary-icon">
+                        <LuFileText />
+                    </span>
+                    <span>
+                        <span className="foro-filter-summary-kicker">FORO FILTER</span>
+                        {normalizedSummary.dateLabel && (
+                            <span className="foro-filter-summary-date">{normalizedSummary.dateLabel}</span>
+                        )}
+                    </span>
+                </div>
+                <button
+                    type="button"
+                    onClick={onCopy}
+                    className="icon-btn-large foro-filter-copy-btn"
+                    title="คัดลอกผลลัพธ์"
+                >
+                    <LuCopy className="text-[14px]" />
+                </button>
+            </div>
+
+            {(normalizedSummary.outputLabel || normalizedSummary.subtitle) && (
+                <div className="foro-filter-summary-pills">
+                    {normalizedSummary.outputLabel && <span>{normalizedSummary.outputLabel}</span>}
+                    {normalizedSummary.subtitle && <span>{normalizedSummary.subtitle}</span>}
+                </div>
+            )}
+
+            <h2 className="foro-filter-summary-title">{normalizedSummary.title}</h2>
+
+            {parsedBullets.length > 0 ? (
+                <div className="foro-filter-summary-list">
+                    {parsedBullets.map(parsed => (
+                            <div key={parsed.key} className="foro-filter-summary-item">
+                                <span className="foro-filter-summary-item-text">{parsed.text}</span>
+                                {parsed.citations.length > 0 && (
+                                    <span className="foro-filter-summary-citations">
+                                        {parsed.citations.map(citation => (
+                                            <span key={`${parsed.text}-${citation}`} className="foro-filter-citation-badge">
+                                                {citation}
+                                            </span>
+                                        ))}
+                                    </span>
+                                )}
+                            </div>
+                    ))}
+                </div>
+            ) : summaryCitationLabels.length > 0 ? (
+                <div className="foro-filter-summary-reference-rail" aria-label="FORO Filter references">
+                    {summaryCitationLabels.map(citation => (
+                        <span key={`summary-reference-${citation}`} className="foro-filter-citation-badge">
+                            {citation}
+                        </span>
+                    ))}
+                </div>
+            ) : null}
+
+            {normalizedSummary.note && <p className="foro-filter-summary-note">{normalizedSummary.note}</p>}
+        </div>
+    );
+};
 
 const mergeNewsResults = (current: NewsResult[], incoming: NewsResult[]) => {
     const merged = new Map<string, NewsResult>();
@@ -150,8 +514,10 @@ const TodayNews = () => {
     const [aiPrompt, setAiPrompt] = useState('');
     const [isAIProcessing, setIsAIProcessing] = useState(false);
     const [aiFilteredIds, setAiFilteredIds] = useState<(string | number)[] | null>(null);
-    const [aiSummary, setAiSummary] = useState<string | null>(null);
+    const [aiFilterCitationMap, setAiFilterCitationMap] = useState<FilterCitationMap>({});
+    const [aiSummary, setAiSummary] = useState<ForoFilterSummary | null>(null);
     const aiFilterRef = useRef<HTMLDivElement>(null);
+    const aiFilterRunIdRef = useRef(0);
 
     // Preset State
     const [foroPresets, setForoPresets] = useState<PresetSearch[]>([]);
@@ -188,19 +554,34 @@ const TodayNews = () => {
         try {
             // 1. Sync Trigger Status first to understand current state
             const triggerData = await getTriggerStatus();
-            const isCleared = localStorage.getItem('today_news_is_cleared') === 'true';
+            const isCleared = localStorage.getItem(TODAY_NEWS_CLEARED_KEY) === 'true';
+            const clearedNewsKeys = readClearedNewsKeys();
 
             // 2. Clear the 'cleared' flag if we detect an active run starting elsewhere
             if (triggerData.trigger === 1 && isCleared) {
-                localStorage.removeItem('today_news_is_cleared');
+                clearTodayNewsClearedState();
             }
 
             // 3. Fetch items from DB
             const dbResults = await loadLatestNewsResults();
             const hasNews = dbResults.length > 0;
+            const shouldKeepCleared =
+                isCleared &&
+                triggerData.trigger !== 1 &&
+                (
+                    !hasNews ||
+                    (
+                        clearedNewsKeys.size > 0 &&
+                        dbResults.every(item => clearedNewsKeys.has(getNewsResultKey(item)))
+                    )
+                );
+
+            if (isCleared && hasNews && !shouldKeepCleared) {
+                clearTodayNewsClearedState();
+            }
 
             // 4. Decision: Show news IF (Run is Active) OR (User hasn't explicitly clicked Clear)
-            if (hasNews && (triggerData.trigger === 1 || !isCleared)) {
+            if (hasNews && (triggerData.trigger === 1 || !shouldKeepCleared)) {
                 setNewsResults(dbResults);
                 setHasStarted(true);
             } else {
@@ -211,9 +592,9 @@ const TodayNews = () => {
             if (triggerData.trigger === 1) {
                 setHasStarted(true);
                 setStatusMessage('ระบบกำลังทำงานอยู่ (ตรวจพบค้างคา)');
-            } else if (isCleared && !hasNews) {
+            } else if (shouldKeepCleared && !hasNews) {
                 setStatusMessage('ระบบพร้อมทำงาน');
-            } else if (isCleared && hasNews) {
+            } else if (shouldKeepCleared && hasNews) {
                 setStatusMessage('ล้างข้อมูลเรียบร้อยแล้ว');
             } else {
                 setStatusMessage(hasNews ? 'ประมวลผลเสร็จสิ้น' : 'ระบบพร้อมทำงาน');
@@ -295,7 +676,7 @@ const TodayNews = () => {
             setNewsResults([]);
             setNextCursor(null);
             localStorage.removeItem('today_news_twitter_cursor');
-            localStorage.removeItem('today_news_is_cleared'); // Reset clear flag on new start
+            clearTodayNewsClearedState(); // Reset clear flag on new start
             setHasStarted(true);
         } else {
             setHasStarted(true);
@@ -376,15 +757,17 @@ const TodayNews = () => {
             if (isLoadingMoreRequest) {
                 setFeedNotice(null);
             }
-        } catch (error: any) {
-            if (error?.name === 'CanceledError' || error?.code === 'ERR_CANCELED') {
+        } catch (error: unknown) {
+            const isCanceledError = isRecord(error)
+                && (error.name === 'CanceledError' || error.code === 'ERR_CANCELED');
+            if (isCanceledError) {
                 setStatusMessage('หยุดการประมวลผลแล้ว');
                 setFeedNotice(null);
                 return;
             }
 
             console.error('Bulk analysis failed:', error);
-            setStatusMessage(`เกิดข้อผิดพลาด: ${error.message || 'Unknown error'}`);
+            setStatusMessage(`เกิดข้อผิดพลาด: ${error instanceof Error ? error.message : 'Unknown error'}`);
             setFeedNotice({
                 variant: 'error',
                 message: 'อัปเดตข้อมูลไม่สำเร็จ ลองฟีดข้อมูลอีกครั้ง',
@@ -436,8 +819,11 @@ const TodayNews = () => {
             setForoPresets(prev => [newPreset, ...prev]);
             setSelectedPresetId(newPreset.id);
             toast.success('บันทึก preset สำเร็จ');
-        } catch (error: any) {
-            toast.error(error?.response?.data?.detail || 'บันทึก preset ไม่สำเร็จ');
+        } catch (error: unknown) {
+            const detail = isRecord(error) && isRecord(error.response) && isRecord(error.response.data)
+                ? toCleanString(error.response.data.detail)
+                : '';
+            toast.error(detail || 'บันทึก preset ไม่สำเร็จ');
         } finally {
             setIsSavingPreset(false);
         }
@@ -514,10 +900,24 @@ const TodayNews = () => {
             return;
         }
 
-        setIsAIProcessing(true);
+        if (newsResults.length === 0) {
+            toast.error('ยังไม่มีข่าวให้ FORO Filter คัดกรอง');
+            return;
+        }
 
-        // Structure to send to backend exactly as requested
-        const payload = {
+        const runId = aiFilterRunIdRef.current + 1;
+        aiFilterRunIdRef.current = runId;
+        setIsAIProcessing(true);
+        setIsAIFilterOpen(false);
+        setAiSummary(null);
+        setAiFilteredIds(null);
+        setAiFilterCitationMap({});
+        setFeedNotice({
+            variant: 'loading',
+            message: 'กำลังวิเคราะห์บทสรุปสำหรับคุณ...',
+        });
+
+        const payload: NewsFilterPayload = {
             prompt: prompt,
             news_items: newsResults.map(res => ({
                 id: res.id,
@@ -526,7 +926,8 @@ const TodayNews = () => {
                 source: res.source,
                 url: res.url,
                 tweet_id: res.tweet_id,
-                created_at: res.created_at,
+                source_item_id: res.source_item_id,
+                created_at: getNewsTimestamp(res),
                 metrics: {
                     retweet_count: res.retweet_count,
                     reply_count: res.reply_count,
@@ -538,49 +939,109 @@ const TodayNews = () => {
         };
 
         try {
-            // refactor to use api/news.ts pattern axios
-            const response = await fetch(`${import.meta.env.VITE_API_URL}/news/filter`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-                },
-                body: JSON.stringify(payload)
-            });
+            const data = await filterNews(payload);
+            if (aiFilterRunIdRef.current !== runId) return;
 
-            const data = await response.json();
+            if (data.status && data.status !== 'success') {
+                toast.error(data.message || 'FORO Filter ไม่สำเร็จ');
+                setFeedNotice({
+                    variant: 'error',
+                    message: data.message || 'FORO Filter มีปัญหา ลองใหม่อีกครั้ง',
+                });
+                return;
+            }
 
-            if (data.filtered_news) {
+            if (Array.isArray(data.filtered_news)) {
                 setAiSummary(data.summary || null);
-                // Map IDs/TweetIDs to track matches - Use strings to avoid precision issues
-                const ids = data.filtered_news.map((item: any) => String(item.tweet_id || item.id));
+                const ids = dedupeStrings(data.filtered_news.flatMap(item => getFilterComparableIds(item)));
+                setAiFilterCitationMap(buildFilterCitationMap(data.filtered_news));
                 setAiFilteredIds(ids);
+                const filteredCount = typeof data.filtered_news_count === 'number'
+                    ? data.filtered_news_count
+                    : ids.length;
+                setFeedNotice({
+                    variant: 'success',
+                    message: data.message || (filteredCount > 0
+                        ? `คัดกรองสำเร็จ • พบ ${filteredCount} การ์ด`
+                        : 'คัดกรองสำเร็จ แต่ไม่พบข่าวที่ตรงกับเงื่อนไข'),
+                });
                 toast.success('คัดกรองข้อมูลสำเร็จ');
             } else {
                 toast.error(data.message || 'คัดกรองไม่สำเร็จ');
+                setFeedNotice({
+                    variant: 'error',
+                    message: data.message || 'คัดกรองไม่สำเร็จ',
+                });
             }
-            setIsAIFilterOpen(false);
         } catch (error) {
+            if (aiFilterRunIdRef.current !== runId) return;
             console.error('AI Filter failed:', error);
             toast.error('เกิดข้อผิดพลาดในการเชื่อมต่อ AI');
+            setFeedNotice({
+                variant: 'error',
+                message: 'FORO Filter มีปัญหา ลองใหม่อีกครั้ง',
+            });
         } finally {
-            setIsAIProcessing(false);
+            if (aiFilterRunIdRef.current === runId) {
+                setIsAIProcessing(false);
+            }
+        }
+    };
+
+    const clearAIFilter = () => {
+        aiFilterRunIdRef.current += 1;
+        setIsAIProcessing(false);
+        setAiFilteredIds(null);
+        setAiFilterCitationMap({});
+        setAiSummary(null);
+        setAiPrompt('');
+        setSelectedPresetId(null);
+        setFeedNotice({
+            variant: 'success',
+            message: 'ล้างตัวกรองแล้ว',
+        });
+    };
+
+    const handleCopyAISummary = async () => {
+        const clipboardText = buildForoSummaryClipboardText(aiSummary);
+        if (!clipboardText) return;
+
+        try {
+            await navigator.clipboard.writeText(clipboardText);
+            setFeedNotice({
+                variant: 'success',
+                message: 'คัดลอกผลลัพธ์จาก FORO Filter แล้ว',
+            });
+            toast.success('คัดลอกผลลัพธ์แล้ว');
+        } catch (error) {
+            console.error('Failed to copy FORO Filter summary:', error);
+            toast.error('คัดลอกไม่สำเร็จ');
         }
     };
 
     const handleClear = async () => {
         try {
-            const newsIds = newsResults.map(item => Number(item.id));
-            await updateTriggerStatus(0, newsIds);
+            const newsIds = newsResults
+                .map(item => Number(item.id))
+                .filter((id): id is number => Number.isFinite(id));
+            const clearedKeys = newsResults.map(getNewsResultKey);
+            await updateTriggerStatus(0, newsIds.length > 0 ? newsIds : undefined);
             if (newsResults.length > 0) {
                 setBackupResults(newsResults);
                 setBackupCursor(nextCursor);
                 setIsRestorable(true);
             }
             setNewsResults([]);
+            aiFilterRunIdRef.current += 1;
+            setIsAIProcessing(false);
+            setAiFilteredIds(null);
+            setAiFilterCitationMap({});
+            setAiSummary(null);
+            setSelectedPresetId(null);
             setHasStarted(false);
             localStorage.removeItem('today_news_twitter_cursor');
-            localStorage.setItem('today_news_is_cleared', 'true'); // Flag to persist clear on refresh
+            localStorage.setItem(TODAY_NEWS_CLEARED_KEY, 'true'); // Flag to persist clear on refresh
+            localStorage.setItem(TODAY_NEWS_CLEARED_IDS_KEY, JSON.stringify(clearedKeys));
             setNextCursor(null);
             setStatusMessage('ล้างข้อมูลเรียบร้อยแล้ว');
         } catch (error) {
@@ -595,6 +1056,7 @@ const TodayNews = () => {
                 setNextCursor(backupCursor);
                 localStorage.setItem('today_news_twitter_cursor', backupCursor);
             }
+            clearTodayNewsClearedState();
             setIsRestorable(false);
             setHasStarted(true);
             setStatusMessage('กู้คืนข้อมูลสำเร็จ');
@@ -623,7 +1085,8 @@ const TodayNews = () => {
         view_count: res.view_count,
         media_urls: res.media_urls,
         media_type: res.media_type,
-        analyzed_with_ai: res.analyzed_with_ai
+        analyzed_with_ai: res.analyzed_with_ai,
+        citation_id: getCitationLabelForNews(res, aiFilterCitationMap) || res.citation_id || null
     });
 
     const toggleFilter = (filter: string) => {
@@ -653,21 +1116,52 @@ const TodayNews = () => {
                 const handle = m.follow_user_x_account || "";
                 return handle.startsWith('@') ? handle.slice(1).toLowerCase() : handle.toLowerCase();
             }).filter(Boolean));
-            const memberSources = new Set(selectedPostList.members
-                .map(m => m.follow_user_source_url || '')
-                .filter(Boolean)
-                .map(source => source.toLowerCase()));
-            const hasRssMembers = selectedPostList.members.some(m =>
+            const rssMembers = selectedPostList.members.filter(m =>
                 (m.follow_user_type || m.follow_user_follow_type) === 'rss' || Boolean(m.follow_user_source_url)
             );
+            const memberSources = new Set(rssMembers
+                .map(m => normalizeFilterUrl(m.follow_user_source_url))
+                .filter(Boolean));
+            const memberSourceHosts = new Set(rssMembers
+                .map(m => getComparableHostname(m.follow_user_source_url))
+                .filter(Boolean));
+            const memberSourceNames = new Set(rssMembers.flatMap(m =>
+                getComparableRssSourceNames([
+                    m.follow_user_name,
+                    m.follow_user_source_url,
+                ])
+            ));
+            const hasRssMembers = rssMembers.length > 0;
 
             filtered = filtered.filter(item => {
-                if (item.source_type === 'rss') {
-                    const rssSource = (item.feed_url || item.source_item_id || item.url || '').toLowerCase();
-                    if (!rssSource) return hasRssMembers;
-                    return memberSources.size > 0
-                        ? [...memberSources].some(source => rssSource.includes(source) || source.includes(rssSource))
-                        : hasRssMembers;
+                if (isRssNewsItem(item)) {
+                    const rssUrls = [
+                        item.feed_url,
+                        item.source_item_id,
+                        item.url,
+                        item.source,
+                    ].map(normalizeFilterUrl).filter(Boolean);
+                    const rssHosts = rssUrls.map(getComparableHostname).filter(Boolean);
+                    const rssSourceNames = getComparableRssSourceNames([
+                        item.source,
+                        item.feed_url,
+                        item.source_item_id,
+                        item.url,
+                    ]);
+
+                    if (rssUrls.length === 0 && rssSourceNames.length === 0) return hasRssMembers;
+
+                    const matchesByUrl = [...memberSources].some(source =>
+                        rssUrls.some(rssUrl => valuesOverlap(rssUrl, source))
+                    );
+                    const matchesByHost = [...memberSourceHosts].some(host =>
+                        rssHosts.some(rssHost => valuesOverlap(rssHost, host))
+                    );
+                    const matchesByName = [...memberSourceNames].some(name =>
+                        rssSourceNames.some(rssSourceName => valuesOverlap(rssSourceName, name))
+                    );
+
+                    return matchesByUrl || matchesByHost || matchesByName;
                 }
 
                 // Try to extract handle from URL: https://x.com/BBCBreaking/status/123 -> BBCBreaking
@@ -710,18 +1204,25 @@ const TodayNews = () => {
         });
 
         // Apply AI Filter if active
-        if (aiFilteredIds) {
+        if (aiFilteredIds !== null) {
+            const filteredIdSet = new Set(aiFilteredIds.map(id => String(id)));
             return sorted.filter(item => {
-                const itemIdStr = String(item.id);
-                const tweetIdStr = item.tweet_id ? String(item.tweet_id) : null;
-                return aiFilteredIds.includes(itemIdStr) || (tweetIdStr && aiFilteredIds.includes(tweetIdStr));
+                return getFilterComparableIds(item).some(id => filteredIdSet.has(id));
             });
         }
         return sorted;
     };
 
     const displayNews = getFilteredNews();
-    const canSearchMore = !isStreaming && hasStarted && displayNews.length > 0 && !aiFilteredIds;
+    const isAiFilterActive = aiFilteredIds !== null;
+    const isFilterUiActive = isAIProcessing || isAiFilterActive;
+    const aiFilterCitationLabels = dedupeStrings(
+        displayNews
+            .map(item => getCitationLabelForNews(item, aiFilterCitationMap) || normalizeCitationLabel(item.citation_id))
+            .filter((label): label is string => Boolean(label)),
+    );
+    const feedCount = isAIProcessing ? newsResults.length : displayNews.length;
+    const canSearchMore = !isStreaming && !isAIProcessing && hasStarted && displayNews.length > 0 && !isAiFilterActive;
     const selectedHomeQuickPresets = homePresets.size > 0
         ? foroPresets.filter(preset => homePresets.has(preset.id))
         : foroPresets.slice(0, 3);
@@ -742,10 +1243,22 @@ const TodayNews = () => {
                 <h3 className="section-title">
                     โพสต์ล่าสุด
                 </h3>
-                <span className="home-feed-count-badge">{`${displayNews.length} \u0e01\u0e32\u0e23\u0e4c\u0e14`}</span>
+                <span className="home-feed-count-badge">{`${feedCount} \u0e01\u0e32\u0e23\u0e4c\u0e14`}</span>
+                {isFilterUiActive && (
+                    <button
+                        type="button"
+                        onClick={clearAIFilter}
+                        className="ai-filtered-badge root-ai-filtered-badge"
+                        title="ล้างตัวกรอง"
+                    >
+                        <LuFilter className="text-[12px]" />
+                        <span>FORO FILTER</span>
+                        <LuX className="text-[12px]" />
+                    </button>
+                )}
             </div>
             <div className="feed-section-filters">
-                {hasStarted && displayNews.length > 0 && (
+                {hasStarted && displayNews.length > 0 && !isFilterUiActive && (
                     <button
                         onClick={handleClear}
                         className="icon-btn-large header-secondary-action root-feed-maintenance-action"
@@ -830,10 +1343,10 @@ const TodayNews = () => {
                                 </div>
 
                                 {/* Right Section: Search/AI/Sync */}
-                                <div className="home-ai-filter-cluster root-home-ai-filter-cluster">
+                                <div className={`home-ai-filter-cluster root-home-ai-filter-cluster ${isAIProcessing ? 'is-filtering' : ''}`.trim()}>
                                     <div className="home-ai-quick-presets">
                                         {visibleHomeQuickPresets.map(preset => {
-                                            const isActive = aiFilteredIds !== null && selectedPresetId === preset.presetId;
+                                            const isActive = isFilterUiActive && selectedPresetId === preset.presetId;
                                             const isDisabled = newsResults.length === 0 || isAIProcessing;
 
                                             return (
@@ -857,10 +1370,11 @@ const TodayNews = () => {
                                     <div className="relative" ref={aiFilterRef}>
                                         <button
                                             onClick={openForoFilter}
-                                            className={`btn-pill home-ai-filter-btn root-home-filter-btn ${isAIFilterOpen ? 'active' : ''}`.trim()}
+                                            disabled={isAIProcessing}
+                                            className={`btn-pill home-ai-filter-btn root-home-filter-btn ${isAIFilterOpen ? 'active' : ''} ${isAIProcessing ? 'is-filtering' : ''} ${isFilterUiActive ? 'has-active-result' : ''}`.trim()}
                                         >
-                                            <span className={`home-ai-filter-btn-signal ${isAIFilterOpen ? 'is-visible is-active' : ''}`.trim()} aria-hidden="true" />
-                                            <span className="home-ai-filter-btn-label">FORO Filter</span>
+                                            <span className={`home-ai-filter-btn-signal ${isFilterUiActive || isAIFilterOpen ? 'is-visible' : ''} ${isAIProcessing ? 'is-spinning' : ''} ${isAiFilterActive ? 'is-active' : ''}`.trim()} aria-hidden="true" />
+                                            <span className="home-ai-filter-btn-label">{isAIProcessing ? 'กำลังคัดการ์ด' : 'FORO Filter'}</span>
                                         </button>
                                     </div>
 
@@ -1069,40 +1583,6 @@ const TodayNews = () => {
                         )}
                     </AnimatePresence>
 
-                    {/* AI Summary Section */}
-                    {aiSummary && (
-                        <div className="mb-6 mx-1">
-                            <motion.div
-                                initial={{ opacity: 0, y: -20 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="relative overflow-hidden group"
-                            >
-                                <div className="absolute inset-0 backdrop-blur-3xl" />
-                                <div className="relative p-4 md:p-6 border border-blue-500/20 rounded-3xl md:rounded-[2.5rem] shadow-2xl shadow-blue-500/5">
-                                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-3 md:gap-5 text-center sm:text-left">
-                                        <div className="shrink-0 p-2.5 md:p-3.5 bg-blue-500/20 rounded-xl md:rounded-[1.25rem] shadow-inner">
-                                            <LuSparkles className="text-blue-400 text-xl md:text-2xl animate-pulse" />
-                                        </div>
-                                        <div className="flex-1 space-y-2 w-full">
-                                            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
-                                                <h3 className="text-lg md:text-xl font-black text-transparent bg-clip-text bg-linear-to-r from-blue-400 to-cyan-400 tracking-tight">
-                                                    บทสรุปจาก AI
-                                                </h3>
-                                                <span className="px-3 py-1 rounded-full border border-blue-500/20 text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-400/70">
-                                                    AI Insight Summary
-                                                </span>
-                                            </div>
-                                            <p className="text-gray-200 leading-relaxed text-sm md:text-base font-medium whitespace-pre-wrap">
-                                                {aiSummary}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <div className="absolute -bottom-24 -right-24 w-48 h-48 blur-[100px] rounded-full hidden sm:block" />
-                                </div>
-                            </motion.div>
-                        </div>
-                    )}
-
                     <div className="root-home-feed-body relative flex-1 overflow-y-auto px-6 pb-8 sm:px-8 lg:px-11 lg:pr-9 scrollbar-hide">
                         {/* News Stream Grid */}
                         <div className={`
@@ -1132,17 +1612,13 @@ const TodayNews = () => {
                                         )}
                                     </div>
                                 </>
-                            ) : aiFilteredIds && displayNews.length === 0 ? (
+                            ) : isAiFilterActive && displayNews.length === 0 ? (
                                 <div className="col-span-full py-32 flex flex-col items-center justify-center bg-white/5 rounded-[40px] border border-white/10 text-gray-400 text-center animate-in fade-in">
                                     <LuSparkles className="text-5xl mb-4 text-blue-500/30" />
                                     <h3 className="text-lg font-bold">ไม่พบข่าวที่ตรงกับการคัดกรอง</h3>
                                     <p className="text-sm opacity-60 mt-1">ลองเปลี่ยนคำสั่งใหม่ หรือเช็คจำนวนข่าวทั้งหมด</p>
                                     <button
-                                        onClick={() => {
-                                            setAiFilteredIds(null);
-                                            setAiSummary(null);
-                                            setAiPrompt('');
-                                        }}
+                                        onClick={clearAIFilter}
                                         className="mt-6 px-6 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-bold transition-all"
                                     >
                                         ล้างการคัดกรอง
@@ -1152,23 +1628,44 @@ const TodayNews = () => {
                                 <>
                                     {feedToolbar}
 
-                                    {displayNews.map((res) => (
-                                        <div key={res.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                            <DashboardCard
-                                                post={mapToNewsItem(res)}
-                                                variant={layoutMode}
-                                                categories={categories}
-                                                onAddToCategory={handleAddNewsToCategory}
-                                                onDelete={handleDeleteIndividual}
-                                            />
-                                        </div>
-                                    ))}
+                                    {isAIProcessing ? (
+                                        <>
+                                            <ForoFilterSummarySkeleton />
+                                            {Array.from({ length: LOAD_MORE_SKELETON_COUNT }).map((_, index) => (
+                                                <div key={`foro-filter-skeleton-${index}`} className="home-load-more-skeleton animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                                    <SkeletonCard variant={layoutMode} />
+                                                </div>
+                                            ))}
+                                        </>
+                                    ) : (
+                                        <>
+                                            {aiSummary && (
+                                                <ForoFilterSummaryCard
+                                                    summary={aiSummary}
+                                                    citationLabels={aiFilterCitationLabels}
+                                                    onCopy={handleCopyAISummary}
+                                                />
+                                            )}
 
-                                    {isLoadingMore && Array.from({ length: LOAD_MORE_SKELETON_COUNT }).map((_, index) => (
-                                        <div key={`load-more-skeleton-${index}`} className="home-load-more-skeleton animate-in fade-in slide-in-from-bottom-4 duration-500">
-                                            <SkeletonCard variant={layoutMode} />
-                                        </div>
-                                    ))}
+                                            {displayNews.map((res) => (
+                                                <div key={res.id} className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                                    <DashboardCard
+                                                        post={mapToNewsItem(res)}
+                                                        variant={layoutMode}
+                                                        categories={categories}
+                                                        onAddToCategory={handleAddNewsToCategory}
+                                                        onDelete={handleDeleteIndividual}
+                                                    />
+                                                </div>
+                                            ))}
+
+                                            {isLoadingMore && Array.from({ length: LOAD_MORE_SKELETON_COUNT }).map((_, index) => (
+                                                <div key={`load-more-skeleton-${index}`} className="home-load-more-skeleton animate-in fade-in slide-in-from-bottom-4 duration-500">
+                                                    <SkeletonCard variant={layoutMode} />
+                                                </div>
+                                            ))}
+                                        </>
+                                    )}
                                 </>
                             )}
 

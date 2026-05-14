@@ -24,6 +24,7 @@ export interface NewsItem {
     media_type?: string | null
     analyzed_with_ai?: boolean | null
     trigger_news?: number
+    citation_id?: string | null
 }
 export interface PaginatedNewsResponse {
     items: NewsItem[];
@@ -64,6 +65,7 @@ export interface NewsResult {
     media_urls?: string[] | null
     media_type?: string | null
     analyzed_with_ai?: boolean | null
+    citation_id?: string | null
 }
 
 export interface SSEEventData {
@@ -120,4 +122,85 @@ export interface AdvancedSearchBulkPayload {
     fetch_rss_first?: boolean;
     rss_limit_per_feed?: number;
     analyze_rss_with_ai?: boolean;
+}
+
+export interface NewsFilterPayloadItem {
+    id: string | number;
+    title: string;
+    content: unknown;
+    source: string;
+    url: string;
+    tweet_id?: string | null;
+    source_item_id?: string | null;
+    created_at: string;
+    metrics: {
+        retweet_count?: number;
+        reply_count?: number;
+        like_count?: number;
+        quote_count?: number;
+        view_count?: number;
+    };
+}
+
+export interface NewsFilterPayload {
+    prompt: string;
+    news_items: NewsFilterPayloadItem[];
+}
+
+export type ForoFilterSummary =
+    | string
+    | {
+        title?: string;
+        headline?: string;
+        subtitle?: string;
+        whyNow?: string;
+        outputLabel?: string;
+        date_range?: string;
+        dateRange?: string;
+        dateLabel?: string;
+        main_summary?: string;
+        bullet_points?: string[];
+        bullets?: string[];
+        matchedSignals?: string[];
+        sections?: Array<{
+            title?: string;
+            items?: string[];
+        }>;
+        foro_note?: string;
+        confidence_score?: number | null;
+        [key: string]: unknown;
+    };
+
+export interface NewsFilterResponseItem {
+    id?: string | number;
+    news_id?: string | number;
+    title?: string;
+    content?: unknown;
+    source?: string;
+    tweet_id?: string | number | null;
+    source_item_id?: string | null;
+    url?: string;
+    citation_id?: string | null;
+    citationId?: string | null;
+    citation?: string | null;
+    reference_id?: string | null;
+    created_at?: string;
+    metrics?: {
+        retweet_count?: number;
+        reply_count?: number;
+        like_count?: number;
+        quote_count?: number;
+        view_count?: number;
+    };
+    [key: string]: unknown;
+}
+
+export interface NewsFilterResponse {
+    status?: 'success' | 'error' | string;
+    prompt?: string;
+    total_news_input?: number;
+    filtered_news_count?: number;
+    filtered_news?: NewsFilterResponseItem[];
+    summary?: ForoFilterSummary | null;
+    message?: string;
 }

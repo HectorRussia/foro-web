@@ -33,6 +33,7 @@ const UserTarget = () => {
     const [isSearchingMore, setIsSearchingMore] = useState(false);
     const [rssActionSourceId, setRssActionSourceId] = useState<string | null>(null);
     const [rssPostListActionKey, setRssPostListActionKey] = useState<string | null>(null);
+    const [followingAccountKey, setFollowingAccountKey] = useState<string | null>(null);
 
     // Followed users state
     const [followedUsers, setFollowedUsers] = useState<FollowedUser[]>([]);
@@ -50,8 +51,33 @@ const UserTarget = () => {
         return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
     }
 
-    const normalizeXAccount = (account?: string | null) => (account || '').replace(/^@/, '').trim().toLowerCase();
+    const normalizeXAccount = (account?: string | null) => String(account || '')
+        .trim()
+        .replace(/^https?:\/\/(?:www\.)?(?:x|twitter)\.com\//i, '')
+        .split(/[/?#]/)[0]
+        .replace(/^@/, '')
+        .trim()
+        .toLowerCase();
     const normalizeRssUrl = (url?: string | null) => String(url || '').trim().toLowerCase().replace(/\/$/, '');
+
+    const readFollowedUsersResponse = (value: any): FollowedUser[] => {
+        if (Array.isArray(value)) return value;
+        if (Array.isArray(value?.data)) return value.data;
+        return [];
+    };
+
+    const getFollowErrorMessage = (error: any) => {
+        const detail = error?.response?.data?.detail;
+        const message = error?.response?.data?.message;
+
+        if (typeof detail?.data?.message === 'string') return detail.data.message;
+        if (typeof detail === 'string') return detail;
+        if (typeof message === 'string') return message;
+        return '';
+    };
+
+    const isAlreadyFollowedMessage = (message: string) =>
+        /already|ติดตาม.*แล้ว|อยู่ใน.*watchlist/i.test(message);
 
     const allRssSources = useMemo(() => Object.values(RSS_CATALOG).flat(), []);
     const rssSourcesByUrl = useMemo(
@@ -157,34 +183,62 @@ const UserTarget = () => {
     };
 
     const handleFollow = async (name: string, x_account: string, profile_image: string): Promise<FollowedUser | null> => {
+        const normalizedAccount = normalizeXAccount(x_account);
+        if (!normalizedAccount) {
+            toast.error('ไม่พบบัญชี X ที่ต้องการติดตาม');
+            return null;
+        }
+
+        const existing = findFollowedUserByAccount(normalizedAccount);
+        if (existing) {
+            toast.success(`${name} อยู่ใน Watchlist แล้ว`);
+            return existing;
+        }
+
+        setFollowingAccountKey(normalizedAccount);
+
         try {
             await api.post(`${BASE_URL}/follow/users/search`, {
                 query: activeTab === 'search' ? searchQuery : recommendQuery,
-                x_account: x_account,
+                x_account: normalizedAccount,
                 name: name,
                 profile_image_url_https: profile_image
             });
 
-            toast.success(`Followed ${name} successfully`);
+            toast.success(`เพิ่ม ${name} เข้า Watchlist แล้ว`);
             const refreshedUsers = await fetchFollowedUsers();
             setRefreshSidebar(prev => prev + 1);
-            return findFollowedUserByAccount(x_account, refreshedUsers);
+            return findFollowedUserByAccount(normalizedAccount, refreshedUsers);
 
         } catch (error: any) {
+            const refreshedUsers = await fetchFollowedUsers();
+            const followedAfterRefresh = findFollowedUserByAccount(normalizedAccount, refreshedUsers);
+
             if (error.response && error.response.status === 400) {
                 const detail = error.response.data.detail;
+                const message = getFollowErrorMessage(error);
                 if (detail?.data?.message) {
-                    toast.error(detail.data.message);
-                    const refreshedUsers = await fetchFollowedUsers();
-                    return findFollowedUserByAccount(x_account, refreshedUsers);
+                    if (followedAfterRefresh) {
+                        toast.success(`${name} อยู่ใน Watchlist แล้ว`);
+                        setRefreshSidebar(prev => prev + 1);
+                        return followedAfterRefresh;
+                    }
+
+                    if (isAlreadyFollowedMessage(message || detail.data.message)) {
+                        toast.error(`API แจ้งว่า @${normalizedAccount} มีอยู่แล้ว แต่ GET /follow ยังไม่คืนรายการนี้`);
+                    } else {
+                        toast.error(message || detail.data.message);
+                    }
                 } else {
-                    toast.error(`เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ`);
+                    toast.error(message || `เกิดข้อผิดพลาดที่ไม่ทราบสาเหตุ`);
                 }
             } else {
                 toast.error(`ไม่สามารถติดตาม ${name} ได้`);
                 console.error("Follow error:", error);
             }
             return null;
+        } finally {
+            setFollowingAccountKey(prev => prev === normalizedAccount ? null : prev);
         }
     };
 
@@ -217,11 +271,7 @@ const UserTarget = () => {
         setIsFetchingFollowed(true);
         try {
             const response = await api.get(`${BASE_URL}/follow`);
-            const nextUsers = Array.isArray(response.data)
-                ? response.data
-                : Array.isArray(response.data?.data)
-                    ? response.data.data
-                    : [];
+            const nextUsers = readFollowedUsersResponse(response.data);
 
             setFollowedUsers(nextUsers);
             return nextUsers;
@@ -588,7 +638,12 @@ const UserTarget = () => {
                                     transition={{ duration: 0.3 }}
                                     className="grid grid-cols-1 lg:grid-cols-2 gap-3 md:gap-4"
                                 >
-                                    {users.map((user, idx) => (
+                                    {users.map((user, idx) => {
+                                        const accountKey = normalizeXAccount(user.screen_name || user.username);
+                                        const followedUser = findFollowedUserByAccount(accountKey);
+                                        const isFollowing = followingAccountKey === accountKey;
+
+                                        return (
                                         <motion.div
                                             key={user.id}
                                             initial={{ opacity: 0, y: 20 }}
@@ -644,14 +699,23 @@ const UserTarget = () => {
                                             <div className="shrink-0 ml-4">
                                                 <button
                                                     onClick={() => handleFollow(user.name, user.screen_name, user.profile_image_url_https)}
-                                                    className="flex items-center justify-center gap-2 px-6 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-full font-black text-xs md:text-sm uppercase tracking-wide transition-all duration-300 active:scale-95 shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] whitespace-nowrap"
+                                                    disabled={Boolean(followedUser) || isFollowing}
+                                                    className={`flex items-center justify-center gap-2 px-6 py-2.5 rounded-full font-black text-xs md:text-sm uppercase tracking-wide transition-all duration-300 active:scale-95 whitespace-nowrap disabled:cursor-default ${followedUser
+                                                        ? 'bg-blue-500/10 text-blue-200 border border-blue-400/20 shadow-none'
+                                                        : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(37,99,235,0.3)] hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] disabled:bg-blue-600/50 disabled:text-white/70'
+                                                        }`}
                                                 >
-                                                    <FaUserPlus className="text-xs" />
-                                                    <span>+ เพิ่มเข้า Watchlist</span>
+                                                    {isFollowing ? (
+                                                        <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+                                                    ) : (
+                                                        <FaUserPlus className="text-xs" />
+                                                    )}
+                                                    <span>{followedUser ? 'อยู่ใน Watchlist แล้ว' : isFollowing ? 'กำลังเพิ่ม...' : '+ เพิ่มเข้า Watchlist'}</span>
                                                 </button>
                                             </div>
                                         </motion.div>
-                                    ))}
+                                        );
+                                    })}
                                 </motion.div>
                             ) : (
                                 /* AI Recommendation Results */
@@ -671,6 +735,7 @@ const UserTarget = () => {
                                         {recommendations.map((rec, idx) => {
                                             const recKey = normalizeXAccount(rec.x_account);
                                             const followedUser = findFollowedUserByAccount(rec.x_account);
+                                            const isFollowing = followingAccountKey === recKey;
                                             const isListMenuOpen = selectedRecommendationForList === recKey;
 
                                             return (
@@ -786,13 +851,16 @@ const UserTarget = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => handleFollow(rec.name, rec.x_account, getRecommendationAvatar(rec))}
-                                                        disabled={!!followedUser}
-                                                        className={`mt-8 flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-xs font-black transition-all active:scale-95 ${followedUser
+                                                        disabled={!!followedUser || isFollowing}
+                                                        className={`mt-8 flex w-full items-center justify-center gap-2 rounded-xl border py-3 text-xs font-black transition-all active:scale-95 disabled:cursor-default ${followedUser
                                                             ? 'cursor-default border-blue-400/20 bg-blue-500/10 text-blue-200'
-                                                            : 'border-white/8 bg-white/6 text-white hover:border-blue-400/40 hover:bg-blue-600'
+                                                            : 'border-white/8 bg-white/6 text-white hover:border-blue-400/40 hover:bg-blue-600 disabled:opacity-70'
                                                             }`}
                                                     >
-                                                        <span>{followedUser ? 'อยู่ใน Watchlist แล้ว' : '+ เพิ่มเข้า Watchlist'}</span>
+                                                        {isFollowing && (
+                                                            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white/25 border-t-white" />
+                                                        )}
+                                                        <span>{followedUser ? 'อยู่ใน Watchlist แล้ว' : isFollowing ? 'กำลังเพิ่ม...' : '+ เพิ่มเข้า Watchlist'}</span>
                                                     </button>
                                                 </motion.div>
                                             );
