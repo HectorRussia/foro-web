@@ -88,7 +88,7 @@ select {
   min-width: 320px;
   overflow: hidden;
   border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.055);
+  border: 0;
   background: var(--bg-900);
 }
 
@@ -651,6 +651,31 @@ select {
   background: rgba(134, 208, 255, 0.18);
 }
 
+.home-ai-filter-btn-signal.is-spinning {
+  animation: homeFilterSignalSpin 0.82s linear infinite;
+}
+
+.root-home-filter-btn.is-filtering,
+.root-home-filter-btn.has-active-result {
+  border-color: rgba(87, 166, 255, 0.35);
+  background: rgba(41, 151, 255, 0.08);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(146, 204, 255, 0.12), 0 0 18px rgba(41, 151, 255, 0.08);
+}
+
+.root-home-filter-btn.is-filtering {
+  cursor: wait;
+}
+
+.root-home-ai-filter-cluster.is-filtering {
+  background: linear-gradient(90deg, rgba(41, 151, 255, 0.05), rgba(124, 109, 255, 0.035));
+  box-shadow: 0 0 0 1px rgba(87, 166, 255, 0.08) inset;
+}
+
+@keyframes homeFilterSignalSpin {
+  to { transform: rotate(360deg); }
+}
+
 .root-home-sync-btn.is-streaming {
   border-color: rgba(41, 151, 255, 0.22);
   background: rgba(41, 151, 255, 0.1);
@@ -838,6 +863,35 @@ select {
   white-space: nowrap;
 }
 
+.ai-filtered-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  border-radius: 999px;
+  border: 1px solid rgba(41, 151, 255, 0.45);
+  background: rgba(41, 151, 255, 0.12);
+  color: #57adff;
+  padding: 0 12px;
+  box-shadow: 0 0 16px rgba(41, 151, 255, 0.14);
+  transition: border-color 180ms ease, background 180ms ease, color 180ms ease, transform 180ms ease;
+}
+
+.ai-filtered-badge span {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  line-height: 1;
+}
+
+.root-ai-filtered-badge:hover {
+  transform: translateY(-1px);
+  border-color: rgba(119, 189, 255, 0.65);
+  background: rgba(41, 151, 255, 0.17);
+  color: #d8efff;
+}
+
 .root-sort-pill {
   height: 34px;
   min-height: 34px;
@@ -853,6 +907,294 @@ select {
   width: 34px;
   height: 34px;
   flex: 0 0 34px;
+}
+
+.reference-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 24px;
+  min-height: 18px;
+  border-radius: 6px;
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: rgba(15, 23, 42, 0.74);
+  color: rgba(226, 232, 240, 0.88);
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+.reference-badge.feed-card-citation-badge {
+  min-width: 26px;
+  min-height: 19px;
+  padding: 0 6px;
+  border-color: rgba(59, 130, 246, 0.38);
+  background: rgba(37, 99, 235, 0.16);
+  color: #dbeafe;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.08), 0 8px 18px rgba(37, 99, 235, 0.08);
+  transform: translateY(-0.5px);
+}
+
+.foro-filter-summary-card {
+  grid-column: 1 / -1;
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.018));
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 32px;
+  margin-bottom: 16px;
+  isolation: isolate;
+}
+
+.foro-filter-summary-glow {
+  position: absolute;
+  top: -34px;
+  left: -26px;
+  width: 150px;
+  height: 150px;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(41, 151, 255, 0.18), transparent 68%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+.foro-filter-summary-header,
+.foro-filter-summary-brand,
+.foro-filter-summary-pills,
+.foro-filter-summary-citations {
+  display: flex;
+  align-items: center;
+}
+
+.foro-filter-summary-header {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.foro-filter-summary-brand {
+  gap: 10px;
+  min-width: 0;
+}
+
+.foro-filter-summary-brand > span:last-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.foro-filter-summary-icon {
+  width: 34px;
+  height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: var(--accent-gradient);
+  color: #fff;
+  box-shadow: 0 12px 28px rgba(41, 151, 255, 0.18);
+}
+
+.foro-filter-summary-kicker {
+  color: var(--accent-blue);
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  line-height: 1;
+}
+
+.foro-filter-summary-date,
+.foro-filter-summary-note {
+  color: rgba(203, 213, 225, 0.72);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.foro-filter-copy-btn {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+
+.foro-filter-summary-pills {
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.foro-filter-summary-pills span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  border: 1px solid rgba(41, 151, 255, 0.16);
+  background: rgba(41, 151, 255, 0.08);
+  color: rgba(222, 239, 255, 0.88);
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.foro-filter-summary-title {
+  max-width: 42ch;
+  color: #fff;
+  font-family: "Kanit", var(--font-ui);
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1.34;
+  letter-spacing: 0;
+  margin: 0 0 14px;
+}
+
+.foro-filter-summary-list {
+  display: grid;
+  gap: 10px;
+}
+
+.foro-filter-summary-item {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  padding-left: 16px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 15px;
+  font-weight: 560;
+  line-height: 1.65;
+}
+
+.foro-filter-summary-item::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--accent-blue);
+}
+
+.foro-filter-summary-item-text {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.foro-filter-summary-citations {
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 1px;
+}
+
+.foro-filter-summary-reference-rail {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.foro-filter-citation-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 24px;
+  border-radius: 8px;
+  border: 1px solid rgba(59, 130, 246, 0.34);
+  background: rgba(37, 99, 235, 0.16);
+  color: #dbeafe;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.06), 0 8px 18px rgba(37, 99, 235, 0.08);
+}
+
+.foro-filter-summary-note {
+  margin: 16px 0 0;
+}
+
+.foro-filter-summary-skeleton {
+  display: grid;
+  gap: 18px;
+}
+
+.foro-filter-summary-skeleton-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.foro-filter-summary-skeleton-heading,
+.foro-filter-summary-skeleton-list {
+  display: grid;
+  gap: 10px;
+  flex: 1 1 auto;
+}
+
+.foro-filter-summary-skeleton-icon,
+.foro-filter-summary-skeleton-line,
+.foro-filter-summary-skeleton-pill,
+.foro-filter-summary-skeleton-title {
+  position: relative;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.foro-filter-summary-skeleton-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  flex: 0 0 42px;
+}
+
+.foro-filter-summary-skeleton-line {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+}
+
+.foro-filter-summary-skeleton-pill-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.foro-filter-summary-skeleton-pill {
+  width: 120px;
+  height: 28px;
+  border-radius: 999px;
+}
+
+.foro-filter-summary-skeleton-title {
+  width: min(680px, 100%);
+  height: 34px;
+  border-radius: 18px;
+}
+
+.foro-filter-summary-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.18) 50%, transparent 100%);
+  animation: foroFilterSummarySweep 1.85s ease-in-out infinite;
+}
+
+@keyframes foroFilterSummarySweep {
+  100% { transform: translateX(100%); }
 }
 
 .home-splash {
@@ -960,6 +1302,24 @@ select {
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
+  }
+
+  .foro-filter-summary-card {
+    border-radius: 22px;
+    padding: 22px;
+  }
+
+  .foro-filter-summary-title {
+    font-size: 20px;
+  }
+
+  .foro-filter-summary-item {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .foro-filter-summary-reference-rail {
+    justify-content: flex-start;
   }
 
   .home-splash {
