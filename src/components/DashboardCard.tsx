@@ -47,6 +47,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     const sourceLabel = post.source || post.username || (isRss ? 'RSS' : 'news');
     const sourceHandle = isRss ? sourceLabel : `@${sourceLabel.replace(/\s+/g, '').replace(/^@/, '').toLowerCase()}`;
     const avatarFallback = (sourceLabel || post.title || 'N').charAt(0);
+    const citationLabel = post.citation_id?.replace(/[\[\]]/g, '').trim();
     const hasSocialMetrics = [post.view_count, post.like_count, post.retweet_count, post.reply_count]
         .some(value => Number(value) > 0);
 
@@ -178,9 +179,16 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                         </div>
 
                         <div className="min-w-0">
-                            <h3 className="truncate text-[13px] font-black leading-tight text-white">
-                                {rssSourceName}
-                            </h3>
+                            <div className="flex min-w-0 items-center gap-1.5">
+                                {citationLabel && (
+                                    <span className="reference-badge feed-card-citation-badge">
+                                        {citationLabel}
+                                    </span>
+                                )}
+                                <h3 className="truncate text-[13px] font-black leading-tight text-white">
+                                    {rssSourceName}
+                                </h3>
+                            </div>
                             <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-gray-500">
                                 {rssSubtitle}
                             </p>
@@ -309,9 +317,16 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                     </div>
                     {/* Info */}
                     <div className="flex flex-col min-w-0">
-                        <h3 className="font-bold text-white text-[15px] leading-tight truncate tracking-tight group-hover:text-blue-400 transition-colors capitalize">
-                            {post.title}
-                        </h3>
+                        <div className="flex min-w-0 items-center gap-1.5">
+                            {citationLabel && (
+                                <span className="reference-badge feed-card-citation-badge">
+                                    {citationLabel}
+                                </span>
+                            )}
+                            <h3 className="font-bold text-white text-[15px] leading-tight truncate tracking-tight group-hover:text-blue-400 transition-colors capitalize">
+                                {post.title}
+                            </h3>
+                        </div>
                         <span className="text-gray-500 font-medium text-[13px] tracking-tight truncate opacity-80 mt-1">
                             {sourceHandle}
                         </span>

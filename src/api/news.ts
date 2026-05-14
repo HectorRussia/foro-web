@@ -2,6 +2,8 @@ import api from './axiosInstance';
 import type {
     AdvancedSearchBulkPayload,
     AdvancedSearchBulkResponse,
+    NewsFilterPayload,
+    NewsFilterResponse,
     PaginatedNewsResponse,
     NewsAnalysisResponse
 } from '../interface/news';
@@ -68,6 +70,11 @@ export const searchAndAnalyzeBulk = async (
     signal?: AbortSignal
 ): Promise<AdvancedSearchBulkResponse> => {
     const response = await api.post<AdvancedSearchBulkResponse>('/advanced-search/search-and-analyze-bulk', payload, { signal });
+    return response.data;
+};
+
+export const filterNews = async (payload: NewsFilterPayload): Promise<NewsFilterResponse> => {
+    const response = await api.post<NewsFilterResponse>('/news/filter', payload);
     return response.data;
 };
 
