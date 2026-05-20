@@ -11,8 +11,8 @@ import {
     LuFileText,
     LuRefreshCw,
     LuSearch,
-    LuSparkles,
     LuX,
+    LuZap,
 } from "react-icons/lu";
 import { FiBarChart } from "react-icons/fi";
 import type { ContentResultItem, ContentSearchRequest, ContentSearchResponse, SearchMode } from "../../interface/searchContent";
@@ -447,14 +447,14 @@ export default function SummaryBullets() {
     return (
         <>
             <section className="px-3 pb-6 pt-7 text-center sm:pt-10">
-                <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl lg:text-6xl">
+                <h1 className="font-['Kanit',var(--font-ui)] text-[38px] font-extrabold leading-[1.12] tracking-normal text-white sm:text-[40px]">
                     ค้นหาคอนเทนต์
                 </h1>
                 <p className="mx-auto mt-2 max-w-2xl text-sm font-semibold text-slate-400 sm:text-base">
                     สำรวจเทรนด์และเจาะลึกข้อมูลจากทั่วโลก
                 </p>
 
-                <div className="mx-auto mt-6 w-full max-w-190 rounded-full border border-white/10 bg-[#1a1a1b] px-4 py-3.5 shadow-[0_20px_60px_rgba(0,0,0,0.34)] sm:px-5 sm:py-4">
+                <div className="mx-auto mt-6 w-full max-w-[720px] rounded-full border border-white/10 bg-[#1a1a1b] px-4 py-3.5 shadow-[0_20px_60px_rgba(0,0,0,0.34)] sm:px-5 sm:py-4">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-3">
                         <div className="flex min-w-0 flex-1 items-center gap-3 rounded-full px-2 sm:px-3">
                             <LuSearch className="h-5 w-5 shrink-0 text-slate-400" />
@@ -467,7 +467,7 @@ export default function SummaryBullets() {
                                     }
                                 }}
                                 className="min-w-0 w-full bg-transparent text-sm font-semibold text-white outline-none placeholder:text-slate-500 sm:text-[15px]"
-                                placeholder="ค้นหา..."
+                                placeholder="พิมพ์คีย์เวิร์ด..."
                             />
                         </div>
 
@@ -476,19 +476,20 @@ export default function SummaryBullets() {
                                 type="button"
                                 onClick={handleQuickSearch}
                                 className="grid h-9 w-9 place-items-center rounded-full text-slate-400 transition hover:bg-white/5 hover:text-white"
-                                title="Quick search"
+                                title="ค้นหาแบบรวดเร็ว"
                             >
-                                <LuSparkles className="h-4.5 w-4.5" />
+                                <LuZap className="h-4.5 w-4.5" />
                             </button>
-                            <button
-                                type="button"
-                                onClick={clearQuery}
-                                className="grid h-9 w-9 place-items-center rounded-full text-slate-400 transition hover:bg-white/5 hover:text-white"
-                                title="Clear search"
-                                disabled={!query}
-                            >
-                                <LuX className="h-4.5 w-4.5" />
-                            </button>
+                            {query ? (
+                                <button
+                                    type="button"
+                                    onClick={clearQuery}
+                                    className="grid h-9 w-9 place-items-center rounded-full text-slate-400 transition hover:bg-white/5 hover:text-white"
+                                    title="ล้างคำค้นหา"
+                                >
+                                    <LuX className="h-4.5 w-4.5" />
+                                </button>
+                            ) : null}
                             <button
                                 type="button"
                                 onClick={() => void runSearch("search")}
@@ -501,7 +502,7 @@ export default function SummaryBullets() {
                     </div>
                 </div>
 
-                <div className="mx-auto mt-4 flex w-full max-w-190 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="mx-auto mt-4 flex w-full max-w-[720px] flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                         {filters.map((item) => (
                             <button
@@ -524,24 +525,28 @@ export default function SummaryBullets() {
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-3 sm:justify-end">
-                        <button
-                            type="button"
-                            onClick={handleReset}
-                            className="inline-flex items-center gap-2 rounded-full border border-white/0 px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white"
-                        >
-                            <LuRefreshCw className="h-4 w-4" />
-                            ล้างผลลัพธ์
-                        </button>
+                        {searchResponse ? (
+                            <button
+                                type="button"
+                                onClick={handleReset}
+                                className="inline-flex items-center gap-2 rounded-full border border-white/0 px-3 py-2 text-sm font-medium text-slate-400 transition hover:bg-white/5 hover:text-white"
+                            >
+                                <LuRefreshCw className="h-4 w-4" />
+                                ล้างผลลัพธ์
+                            </button>
+                        ) : null}
 
-                        <button
-                            type="button"
-                            onClick={handleSaveSearch}
-                            disabled={isLoading || !query.trim()}
-                            className="inline-flex items-center gap-2 rounded-full border border-[#1f4b82] bg-[#0f1720] px-4 py-2 text-sm font-semibold text-white transition hover:border-[#2f74ca] hover:bg-[#111b28] disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                            <LuBookmark className="h-4 w-4" />
-                            บันทึกเป็น Preset
-                        </button>
+                        {query.trim() ? (
+                            <button
+                                type="button"
+                                onClick={handleSaveSearch}
+                                disabled={isLoading}
+                                className="inline-flex items-center gap-2 rounded-full border border-[#1f4b82] bg-[#0f1720] px-4 py-2 text-sm font-semibold text-white transition hover:border-[#2f74ca] hover:bg-[#111b28] disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                                <LuBookmark className="h-4 w-4" />
+                                บันทึกเป็น Preset
+                            </button>
+                        ) : null}
                     </div>
                 </div>
             </section>
