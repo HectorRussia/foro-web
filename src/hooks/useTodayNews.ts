@@ -70,11 +70,18 @@ export const useTodayNews = () => {
     const [homePresets, setHomePresets] = useState<Set<number>>(() => {
         try {
             const stored = localStorage.getItem('foro_home_presets');
-            return stored ? new Set(JSON.parse(stored)) : new Set();
+            if (!stored) return new Set();
+            const parsed = JSON.parse(stored);
+            const presetIds = Array.isArray(parsed)
+                ? parsed.map(id => Number(id)).filter(Number.isFinite)
+                : [];
+            return new Set(presetIds);
         } catch { return new Set(); }
     });
     const [isLoadingPresets, setIsLoadingPresets] = useState(false);
     const [isSavingPreset, setIsSavingPreset] = useState(false);
+    const hasLoadedForoPresetsRef = useRef(false);
+    const isLoadingPresetsRef = useRef(false);
 
     // Search Parameters
     const [newsResults, setNewsResults] = useState<NewsResult[]>([]);
@@ -160,6 +167,7 @@ export const useTodayNews = () => {
     useEffect(() => {
         init();
         fetchCats();
+        loadForoPresets();
         return () => {
             if (abortControllerRef.current) abortControllerRef.current.abort();
         };
@@ -336,14 +344,20 @@ export const useTodayNews = () => {
         setFeedNotice(null);
     };
 
-    const loadForoPresets = async () => {
+    const loadForoPresets = async (options: { force?: boolean } = {}) => {
+        if (isLoadingPresetsRef.current) return;
+        if (hasLoadedForoPresetsRef.current && !options.force) return;
+
+        isLoadingPresetsRef.current = true;
         setIsLoadingPresets(true);
         try {
             const presets = await getPresets('forofilter');
             setForoPresets(presets);
+            hasLoadedForoPresetsRef.current = true;
         } catch (error) {
             console.error('Failed to load presets:', error);
         } finally {
+            isLoadingPresetsRef.current = false;
             setIsLoadingPresets(false);
         }
     };
@@ -412,7 +426,7 @@ export const useTodayNews = () => {
 
     const openForoFilter = () => {
         setIsAIFilterOpen(true);
-        loadForoPresets();
+        loadForoPresets({ force: true });
     };
 
     const handleDeleteIndividual = async (id: number) => {
@@ -767,8 +781,11 @@ export const useTodayNews = () => {
     );
     const feedCount = isAIProcessing ? newsResults.length : displayNews.length;
     const canSearchMore = !isStreaming && !isAIProcessing && hasStarted && displayNews.length > 0 && !isAiFilterActive;
-    const selectedHomeQuickPresets = homePresets.size > 0
+    const selectedHomePresets = homePresets.size > 0
         ? foroPresets.filter(preset => homePresets.has(preset.id))
+        : [];
+    const selectedHomeQuickPresets = selectedHomePresets.length > 0
+        ? selectedHomePresets
         : foroPresets.slice(0, 3);
     const homeQuickPresets = selectedHomeQuickPresets
         .map(preset => ({
