@@ -39,7 +39,7 @@ VITE_API_URL=http://localhost:3000
 Run it from the repo root:
 
 ```sh
-pnpm --dir prototype install
+pnpm --dir prototype install --ignore-workspace
 pnpm prototype:dev
 ```
 
@@ -47,6 +47,12 @@ Or run it directly:
 
 ```sh
 cd prototype
-pnpm install
+pnpm install --ignore-workspace
 pnpm dev
 ```
+
+Why `--ignore-workspace`: this repository has a root `pnpm-workspace.yaml`, while
+`prototype/` keeps its own standalone `package.json` and lockfile. After a fresh
+clone, a plain `pnpm install` may only install the root app dependencies, which
+can make Vite report missing prototype packages such as `lucide-react`,
+`dompurify`, `idb`, `@ai-sdk/xai`, `ai`, or `marked`.
