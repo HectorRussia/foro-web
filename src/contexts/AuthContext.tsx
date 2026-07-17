@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 interface User {
@@ -6,13 +6,13 @@ interface User {
     name: string,
     id: string,
     role: string,
-    phone: string
+    phone: string | null
     permissions?: string[];
 }
 interface AuthContextType {
     accessToken: string | null;
     user: User | null;
-    login: (token: string, userData: any) => void;
+    login: (token: string, userData: User) => void;
     logout: () => void;
     isAuthenticated: boolean;
     isLoading: boolean;
@@ -42,12 +42,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsLoading(false);
     }, []);
 
-    const login = (token: string, userData: User) => {
+    const login = useCallback((token: string, userData: User) => {
         setAccessToken(token);
         setUser(userData);
         localStorage.setItem('accessToken', token);
         localStorage.setItem('userData', JSON.stringify(userData));
-    };
+    }, []);
 
     const logout = async () => {
         try {

@@ -29,8 +29,13 @@ Copy-Item .env.example .env
 ```
 
 ```env
-VITE_API_URL=http://localhost:3000
+VITE_API_URL=http://localhost:8080/api/v1
+VITE_GOOGLE_AUTH_ENABLED=false
 ```
+
+Keep `VITE_GOOGLE_AUTH_ENABLED=false` until the backend Google OAuth endpoints are ready.
+The cross-project contract and backend implementation checklist are documented in
+`docs/API_DOCUMENTATION_GOOGLE_AUTH.md`.
 
 ## Prototype
 

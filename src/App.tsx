@@ -17,6 +17,7 @@ import { Analytics } from "@vercel/analytics/react"
 import PostListPage from './pages/PostListPage';
 import Contents from './pages/Contents';
 import Bookmark from './pages/Bookmark';
+import AuthCallback from './pages/AuthCallback';
 
 
 function App() {
@@ -25,6 +26,7 @@ function App() {
       <Routes>
         {/* Public Routes - Accessible by everyone */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Guest-only Routes - Redirect to dashboard if already logged in */}
         <Route element={<PublicRoute />}>

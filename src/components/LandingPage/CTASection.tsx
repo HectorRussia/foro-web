@@ -2,10 +2,20 @@ import { motion } from 'framer-motion';
 import { HiArrowRight } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { getUnauthenticatedAuthUrl } from '../../config/auth';
 
 const CTASection = () => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
+
+    const handlePrimaryAction = () => {
+        if (isAuthenticated) {
+            navigate('/dashboard');
+            return;
+        }
+
+        window.location.assign(getUnauthenticatedAuthUrl());
+    };
 
     return (
         <section className="py-20 px-6 relative overflow-hidden">
@@ -37,7 +47,7 @@ const CTASection = () => {
                         className="mt-6"
                     >
                         <button
-                            onClick={() => navigate(isAuthenticated ? '/dashboard' : '/login')}
+                            onClick={handlePrimaryAction}
                             className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-8 rounded-xl text-lg shadow-xl shadow-blue-500/30 flex items-center gap-2 mx-auto transition-all group"
                         >
                             {isAuthenticated ? 'ไปที่แดชบอร์ด' : 'เริ่มต้นใช้งานฟรี'}

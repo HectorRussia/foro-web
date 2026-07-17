@@ -1,10 +1,11 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { FaArrowRight, FaHeart } from 'react-icons/fa6';
 import { HiCheckBadge } from 'react-icons/hi2';
 import { newsBatches } from '../../constants/LandingPage';
 import { useAuth } from '../../contexts/AuthContext';
+import { getUnauthenticatedAuthUrl } from '../../config/auth';
 
 interface HeroLandingProps {
     newsIndex: number;
@@ -25,16 +26,16 @@ const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
                 className="flex-1 text-center lg:text-left z-10"
             >
                 <motion.h1
-                    className="text-6xl lg:text-8xl font-black tracking-tighter leading-[0.95] mb-6"
+                    className="text-6xl lg:text-8xl font-black tracking-tighter leading-none mb-6"
                     initial={{ opacity: 0, scale: 0.9 }}
                     animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.2, duration: 0.5 }}
                 >
-                    FORO
-                    <span className="block mt-4 text-transparent bg-clip-text bg-linear-to-r from-blue-400 via-indigo-400 to-purple-400">
+                    <span className="block">FORO</span>
+                    <span className="block mt-4 leading-[1.15] text-transparent bg-clip-text bg-linear-to-r from-blue-400 via-indigo-400 to-purple-400">
                         AI สรุปข่าว
                     </span>
-                    <span className="block mt-2 text-4xl md:text-5xl lg:text-7xl tracking-tight text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-rose-400">
+                    <span className="block mt-2 text-4xl md:text-5xl lg:text-7xl leading-[1.15] tracking-tight text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-rose-400">
                         อ่านง่าย  ได้ประเด็น
                     </span>
                 </motion.h1>
@@ -53,10 +54,10 @@ const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
                         <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                     </button>
                 ) : (
-                    <Link to="/login" className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
+                    <a href={getUnauthenticatedAuthUrl()} className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
                         <span>เริ่มต้นใช้งานฟรี</span>
                         <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
-                    </Link>
+                    </a>
                 )}
             </motion.div>
 
