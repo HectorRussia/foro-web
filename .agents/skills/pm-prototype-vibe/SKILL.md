@@ -30,11 +30,11 @@ Help PMs use the FORO prototype as a fast product-vibe workspace. Keep the work 
 
 1. Clarify the PM goal in plain product terms when needed.
 2. Open or inspect only the prototype files relevant to the request.
-3. For running the app, use:
+3. For first-time setup or dependency changes, use:
 
 ```powershell
 cd prototype
-pnpm install
+pnpm install --ignore-workspace
 pnpm dev
 ```
 
@@ -71,4 +71,4 @@ pnpm build
 pnpm preview
 ```
 
-If a command fails because of dependency drift, run `pnpm install` in `prototype/` and retry.
+If a command fails because of dependency drift, run `pnpm install --ignore-workspace` in `prototype/` and retry.

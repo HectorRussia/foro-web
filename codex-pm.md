@@ -19,7 +19,7 @@
 ## Files To Read First
 
 1. `PM_README.md` สำหรับคู่มือ PM ว่ารัน prototype ยังไง
-2. `.codex/skills/pm-prototype-vibe/SKILL.md` สำหรับ workflow ของ agent
+2. `.agents/skills/pm-prototype-vibe/SKILL.md` สำหรับ workflow ของ agent
 3. `prototype/package.json` เพื่อดู command ที่ใช้ได้จริง
 4. ไฟล์ใน `prototype/src/`, `prototype/server/`, หรือ `prototype/public/` เฉพาะส่วนที่เกี่ยวกับคำขอ
 
@@ -29,7 +29,7 @@
 
 ```powershell
 cd prototype
-pnpm install
+pnpm install --ignore-workspace
 pnpm dev
 ```
 
@@ -63,7 +63,7 @@ http://127.0.0.1:5173/test/
 
 - ถ้าแก้ code ให้แก้เฉพาะ path ใต้ `prototype/`
 - ถ้าเพิ่ม mock ให้ทำให้เห็นชัดว่าเป็น prototype/demo data
-- ถ้าต้องแตะไฟล์นอก `prototype/` ให้ทำเฉพาะเอกสาร PM หรือ skill เช่น `PM_README.md`, `codex-pm.md`, `.codex/skills/pm-prototype-vibe/SKILL.md`
+- ถ้าต้องแตะไฟล์นอก `prototype/` ให้ทำเฉพาะเอกสาร PM หรือ skill เช่น `PM_README.md`, `codex-pm.md`, `.agents/skills/pm-prototype-vibe/SKILL.md`
 - ถ้า user ขอให้แก้นอก scope ให้ยืนยันขอบเขตก่อนลงมือ
 
 ## Verification

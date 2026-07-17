@@ -192,7 +192,7 @@ VITE_COWORK_AGENT=PM
 จากนั้นให้ Codex เริ่มจาก `codex.md` ซึ่งเป็น role router กลาง แล้ว Codex จะโหลด:
 
 - `codex-pm.md`
-- `.codex/skills/pm-prototype-vibe/SKILL.md`
+- `.agents/skills/pm-prototype-vibe/SKILL.md`
 - `prototype/package.json`
 
 ถ้าจะให้ Codex กลับไปทำงานฝั่ง dev ให้เปลี่ยนเป็น:
