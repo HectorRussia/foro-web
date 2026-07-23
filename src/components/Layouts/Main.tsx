@@ -1,9 +1,8 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { Fragment, useEffect, useState, useRef, useCallback } from 'react';
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useInView } from 'react-intersection-observer';
-import { LuLayoutDashboard } from 'react-icons/lu';
+import { LuLayoutDashboard, LuSearch, LuX } from 'react-icons/lu';
 import { FaTrash } from 'react-icons/fa';
-import { FaMagnifyingGlass } from 'react-icons/fa6';
 import { toast } from 'react-hot-toast';
 import DashboardCard from '../DashboardCard';
 import { createCategoryNews } from '../../api/categoryNews';
@@ -133,76 +132,71 @@ const Main = () => {
     };
 
     return (
-        <main ref={mainRef} className="flex-1 p-4 lg:p-8 overflow-y-auto no-scrollbar bg-transparent">
+        <main ref={mainRef} className="reader-library-view read-library-main">
             {/* Header */}
-            <header className="mb-10">
-                <h1 className="text-4xl md:text-5xl font-black text-white mb-3">
+            <header className="reader-header">
+                <h1 className="hero-search-title reader-page-title">
                     อ่านข่าว
                 </h1>
-                <p className="text-gray-500 text-sm md:text-base font-bold opacity-80">
+                <p className="hero-search-subtitle reader-page-subtitle">
                     บทความและข่าวสารที่คุณบันทึกไว้า่านแบบ Deep Read
                 </p>
             </header>
 
             {/* Filter & Search Section */}
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+            <div className="reader-toolbar">
                 {/* Search Bar */}
-                <div className="relative w-full max-w-xl group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                        <FaMagnifyingGlass className="text-gray-500 text-sm group-focus-within:text-blue-500 transition-colors" />
+                <div className="reader-search-shell">
+                    <div className="reader-search-input-wrap">
+                        <LuSearch className="reader-search-icon" size={18} />
+                        <input
+                            type="text"
+                            value={searchInput}
+                            onChange={(e) => setSearchInput(e.target.value)}
+                            placeholder="ค้นหาจากชื่อบัญชี เนื้อหา หรือคำสำคัญ..."
+                            className="reader-search-input"
+                        />
+                        {searchInput && (
+                            <button
+                                type="button"
+                                onClick={() => setSearchInput('')}
+                                className="reader-search-clear"
+                                aria-label="ล้างคำค้นหา"
+                            >
+                                <LuX size={14} />
+                            </button>
+                        )}
                     </div>
-                    <input
-                        type="text"
-                        value={searchInput}
-                        onChange={(e) => setSearchInput(e.target.value)}
-                        placeholder="ค้นหาจากชื่อบัญชี เนื้อหา หรือคำสำคัญ..."
-                        className="w-full bg-[#111112] border border-white/5 rounded-2xl py-3.5 pl-11 pr-10 text-sm font-bold text-gray-200 placeholder-gray-600 focus:outline-none focus:border-blue-500/30 focus:ring-4 focus:ring-blue-500/5 transition-all"
-                    />
-                    {searchInput && (
-                        <button
-                            onClick={() => setSearchInput('')}
-                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-500 hover:text-gray-300 transition-colors"
-                        >
-                            <span className="text-lg leading-none">&times;</span>
-                        </button>
-                    )}
                 </div>
 
                 {/* Segmented Filters & Layout Wrapper */}
-                <div className="flex items-center gap-4 self-end md:self-auto">
-                    <div className="hidden sm:block px-4 py-2 text-[11px] font-black text-gray-600 uppercase tracking-widest">
+                <div className="reader-toolbar-actions">
+                    <div className="reader-toolbar-count">
                         {data?.pages[0]?.total || 0} รายการ
                     </div>
 
-                    <div className="flex p-1 bg-[#111112] border border-white/5 rounded-xl shadow-xl">
+                    <div className="reader-toolbar-actions-group">
                         <button
                             onClick={() => toggleSort('views')}
-                            className={`px-5 py-1.5 rounded-lg text-[11px] font-black transition-all uppercase tracking-wider ${
-                                activeSort === 'views'
-                                    ? 'bg-white/5 text-white shadow-lg'
-                                    : 'text-gray-500 hover:text-gray-300'
-                            }`}
+                            className={`btn-pill reader-sort-pill ${activeSort === 'views' ? 'active' : ''}`}
                             title={`ยอดวิว ≥ ${VIEW_THRESHOLD.toLocaleString()}`}
                         >
                             ยอดวิว
                         </button>
                         <button
                             onClick={() => toggleSort('engagement')}
-                            className={`px-5 py-1.5 rounded-lg text-[11px] font-black transition-all uppercase tracking-wider ${
-                                activeSort === 'engagement'
-                                    ? 'bg-white/5 text-white shadow-lg'
-                                    : 'text-gray-500 hover:text-gray-300'
-                            }`}
+                            className={`btn-pill reader-sort-pill ${activeSort === 'engagement' ? 'active' : ''}`}
                             title={`Engagement ≥ ${ENGAGEMENT_THRESHOLD.toLocaleString()}`}
                         >
                             เอ็นเกจเมนต์
                         </button>
                     </div>
 
-                    <div className="relative layout-dropdown-container">
+                    <div className="relative layout-dropdown-container reader-layout-dropdown">
                         <button
                             onClick={() => setIsLayoutDropdownOpen(!isLayoutDropdownOpen)}
-                            className="flex items-center gap-2 p-2.5 rounded-xl bg-[#111112] border border-white/5 text-gray-400 hover:text-white transition-all shadow-xl"
+                            className="reader-layout-button"
+                            aria-label="เปลี่ยนรูปแบบการแสดงผล"
                         >
                             {layoutMode === 'grid' ? <LuLayoutDashboard className="rotate-90" /> : <LuLayoutDashboard className="scale-y-75" />}
                         </button>
@@ -230,12 +224,7 @@ const Main = () => {
             </div>
 
             {/* Cards Grid */}
-            <div className={`
-                ${layoutMode === 'grid'
-                    ? 'grid grid-cols-1 xl:grid-cols-2 gap-6'
-                    : 'flex flex-col space-y-3'
-                }
-            `}>
+            <div className={`reader-feed-grid ${layoutMode === 'grid' ? 'is-grid' : 'is-list'}`}>
                 {status === 'pending' ? (
                     <div className="col-span-full flex flex-col items-center justify-center py-32 gap-4">
                         <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
@@ -248,7 +237,7 @@ const Main = () => {
                         {(() => {
                             const seenTweetIds = new Set<string>();
                             return data?.pages.map((group, i) => (
-                                <div key={i} className="contents">
+                                <Fragment key={i}>
                                     {group.items.map(post => {
                                         if (post.tweet_id) {
                                             if (seenTweetIds.has(post.tweet_id)) return null;
@@ -265,7 +254,7 @@ const Main = () => {
                                             />
                                         );
                                     })}
-                                </div>
+                                </Fragment>
                             ));
                         })()}
                     </>

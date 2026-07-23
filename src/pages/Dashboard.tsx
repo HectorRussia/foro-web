@@ -6,10 +6,10 @@ const Dashboard = () => {
 
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-read-page">
             <Sidebar />
             <div className="foro-center-stage">
-                <section className="foro-workspace-panel [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                <section className="foro-workspace-panel foro-read-workspace">
                     <Main />
                 </section>
                 <aside className="foro-right-rail">
