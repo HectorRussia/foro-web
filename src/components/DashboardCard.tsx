@@ -10,7 +10,8 @@ import {
     HiOutlineArrowTopRightOnSquare,
     HiOutlineBookmark,
     HiOutlinePencilSquare,
-    HiOutlineDocumentText
+    HiOutlineDocumentText,
+    HiPlay
 } from "react-icons/hi2";
 import { toast } from 'react-hot-toast';
 import type { NewsItem } from '../interface/news';
@@ -47,7 +48,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     const sourceLabel = post.source || post.username || (isRss ? 'RSS' : 'news');
     const sourceHandle = isRss ? sourceLabel : `@${sourceLabel.replace(/\s+/g, '').replace(/^@/, '').toLowerCase()}`;
     const avatarFallback = (sourceLabel || post.title || 'N').charAt(0);
-    const citationLabel = post.citation_id?.replace(/[\[\]]/g, '').trim();
+    const citationLabel = post.citation_id?.replaceAll('[', '').replaceAll(']', '').trim();
     const hasSocialMetrics = [post.view_count, post.like_count, post.retweet_count, post.reply_count]
         .some(value => Number(value) > 0);
 
@@ -150,20 +151,11 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     if (isRss) {
         return (
             <div
-                className={`feed-card group relative flex min-h-[168px] flex-col overflow-hidden h-full font-card ${showMenu ? 'z-50' : 'z-auto'}`}
-                style={{
-                    padding: '20px 24px 16px',
-                    borderRadius: '28px',
-                }}
+                className={`feed-card feed-card-rss group relative flex h-full min-h-[168px] flex-col overflow-hidden rounded-[28px] border border-white/8 px-6 pt-[18px] pb-[14px] font-card ${showMenu ? 'z-50' : 'z-auto'}`}
             >
-                <div
-                    className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                    style={{ background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.1), transparent 70%)' }}
-                />
-
-                <div className="relative z-10 mb-5 flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                        <div className="flex h-10.5 w-10.5 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/8 bg-[#1a1a1c] shadow-[0_10px_24px_rgba(0,0,0,0.18)]">
+                <div className="feed-card-header relative z-10 mb-[14px] flex min-w-0 items-center justify-between gap-4">
+                    <div className="feed-card-author flex min-w-0 items-center gap-2.5">
+                        <div className="feed-card-author-avatar flex size-[42px] shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/8 bg-[#1a1a1c]">
                             {rssAvatarUrl && !rssAvatarFailed ? (
                                 <img
                                     src={rssAvatarUrl}
@@ -172,7 +164,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                                     onError={() => setRssAvatarFailed(true)}
                                 />
                             ) : (
-                                <div className="flex h-full w-full items-center justify-center bg-blue-600/20 text-sm font-black uppercase text-blue-300">
+                                <div className="flex h-full w-full items-center justify-center bg-blue-600/20 text-xs font-black uppercase text-blue-300">
                                     {(rssSourceName || rssTitle).charAt(0)}
                                 </div>
                             )}
@@ -185,21 +177,21 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                                         {citationLabel}
                                     </span>
                                 )}
-                                <h3 className="truncate text-[13px] font-black leading-tight text-white">
+                                <h3 className="feed-card-author-name truncate text-[13px] leading-[1.2] font-extrabold text-white">
                                     {rssSourceName}
                                 </h3>
                             </div>
-                            <p className="mt-0.5 truncate text-[11px] font-semibold leading-tight text-gray-500">
+                            <p className="feed-card-author-handle mt-px truncate text-[11px] leading-[1.3] text-slate-400">
                                 {rssSubtitle}
                             </p>
                         </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-1.5">
-                        <span className="flex h-6 items-center rounded-full border border-orange-400/28 bg-orange-400/14 px-2.5 text-[10px] font-black text-orange-300">
+                    <div className="feed-card-meta flex shrink-0 items-center gap-1.5">
+                        <span className="feed-card-source-badge feed-card-source-badge-rss inline-flex h-[26px] items-center justify-center rounded-full px-2.5 text-[10px] leading-none font-black">
                             RSS
                         </span>
-                        <span className="flex h-6 items-center rounded-full border border-blue-400/24 bg-blue-500/14 px-2.5 text-[10px] font-black text-white">
+                        <span className="feed-card-time-badge inline-flex h-[26px] items-center justify-center rounded-full px-2.5 text-[10px] leading-none font-black">
                             {dayjs(displayDate).isSame(dayjs(), 'day')
                                 ? dayjs(displayDate).fromNow(true)
                                     .replace('วินาที', 's').replace('นาที', 'm').replace('ชั่วโมง', 'h').replace('วัน', 'd').replace('เดือน', 'mo').replace('ปี', 'y').replace(/\s+/g, '')
@@ -208,7 +200,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                         <button
                             onClick={handleToggleBookmark}
                             disabled={isBookmarkLoading}
-                            className={`flex h-8 w-8 items-center justify-center rounded-lg transition-all hover:bg-white/5 ${
+                            className={`feed-card-icon-action ${
                                 isBookmarked ? 'text-yellow-400' : 'text-gray-500 hover:text-white'
                             } ${isBookmarkLoading ? 'cursor-not-allowed opacity-50' : ''}`}
                             title={isBookmarked ? 'ลบ Bookmark' : 'Bookmark'}
@@ -220,7 +212,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                             href={post.url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition-all hover:bg-white/5 hover:text-blue-400"
+                            className="feed-card-icon-action text-gray-500 hover:text-blue-400"
                             title="เปิดต้นทาง"
                         >
                             <HiOutlineArrowTopRightOnSquare className="text-lg" />
@@ -228,12 +220,12 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                     </div>
                 </div>
 
-                <div className="relative z-10 mb-5 flex grow gap-4">
+                <div className={`feed-card-content relative z-10 mb-4 flex min-w-0 grow items-start gap-3 ${hasMedia ? 'has-media' : 'no-media'}`}>
                     {hasMedia && (
                         <button
                             type="button"
                             onClick={() => setLightboxIndex(0)}
-                            className="group/media relative h-24 w-28 shrink-0 overflow-hidden rounded-[18px] border border-white/6 bg-white/5 text-left shadow-[0_12px_26px_rgba(0,0,0,0.18)]"
+                            className="feed-card-media group/media relative size-28 shrink-0 overflow-hidden rounded-2xl border border-white/6 bg-white/5 text-left"
                         >
                             <img
                                 src={mediaUrls[0]}
@@ -245,11 +237,11 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                     )}
 
                     <div className="min-w-0 grow">
-                        <p className="line-clamp-2 text-[15px] font-bold leading-relaxed tracking-tight text-gray-100">
+                        <p className="feed-card-body-copy line-clamp-3 overflow-hidden text-[15px] leading-[1.45] text-gray-100">
                             {rssTitle}
                         </p>
                         {contentText && contentText !== rssTitle ? (
-                            <p className="mt-2 line-clamp-2 text-[13px] font-medium leading-relaxed text-slate-400">
+                            <p className="feed-card-rss-summary line-clamp-2 text-slate-400">
                                 {contentText}
                             </p>
                         ) : null}
@@ -268,18 +260,18 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                     />
                 )}
 
-                <div className="relative z-10 mt-auto flex items-center justify-between gap-3 border-t border-white/5 pt-3.5">
+                <div className="feed-card-footer relative z-10 mt-auto flex min-w-0 items-center gap-2.5 border-t border-white/4 pt-2">
                     <a
                         href={post.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex h-8 items-center gap-2 rounded-full border border-blue-400/18 bg-blue-500/12 px-3.5 text-[10px] font-black text-blue-200 transition-all hover:border-blue-300/30 hover:bg-blue-500/18 hover:text-white"
+                        className="feed-card-inline-action feed-card-read-action"
                     >
                         <HiOutlineDocumentText className="text-sm" />
                         <span>อ่านเนื้อหา</span>
                     </a>
 
-                    <button className="inline-flex h-8 items-center gap-2 rounded-xl border border-white/7 bg-[#2a2a2c] px-4 text-[10px] font-black text-gray-300 shadow-lg transition-all hover:bg-white/10 hover:text-white">
+                    <button className="feed-card-inline-action ml-auto">
                         <HiOutlinePencilSquare className="text-sm" />
                         <span>สร้างคอนเทนต์</span>
                     </button>
@@ -289,23 +281,14 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
     }
 
     return (
-        <div className={`feed-card group relative flex flex-col overflow-hidden h-full font-card
+        <div className={`feed-card group relative flex h-full min-h-[168px] flex-col overflow-hidden rounded-[28px] border border-white/8 px-6 pt-[18px] pb-[14px] font-card
             ${showMenu ? 'z-50' : 'z-auto'}
-        `}
-            style={{
-                padding: '20px 24px 16px',
-            }}>
-            {/* Hover Glow Effect */}
-            <div className="absolute top-0 right-0 w-32 h-32 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none"
-                style={{ background: 'radial-gradient(circle at top right, rgba(0, 112, 243, 0.1), transparent 70%)' }}
-            />
+        `}>
 
-            {/* Header Area */}
-            <div className="flex items-start justify-between mb-4.5 relative z-10">
-                <div className="flex items-center gap-3.5 min-w-0">
-                    {/* Avatar */}
+            <div className="feed-card-header relative z-10 mb-[14px] flex min-w-0 items-center justify-between gap-4">
+                <div className="feed-card-author flex min-w-0 items-center gap-2.5">
                     <div className="shrink-0">
-                        <div className="w-12 h-12 rounded-full flex items-center justify-center bg-[#1a1a1c] border border-white/10 overflow-hidden shadow-[0_10px_24px_rgba(0,0,0,0.15)]">
+                        <div className="feed-card-author-avatar flex size-[42px] items-center justify-center overflow-hidden rounded-full border-2 border-white/8 bg-[#1a1a1c]">
                             {post.tweet_profile_pic ? (
                                 <img src={post.tweet_profile_pic} alt="owner" className="w-full h-full object-cover" />
                             ) : (
@@ -315,7 +298,6 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                             )}
                         </div>
                     </div>
-                    {/* Info */}
                     <div className="flex flex-col min-w-0">
                         <div className="flex min-w-0 items-center gap-1.5">
                             {citationLabel && (
@@ -323,19 +305,18 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                                     {citationLabel}
                                 </span>
                             )}
-                            <h3 className="font-bold text-white text-[15px] leading-tight truncate tracking-tight group-hover:text-blue-400 transition-colors capitalize">
+                            <h3 className="feed-card-author-name truncate text-[13px] leading-[1.2] font-extrabold text-white capitalize transition-colors group-hover:text-blue-400">
                                 {post.title}
                             </h3>
                         </div>
-                        <span className="text-gray-500 font-medium text-[13px] tracking-tight truncate opacity-80 mt-1">
+                        <span className="feed-card-author-handle mt-px truncate text-[11px] leading-[1.3] text-slate-400">
                             {sourceHandle}
                         </span>
                     </div>
                 </div>
 
-                {/* Right Header Actions */}
-                <div className="flex items-center gap-1 shrink-0">
-                        <div className="px-3 py-1 bg-[#0f1419]/80 rounded-full text-white text-[11px] font-bold tracking-tight mr-2 flex items-center justify-center border border-white/5">
+                <div className="feed-card-meta flex shrink-0 items-center gap-1.5">
+                    <div className="feed-card-time-badge inline-flex h-[26px] items-center justify-center rounded-full px-2.5 text-[10px] leading-none font-black">
                         {dayjs(displayDate).isSame(dayjs(), 'day')
                             ? dayjs(displayDate).fromNow(true)
                                 .replace('วินาที', 's').replace('นาที', 'm').replace('ชั่วโมง', 'h').replace('วัน', 'd').replace('เดือน', 'mo').replace('ปี', 'y').replace(/\s+/g, '')
@@ -345,7 +326,7 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                     <button
                         onClick={handleToggleBookmark}
                         disabled={isBookmarkLoading}
-                        className={`w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-all ${
+                        className={`feed-card-icon-action ${
                             isBookmarked ? 'text-yellow-400' : 'text-gray-500 hover:text-white'
                         } ${isBookmarkLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                         title={isBookmarked ? 'ลบ Bookmark' : 'Bookmark'}
@@ -353,35 +334,22 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                         <HiOutlineBookmark className={`text-lg ${isBookmarked ? 'fill-yellow-400' : ''}`} />
                     </button>
 
-                    <a href={post.url} target="_blank" rel="noopener noreferrer" className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 text-gray-500 hover:text-blue-400 transition-all">
+                    <a href={post.url} target="_blank" rel="noopener noreferrer" className="feed-card-icon-action text-gray-500 hover:text-blue-400">
                         <HiOutlineArrowTopRightOnSquare className="text-lg" />
                     </a>
                 </div>
             </div>
 
-            {/* Reply Badge Component */}
-            {!isRss && contentText.toLowerCase().includes('http') && (
-                <div className="mb-5 flex relative z-10">
-                    <div className="bg-blue-500/10 border border-blue-400/10 px-3.5 py-1.5 rounded-full flex items-center gap-2 text-[10px] font-bold text-blue-400 uppercase tracking-widest cursor-default hover:bg-blue-500/20 transition-colors">
-                        <HiOutlineChatBubbleLeft className="text-xs" />
-                        <span>ตอบกลับ {sourceHandle}</span>
-                    </div>
-                </div>
-            )}
-
-            {/* Content Body + Inline Media Thumbnail */}
-            <div className={`flex flex-row-reverse gap-3 relative z-10 ${isCompact ? 'mb-4' : 'mb-5'} grow`}>
-                <div className={`text-white leading-relaxed tracking-tight wrap-break-word
-                    ${isCompact ? 'text-[13px] line-clamp-3' : 'text-[15px]'}
-                    grow min-w-0
-                `} style={{ fontFamily: 'var(--font-card)', fontWeight: 500 }}>
+            <div className={`feed-card-content relative z-10 mb-4 flex min-w-0 grow flex-row-reverse items-start gap-3 ${hasMedia ? 'has-media' : 'no-media'}`}>
+                <div className={`feed-card-body-copy wrap-break-word min-w-0 grow overflow-hidden leading-[1.45] text-white
+                    ${isCompact ? 'line-clamp-3 text-[13px]' : 'text-[15px]'}
+                `}>
                     {contentText}
                 </div>
 
-                {/* Inline thumbnail */}
                 {hasMedia && (
                     <div
-                        className="shrink-0 w-20 h-20 rounded-xl overflow-hidden cursor-pointer relative group/thumb"
+                        className="feed-card-media group/thumb relative size-28 shrink-0 cursor-pointer overflow-hidden rounded-2xl"
                         onClick={() => setLightboxIndex(0)}
                     >
                         <img
@@ -390,17 +358,13 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                             className="w-full h-full object-cover transition-transform duration-300 group-hover/thumb:scale-105"
                         />
                         <div className="absolute inset-0 bg-black/0 group-hover/thumb:bg-black/20 transition-colors duration-200" />
-                        {/* Video play badge */}
                         {(mediaType === 'video' || mediaType === 'animated_gif') && (
                             <div className="absolute inset-0 flex items-center justify-center">
                                 <div className="w-7 h-7 flex items-center justify-center rounded-full bg-black/60 border border-white/20">
-                                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 ml-0.5 text-white">
-                                        <path d="M8 5v14l11-7z" />
-                                    </svg>
+                                    <HiPlay className="w-3.5 h-3.5 ml-0.5 text-white" />
                                 </div>
                             </div>
                         )}
-                        {/* Count badge */}
                         {mediaUrls.length > 1 && (
                             <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-black/65 text-white text-[9px] font-black leading-none">
                                 1/{mediaUrls.length}
@@ -410,7 +374,6 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                 )}
             </div>
 
-            {/* Media Lightbox */}
             {lightboxIndex !== null && hasMedia && (
                 <MediaLightbox
                     urls={mediaUrls}
@@ -423,35 +386,34 @@ const DashboardCard = ({ post, variant = 'list'}: DashboardCardProps) => {
                 />
             )}
 
-            {/* Action Footer */}
-            <div className="flex items-center justify-between mt-auto pt-4.5 border-t border-white/5 relative z-10">
+            <div className="feed-card-footer relative z-10 mt-auto flex min-w-0 items-center gap-2.5 border-t border-white/4 pt-2">
                 {isRss && !hasSocialMetrics ? (
                     <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-widest text-gray-500">
                         <span className="h-1.5 w-1.5 rounded-full bg-blue-500/70" />
                         <span>RSS Article</span>
                     </div>
                 ) : (
-                    <div className="flex items-center gap-4 text-[11px] font-bold text-gray-500">
-                        <div className="flex items-center gap-1.5 hover:text-blue-400 transition-colors cursor-default">
+                    <div className="feed-card-stats flex items-center text-gray-500">
+                        <div className="feed-card-stat hover:text-blue-400 transition-colors cursor-default">
                             <HiOutlineChartBar className="text-sm opacity-60" />
                             <span>{formatNumber(post.view_count)}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 hover:text-rose-500 transition-colors cursor-default">
+                        <div className="feed-card-stat hover:text-rose-500 transition-colors cursor-default">
                             <HiOutlineHeart className="text-sm opacity-60" />
                             <span>{formatNumber(post.like_count)}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 hover:text-emerald-500 transition-colors cursor-default">
+                        <div className="feed-card-stat hover:text-emerald-500 transition-colors cursor-default">
                             <HiOutlineArrowPathRoundedSquare className="text-sm opacity-60" />
                             <span>{formatNumber(post.retweet_count)}</span>
                         </div>
-                        <div className="flex items-center gap-1.5 hover:text-cyan-500 transition-colors cursor-default">
+                        <div className="feed-card-stat hover:text-cyan-500 transition-colors cursor-default">
                             <HiOutlineChatBubbleLeft className="text-sm opacity-60" />
                             <span>{formatNumber(post.reply_count)}</span>
                         </div>
                     </div>
                 )}
 
-                <button className="flex items-center gap-2 px-4 py-2 bg-[#2a2a2c] border border-white/5 rounded-xl text-[10px] font-black text-gray-300 hover:text-white hover:bg-white/10 transition-all uppercase tracking-widest group/action shadow-lg">
+                <button className="feed-card-inline-action ml-auto group/action">
                     <HiOutlinePencilSquare className="text-sm group-hover/action:scale-110 transition-transform" />
                     <span>สร้างคอนเทนต์</span>
                 </button>

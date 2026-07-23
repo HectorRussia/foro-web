@@ -55,18 +55,16 @@ export const TodayNewsHeader = ({
     setSelectedPresetId: Dispatch<SetStateAction<number | null>>;
 }) => (
     <>
-                    {/* Header Section */}
-                    <header className="root-home-header relative shrink-0 mb-5 px-6 pt-5 sm:px-8 sm:pt-6 lg:px-11">
-                        <div className="root-home-title-stack flex flex-col mb-2">
-                            <h1 className="root-home-title text-[40px] sm:text-[42px] font-black text-white tracking-tight leading-[1.05] mb-1">
+                    <header className="root-home-header">
+                        <div className="root-home-title-stack">
+                            <h1 className="root-home-title">
                                 หน้าหลัก
                             </h1>
-                            <span className="root-home-subtitle text-gray-500 text-[10px] sm:text-[11px] font-black tracking-widest uppercase mb-1 opacity-70">
+                            <span className="root-home-subtitle">
                                 WATCHLIST FEED
                             </span>
                         </div>
 
-                        {/* Search & Actions Bar */}
                         <div className="relative z-10">
                             <div className="home-control-panel root-home-control-panel">
 
@@ -113,7 +111,6 @@ export const TodayNewsHeader = ({
                                             );
                                         })}
                                     </div>
-                                    {/* FORO Filter Button */}
                                     <div className="relative" ref={aiFilterRef}>
                                         <button
                                             onClick={openForoFilter}
@@ -125,7 +122,6 @@ export const TodayNewsHeader = ({
                                         </button>
                                     </div>
 
-                                    {/* Sync Button */}
                                     {!isStreaming ? (
                                         <button
                                             onClick={() => startBulkAnalysis()}
@@ -146,14 +142,6 @@ export const TodayNewsHeader = ({
                                     )}
                                 </div>
                             </div>
-
-                            {/* Status Indicator (Optional) - Hidden for now to match clean bar design */}
-                            {/* <div className="flex items-center justify-start gap-2 pl-2 mt-3">
-                                <div className={`w-1.5 h-1.5 rounded-full ${statusMessage.includes('วิเคราะห์') || statusMessage.includes('ประมวลผล') ? 'bg-emerald-500 animate-pulse' : 'bg-blue-500 animate-pulse'}`} />
-                                <span className={`text-[10px] font-black uppercase tracking-tighter ${statusMessage.includes('วิเคราะห์') || statusMessage.includes('ประมวลผล') ? 'text-emerald-400/80' : 'text-blue-400/80'}`}>
-                                    {statusMessage}
-                                </span>
-                            </div> */}
 
                         </div>
                     </header>
