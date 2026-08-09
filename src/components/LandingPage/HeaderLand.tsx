@@ -1,9 +1,12 @@
 import { Link } from 'react-router-dom';
 import { FaSignInAlt, FaArrowRight } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUnauthenticatedAuthUrl } from '../../config/auth';
 
-const HeaderLand = () => {
+interface HeaderLandProps {
+    onOpenLogin: () => void;
+}
+
+const HeaderLand = ({ onOpenLogin }: HeaderLandProps) => {
     const { isAuthenticated } = useAuth();
 
     return (
@@ -19,10 +22,10 @@ const HeaderLand = () => {
                         <span>ไปที่แดชบอร์ด</span>
                     </Link>
                 ) : (
-                    <a href={getUnauthenticatedAuthUrl()} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 active:scale-95">
+                    <button type="button" onClick={onOpenLogin} className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 active:scale-95">
                         <FaSignInAlt className="text-xs" />
                         <span>เข้าสู่ระบบ</span>
-                    </a>
+                    </button>
                 )}
             </nav>
         </>

@@ -2,9 +2,12 @@ import { motion } from 'framer-motion';
 import { HiArrowRight } from 'react-icons/hi2';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUnauthenticatedAuthUrl } from '../../config/auth';
 
-const CTASection = () => {
+interface CTASectionProps {
+    onOpenLogin: () => void;
+}
+
+const CTASection = ({ onOpenLogin }: CTASectionProps) => {
     const navigate = useNavigate();
     const { isAuthenticated } = useAuth();
 
@@ -14,7 +17,7 @@ const CTASection = () => {
             return;
         }
 
-        window.location.assign(getUnauthenticatedAuthUrl());
+        onOpenLogin();
     };
 
     return (

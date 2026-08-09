@@ -5,13 +5,13 @@ import { FaArrowRight, FaHeart } from 'react-icons/fa6';
 import { HiCheckBadge } from 'react-icons/hi2';
 import { newsBatches } from '../../constants/LandingPage';
 import { useAuth } from '../../contexts/AuthContext';
-import { getUnauthenticatedAuthUrl } from '../../config/auth';
 
 interface HeroLandingProps {
     newsIndex: number;
+    onOpenLogin: () => void;
 }
 
-const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
+const HeroLanding = ({ newsIndex, onOpenLogin }: HeroLandingProps) => {
     const { isAuthenticated } = useAuth();
     const navigate = useNavigate();
 
@@ -54,10 +54,10 @@ const HeroLanding = ({ newsIndex }: HeroLandingProps) => {
                         <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                     </button>
                 ) : (
-                    <a href={getUnauthenticatedAuthUrl()} className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
+                    <button type="button" onClick={onOpenLogin} className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
                         <span>เริ่มต้นใช้งานฟรี</span>
                         <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
-                    </a>
+                    </button>
                 )}
             </motion.div>
 
