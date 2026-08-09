@@ -7,6 +7,26 @@ export type FeedNotice = {
     message: string;
 };
 
+export type BackgroundNewsJobStatus = 'idle' | 'running' | 'success' | 'error';
+
+export type BackgroundNewsJobMode = 'refresh' | 'loadMore';
+
+export type BackgroundNewsJobScope = {
+    postListId: number | null;
+    postListName: string;
+};
+
+export type BackgroundNewsJobState = {
+    status: BackgroundNewsJobStatus;
+    mode: BackgroundNewsJobMode;
+    scope: BackgroundNewsJobScope;
+    startedAt: number | null;
+    completedAt: number | null;
+    message: string;
+    resultCount: number;
+    error: string | null;
+};
+
 export type FilterComparableItem = {
     id?: string | number | null;
     news_id?: string | number | null;

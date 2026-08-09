@@ -1226,6 +1226,32 @@ select {
   box-shadow: 0 16px 52px rgba(0, 0, 0, 0.44), 0 0 0 1px rgba(41, 151, 255, 0.08) inset, 0 0 32px rgba(41, 151, 255, 0.16);
   color: #fff;
   pointer-events: none;
+  appearance: none;
+  font: inherit;
+  text-align: left;
+}
+
+.home-feed-status-toast.is-global {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  z-index: 70;
+  width: min(500px, calc(100% - 32px));
+  translate: -50% 0;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.home-feed-status-toast.is-global:hover {
+  transform: translateY(-1px);
+  border-color: rgba(111, 190, 255, 0.5);
+  box-shadow: 0 20px 58px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(41, 151, 255, 0.12) inset, 0 0 38px rgba(41, 151, 255, 0.2);
+}
+
+.home-feed-status-toast.is-global:focus-visible {
+  outline: 2px solid rgba(96, 165, 250, 0.9);
+  outline-offset: 3px;
 }
 
 .home-feed-status-toast::before {
@@ -1288,6 +1314,30 @@ select {
   font-weight: 800;
   line-height: 1.32;
   letter-spacing: 0;
+}
+
+.home-feed-status-action {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: rgba(167, 216, 255, 0.9);
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.home-feed-status-action svg {
+  width: 14px;
+  height: 14px;
+  transition: transform 180ms ease;
+}
+
+.home-feed-status-toast.is-global:hover .home-feed-status-action svg {
+  transform: translateX(2px);
 }
 
 .root-home-feed-body {
@@ -1797,6 +1847,16 @@ select {
   .home-feed-status-toast {
     top: 10px;
     width: min(380px, calc(100% - 28px));
+  }
+
+  .home-feed-status-toast.is-global {
+    position: fixed;
+    top: 12px;
+    width: min(440px, calc(100% - 24px));
+  }
+
+  .home-feed-status-action span {
+    display: none;
   }
 
   .home-selected-list-bar {
