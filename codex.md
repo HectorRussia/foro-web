@@ -17,7 +17,7 @@
 ถ้าเป็น `PM` และมีงานเกี่ยวกับ prototype ให้โหลด skill นี้เพิ่มด้วย:
 
 ```text
-.codex/skills/pm-prototype-vibe/SKILL.md
+.agents/skills/pm-prototype-vibe/SKILL.md
 ```
 
 ## Fallback

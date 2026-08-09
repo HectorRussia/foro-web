@@ -1,4 +1,5 @@
 export { FeedStatusToast } from './FeedStatusToast';
+export { GlobalNewsSyncStatus } from './GlobalNewsSyncStatus';
 export { ForoFilterModal } from './ForoFilterModal';
 export { ForoFilterSummaryCard, ForoFilterSummarySkeleton } from './ForoFilterSummary';
 export { ProcessingProgress } from './ProcessingProgress';

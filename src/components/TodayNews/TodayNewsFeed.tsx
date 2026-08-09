@@ -75,13 +75,13 @@ export const TodayNewsFeed = ({
     );
 
     return (
-                    <div className="root-home-feed-body relative flex-1 overflow-y-auto px-6 pb-8 sm:px-8 lg:px-11 lg:pr-9 scrollbar-hide">
-                        {/* News Stream Grid */}
-                        <div className={`
-                        ${layoutMode === 'grid'
-                                ? 'grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 pb-20'
-                                : 'flex flex-col space-y-4 pb-20'}
-                    `}>
+                    <div className="root-home-feed-body">
+                        {newsResults.length > 0 ? feedToolbar : null}
+
+                        <div className={`home-feed-grid ${layoutMode === 'grid'
+                            ? 'is-grid grid grid-cols-1 gap-4 pb-20 md:grid-cols-2 md:gap-6'
+                            : 'is-list flex flex-col gap-4 pb-20'
+                        }`}>
                             {newsResults.length === 0 ? (
                                 <>
                                     {isStreaming ? feedToolbar : null}
@@ -118,8 +118,6 @@ export const TodayNewsFeed = ({
                                 </div>
                             ) : (
                                 <>
-                                    {feedToolbar}
-
                                     {isAIProcessing ? (
                                         <>
                                             <ForoFilterSummarySkeleton />

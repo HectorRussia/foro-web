@@ -26,8 +26,14 @@ cd prototype
 ติดตั้ง dependency:
 
 ```powershell
-pnpm install
+pnpm install --ignore-workspace
 ```
+
+ต้องใส่ `--ignore-workspace` เพราะ repo นี้มี `pnpm-workspace.yaml` อยู่ที่ root
+แต่ `prototype` เป็นโปรเจกต์แยกที่มี `package.json` และ `pnpm-lock.yaml` ของตัวเอง
+ถ้าใช้ `pnpm install` เฉย ๆ หลัง clone ใหม่ อาจติดตั้งเฉพาะ dependency ของ root
+แล้ว Vite หา package ของ prototype ไม่เจอ เช่น `lucide-react`, `dompurify`, `idb`,
+`@ai-sdk/xai`, `ai`, หรือ `marked`
 
 เปิด prototype:
 
@@ -55,7 +61,7 @@ pnpm dev
 ถ้า dev แจ้งว่ามีการเพิ่ม package หรือเพิ่ง pull โค้ดใหม่แล้วเปิดไม่ขึ้น ให้รัน:
 
 ```powershell
-pnpm install
+pnpm install --ignore-workspace
 pnpm dev
 ```
 
@@ -153,9 +159,27 @@ prototype บางส่วนต้องพึ่ง API key และ intern
 ให้หยุด server แล้วรันใหม่:
 
 ```powershell
-pnpm install
+pnpm install --ignore-workspace
 pnpm dev
 ```
+
+### Vite แจ้งว่า dependency imported แต่ resolve ไม่ได้
+
+ถ้าเจอ error ประมาณนี้:
+
+```text
+Failed to run dependency scan. The following dependencies are imported but could not be resolved
+```
+
+ให้เช็กก่อนว่าอยู่ในโฟลเดอร์ `prototype` แล้วรัน:
+
+```powershell
+pnpm install --ignore-workspace
+pnpm dev
+```
+
+อาการนี้มักเกิดหลัง clone ใหม่หรือ pull โค้ดใหม่ โดย dependency ของ root ถูกติดตั้งแล้ว
+แต่ dependency ของ prototype ยังไม่ได้ถูกสร้างใน `prototype/node_modules`
 
 ## ถ้าให้ Codex ช่วย PM
 
@@ -168,7 +192,7 @@ VITE_COWORK_AGENT=PM
 จากนั้นให้ Codex เริ่มจาก `codex.md` ซึ่งเป็น role router กลาง แล้ว Codex จะโหลด:
 
 - `codex-pm.md`
-- `.codex/skills/pm-prototype-vibe/SKILL.md`
+- `.agents/skills/pm-prototype-vibe/SKILL.md`
 - `prototype/package.json`
 
 ถ้าจะให้ Codex กลับไปทำงานฝั่ง dev ให้เปลี่ยนเป็น:

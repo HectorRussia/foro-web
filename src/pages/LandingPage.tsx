@@ -7,10 +7,12 @@ import ComparisonSection from '../components/LandingPage/ComparisonSection';
 import SmartFilterSection from '../components/LandingPage/SmartFilterSection';
 import CTASection from '../components/LandingPage/CTASection';
 import FooterLand from '../components/LandingPage/FooterLand';
+import LoginModal from '../components/LandingPage/LoginModal';
 import { organizationSchema, schemaData } from '../constants/SchemaMarkup';
 
 const LandingPage = () => {
     const [newsIndex, setNewsIndex] = useState(0);
+    const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -32,11 +34,11 @@ const LandingPage = () => {
             <BackGround />
 
             {/* ── Header ── */}
-            <HeaderLand />
+            <HeaderLand onOpenLogin={() => setIsLoginModalOpen(true)} />
 
             <main>
                 {/* ── Hero Section ── */}
-                <HeroLanding newsIndex={newsIndex} />
+                <HeroLanding newsIndex={newsIndex} onOpenLogin={() => setIsLoginModalOpen(true)} />
 
                 {/* ── Interests Section ── */}
                 <InterestsSection />
@@ -48,11 +50,12 @@ const LandingPage = () => {
                 <SmartFilterSection />
 
                 {/* ── CTA Section ── */}
-                <CTASection />
+                <CTASection onOpenLogin={() => setIsLoginModalOpen(true)} />
             </main>
 
             {/* ── Footer ── */}
             <FooterLand />
+            <LoginModal isOpen={isLoginModalOpen} onClose={() => setIsLoginModalOpen(false)} />
 
         </div>
     );

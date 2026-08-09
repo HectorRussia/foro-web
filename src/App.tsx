@@ -17,6 +17,8 @@ import { Analytics } from "@vercel/analytics/react"
 import PostListPage from './pages/PostListPage';
 import Contents from './pages/Contents';
 import Bookmark from './pages/Bookmark';
+import AuthCallback from './pages/AuthCallback';
+import ProtectedAppLayout from './components/auth/ProtectedAppLayout';
 
 
 function App() {
@@ -25,6 +27,7 @@ function App() {
       <Routes>
         {/* Public Routes - Accessible by everyone */}
         <Route path="/" element={<LandingPage />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
 
         {/* Guest-only Routes - Redirect to dashboard if already logged in */}
         <Route element={<PublicRoute />}>
@@ -34,28 +37,30 @@ function App() {
 
         {/* Protected Routes*/}
         <Route element={<ProtectedRoute />}>
-          <Route path="/contents" element={<Contents />} />
-          <Route path="/today-news" element={<TodayNews />} />
-
-          <Route path="/post-list" element={<PostListPage />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/user-target" element={<UserTarget />} />
-          <Route path="/user-following" element={<UserFollow />} />
-          <Route path="/category-management" element={<Category />} />
-          <Route path="/category-news/:id" element={<CategoryNews />} />
-          <Route path="/bookmark" element={<Bookmark />} />  
-          {/*add more route*/}
-
-          {/*For King*/}
-          <Route element={<ProtectedRoute requiredRole={"king"} />}>
-            <Route path="/advance-search" element={<AdvanceSearch />} />
-            <Route path="/realtime-search" element={<RealtimeSearch />} />
+          <Route element={<ProtectedAppLayout />}>
+            <Route path="/contents" element={<Contents />} />
             <Route path="/today-news" element={<TodayNews />} />
-          </Route>
-          {/*For Queen*/}
-          <Route element={<ProtectedRoute requiredRole={"queen"} />}>
-            <Route path="/realtime-search" element={<RealtimeSearch />} />
-            <Route path="/today-news" element={<TodayNews />} />
+
+            <Route path="/post-list" element={<PostListPage />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/user-target" element={<UserTarget />} />
+            <Route path="/user-following" element={<UserFollow />} />
+            <Route path="/category-management" element={<Category />} />
+            <Route path="/category-news/:id" element={<CategoryNews />} />
+            <Route path="/bookmark" element={<Bookmark />} />
+            {/*add more route*/}
+
+            {/*For King*/}
+            <Route element={<ProtectedRoute requiredRole={"king"} />}>
+              <Route path="/advance-search" element={<AdvanceSearch />} />
+              <Route path="/realtime-search" element={<RealtimeSearch />} />
+              <Route path="/today-news" element={<TodayNews />} />
+            </Route>
+            {/*For Queen*/}
+            <Route element={<ProtectedRoute requiredRole={"queen"} />}>
+              <Route path="/realtime-search" element={<RealtimeSearch />} />
+              <Route path="/today-news" element={<TodayNews />} />
+            </Route>
           </Route>
 
         </Route>

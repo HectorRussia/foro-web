@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { HiOutlinePlus, HiOutlineTrash, HiOutlineShare, HiBars3, HiOutlineUsers, HiXMark } from 'react-icons/hi2';
+import { HiOutlineChartBar, HiOutlinePlus, HiOutlineTrash, HiOutlineShare, HiBars3, HiOutlineUsers, HiXMark } from 'react-icons/hi2';
 import { FaRegFileCode } from 'react-icons/fa6';
 import * as postListApi from '../api/postList';
 import type { PostList as IPostList, PostListUser } from '../api/postList';
@@ -48,6 +48,7 @@ const PostList = ({
     const [newListName, setNewListName] = useState('');
     const [newListColor, setNewListColor] = useState(colors[0]);
     const [selectedListId, setSelectedListId] = useState<number | null>(null);
+    const [expandedListId, setExpandedListId] = useState<number | null>(null);
     const actionMenuRef = useRef<HTMLDivElement>(null);
 
     const fetchAllData = async () => {
@@ -156,6 +157,7 @@ const PostList = ({
             await postListApi.deletePostList(id);
             fetchAllData();
             if (selectedListId === id) setSelectedListId(null);
+            if (expandedListId === id) setExpandedListId(null);
             if (activeId === id && onSelect) onSelect(null);
             toast.success('ลบรายการสำเร็จ');
         } catch {
@@ -245,21 +247,16 @@ const PostList = ({
     };
 
     return (
-        <div className={`flex h-full w-full shrink-0 flex-col bg-[var(--bg-900)] ${showBorder ? 'border-l border-white/5' : ''} transition-all duration-500`}>
+        <div className={`post-list-rail flex h-full w-full shrink-0 flex-col bg-[var(--bg-900)] ${showBorder ? 'border-l border-white/5' : ''} transition-all duration-500`}>
 
             {/* Header */}
             <div
                 ref={actionMenuRef}
-                className="relative border-b border-white/6 px-4 pt-6 pb-4"
+                className="post-list-header relative border-b border-white/6"
             >
                 <div className="flex items-center justify-between gap-4">
                     <div className="flex items-center gap-3">
-                        <div className="flex items-end gap-0.75 mb-1">
-                            <div className="w-0.75 h-4 rounded-full bg-white/60" />
-                            <div className="w-0.75 h-6 rounded-full bg-white" />
-                            <div className="w-0.75 h-4.5 rounded-full bg-white/70" />
-                            <div className="w-0.75 h-3.5 rounded-full bg-white/45" />
-                        </div>
+                        <HiOutlineChartBar className="post-list-header-mark" aria-hidden="true" />
                         <span className="font-black text-[12px] tracking-[0.18em] text-slate-400 uppercase">
                             POST LIST
                         </span>
@@ -378,7 +375,7 @@ const PostList = ({
             </AnimatePresence>
 
             {/* Lists */}
-            <div className="flex-1 overflow-y-auto px-4 pb-32 space-y-1 lg:pb-10">
+            <div className="post-list-scroll flex-1 overflow-y-auto px-4 pb-32 space-y-1 lg:pb-10">
                 {isLoading && lists.length === 0 ? (
                     <div className="flex justify-center py-10">
                         <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
@@ -404,12 +401,13 @@ const PostList = ({
                     </div>
                 ) : (
                     <>
-                        <div className="px-3 pt-4 pb-2">
+                        <div className="post-list-section-label px-3 pt-4 pb-2">
                             <span className="text-[11px] font-black tracking-[0.12em] uppercase text-[var(--text-dim)]">Your lists</span>
                         </div>
                         {lists.map((list) => {
                             const currentActiveId = activeId !== undefined ? activeId : selectedListId;
                             const isSelected = currentActiveId === list.id;
+                            const isExpanded = expandedListId === list.id;
                             const availableUsers = getAvailableUsers(list.members);
                             const availableSources = availableUsers.filter(isRssFollowedUser);
                             const availableAccounts = availableUsers.filter(user => !isRssFollowedUser(user));
@@ -425,17 +423,19 @@ const PostList = ({
                                             setSelectedListId(nextList ? nextList.id : null);
                                         }
                                     }}
-                                    className="group overflow-hidden rounded-[12px] transition-all duration-300"
+                                    className="post-list-row group overflow-hidden rounded-[12px] transition-all duration-300"
                                 >
                                     <div
-                                        className={`flex items-center gap-3 rounded-[12px] border p-2 transition-all duration-300 ${isSelected
+                                        className={`post-list-row-main flex items-center gap-3 rounded-[12px] border p-2 transition-all duration-300 ${isSelected
                                             ? 'border-white/5 bg-white/8'
                                             : 'border-transparent bg-transparent hover:bg-white/4'}`}
                                     >
                                         <div
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                const nextList = isSelected ? null : list;
+                                                const nextExpandedId = isExpanded ? null : list.id;
+                                                setExpandedListId(nextExpandedId);
+                                                const nextList = nextExpandedId === null ? null : list;
                                                 if (onSelect) {
                                                     onSelect(nextList);
                                                 } else {
@@ -489,7 +489,7 @@ const PostList = ({
 
                                     {/* Expanded Content */}
                                     <AnimatePresence>
-                                        {isSelected && (
+                                        {isExpanded && (
                                             <motion.div
                                                 initial={{ opacity: 0, height: 0 }}
                                                 animate={{ opacity: 1, height: 'auto' }}

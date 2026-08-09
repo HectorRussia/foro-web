@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import dayjs from 'dayjs';
 import { toast } from 'react-hot-toast';
 import { createCategoryNews } from '../api/categoryNews';
@@ -8,7 +8,7 @@ import { deleteNews, filterNews, getTriggerStatus, updateTriggerStatus } from '.
 import type { AdvancedSearchBulkPayload, ForoFilterSummary, NewsFilterPayload, NewsItem, NewsResult } from '../interface/news';
 import type { Category } from '../interface/category';
 import type { PostListWithMembers } from '../components/PostList';
-import type { FeedNotice, FilterCitationMap } from '../interface/todayNews';
+import type { BackgroundNewsJobState, FeedNotice, FilterCitationMap } from '../interface/todayNews';
 import {
     buildFilterCitationMap,
     buildForoSummaryClipboardText,
@@ -35,7 +35,21 @@ import {
     TODAY_NEWS_CLEARED_KEY,
 } from '../api/todayNews';
 
-export const useTodayNews = () => {
+const initialBackgroundJob: BackgroundNewsJobState = {
+    status: 'idle',
+    mode: 'refresh',
+    scope: {
+        postListId: null,
+        postListName: 'ทั้งหมด',
+    },
+    startedAt: null,
+    completedAt: null,
+    message: 'ระบบพร้อมทำงาน',
+    resultCount: 0,
+    error: null,
+};
+
+export const useTodayNewsController = () => {
     const [isStreaming, setIsStreaming] = useState(false);
     const [isLoadingMore, setIsLoadingMore] = useState(false);
     const [layoutMode] = useState<'grid' | 'compact'>('grid');
@@ -87,12 +101,11 @@ export const useTodayNews = () => {
     const [newsResults, setNewsResults] = useState<NewsResult[]>([]);
     const [progress, setProgress] = useState({ current: 0, total: 0 });
     const [selectedPostList, setSelectedPostList] = useState<PostListWithMembers | null>(null);
+    const [backgroundJob, setBackgroundJob] = useState<BackgroundNewsJobState>(initialBackgroundJob);
     const [searchParams] = useState({
 
         query: "",
         query_type: "latest",
-        since_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
-        until_date: dayjs().add(1, 'day').format('YYYY-MM-DD'),
         cursor: ""
     });
 
@@ -100,6 +113,7 @@ export const useTodayNews = () => {
 
     // Refs
     const abortControllerRef = useRef<AbortController | null>(null);
+    const isBulkAnalysisInFlightRef = useRef(false);
 
     // Context restoration and Initial Data Fetch
     const init = async () => {
@@ -207,22 +221,38 @@ export const useTodayNews = () => {
         cursorOverride?: string,
         options: { preserveExisting?: boolean } = {}
     ) => {
-        if (isStreaming) return;
+        if (isBulkAnalysisInFlightRef.current || isStreaming) return;
+        isBulkAnalysisInFlightRef.current = true;
         const isLoadingMoreRequest = Boolean(
             (typeof cursorOverride === 'string' && cursorOverride) ||
             options.preserveExisting
         );
+        const jobMode = isLoadingMoreRequest ? 'loadMore' : 'refresh';
+        const jobScope = {
+            postListId: selectedPostList?.id ?? null,
+            postListName: selectedPostList?.name || 'ทั้งหมด',
+        };
+        const loadingMessage = isLoadingMoreRequest
+            ? 'กำลังโหลดข่าวเพิ่มเติม คุณไปใช้งานหน้าอื่นได้'
+            : 'กำลังดึงฟีดข่าวล่าสุด คุณไปใช้งานหน้าอื่นได้';
 
         setIsStreaming(true);
         setIsLoadingMore(isLoadingMoreRequest);
         setStatusMessage('กำลังเชื่อมต่อและวิเคราะห์ข่าว...');
         setFeedNotice({
             variant: 'loading',
-            message: 'กำลังเชื่อมต่อฐานข้อมูล... ดึงฟีดข่าวล่าสุด',
+            message: loadingMessage,
         });
-        if (isLoadingMoreRequest) {
-            setFeedNotice(null);
-        }
+        setBackgroundJob({
+            status: 'running',
+            mode: jobMode,
+            scope: jobScope,
+            startedAt: Date.now(),
+            completedAt: null,
+            message: loadingMessage,
+            resultCount: 0,
+            error: null,
+        });
 
         // If not loading more, clear previous results and cache
         if ((!cursorOverride || typeof cursorOverride !== 'string') && !options.preserveExisting) {
@@ -240,8 +270,10 @@ export const useTodayNews = () => {
 
         const payload: AdvancedSearchBulkPayload = {
             query_type: searchParams.query_type,
-            since_date: searchParams.since_date,
-            until_date: searchParams.until_date,
+            // The controller is app-scoped now, so calculate the rolling window
+            // when the user starts a job instead of when the provider first mounts.
+            since_date: dayjs().subtract(1, 'day').format('YYYY-MM-DD'),
+            until_date: dayjs().add(1, 'day').format('YYYY-MM-DD'),
             cursor: (typeof cursorOverride === 'string') ? cursorOverride : searchParams.cursor,
             fetch_rss_first: !(typeof cursorOverride === 'string' && cursorOverride),
             rss_limit_per_feed: 20,
@@ -303,33 +335,54 @@ export const useTodayNews = () => {
             const rssCount = dbResults.filter(item => item.source_type === 'rss').length;
             const rssText = rssCount > 0 ? `${rssCount} ข่าวจาก RSS + ` : '';
             const moreText = result.twitter_cursor ? ' • มี cursor สำหรับโหลด X ต่อ' : ' • ค้นหา RSS + X แล้ว';
+            const successMessage = `อัปเดตข้อมูลเรียบร้อย • ${rssText}${syncedCount} การ์ด${moreText}`;
             setFeedNotice({
                 variant: 'success',
-                message: `อัปเดตข้อมูลเรียบร้อย • ${rssText}${syncedCount} การ์ด${moreText}`,
+                message: successMessage,
             });
-            if (isLoadingMoreRequest) {
-                setFeedNotice(null);
-            }
+            setBackgroundJob(prev => ({
+                ...prev,
+                status: 'success',
+                completedAt: Date.now(),
+                message: successMessage,
+                resultCount: syncedCount,
+                error: null,
+            }));
         } catch (error: unknown) {
             const isCanceledError = isRecord(error)
                 && (error.name === 'CanceledError' || error.code === 'ERR_CANCELED');
             if (isCanceledError) {
                 setStatusMessage('หยุดการประมวลผลแล้ว');
                 setFeedNotice(null);
+                setBackgroundJob(prev => ({
+                    ...prev,
+                    status: 'idle',
+                    completedAt: Date.now(),
+                    message: 'หยุดการประมวลผลแล้ว',
+                    error: null,
+                }));
                 return;
             }
 
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error';
             console.error('Bulk analysis failed:', error);
-            setStatusMessage(`เกิดข้อผิดพลาด: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            setStatusMessage(`เกิดข้อผิดพลาด: ${errorMessage}`);
             setFeedNotice({
                 variant: 'error',
                 message: 'อัปเดตข้อมูลไม่สำเร็จ ลองฟีดข้อมูลอีกครั้ง',
             });
-            if (isLoadingMoreRequest) {
-                setFeedNotice(null);
-            }
+            setBackgroundJob(prev => ({
+                ...prev,
+                status: 'error',
+                completedAt: Date.now(),
+                message: 'อัปเดตข้อมูลไม่สำเร็จ ลองฟีดข้อมูลอีกครั้ง',
+                resultCount: 0,
+                error: errorMessage,
+            }));
             toast.error('เกิดข้อผิดพลาดในการดึงข้อมูลข่าว');
         } finally {
+            isBulkAnalysisInFlightRef.current = false;
+            abortControllerRef.current = null;
             setIsStreaming(false);
             setIsLoadingMore(false);
             setProgress({ current: 0, total: 0 });
@@ -342,7 +395,19 @@ export const useTodayNews = () => {
         setIsLoadingMore(false);
         setStatusMessage('หยุดการประมวลผลแล้ว');
         setFeedNotice(null);
+        setBackgroundJob(prev => ({
+            ...prev,
+            status: 'idle',
+            completedAt: Date.now(),
+            message: 'หยุดการประมวลผลแล้ว',
+            error: null,
+        }));
     };
+
+    const dismissTransientUi = useCallback(() => {
+        setIsFilterDropdownOpen(false);
+        setIsAIFilterOpen(false);
+    }, []);
 
     const loadForoPresets = async (options: { force?: boolean } = {}) => {
         if (isLoadingPresetsRef.current) return;
@@ -824,10 +889,12 @@ export const useTodayNews = () => {
         isSavingPreset,
         newsResults,
         progress,
+        backgroundJob,
         selectedPostList,
         setSelectedPostList,
         startBulkAnalysis,
         stopStream,
+        dismissTransientUi,
         handleSelectPreset,
         handleSavePreset,
         handleDeletePreset,
@@ -854,4 +921,4 @@ export const useTodayNews = () => {
     };
 };
 
-export type TodayNewsViewModel = ReturnType<typeof useTodayNews>;
+export type TodayNewsViewModel = ReturnType<typeof useTodayNewsController>;
