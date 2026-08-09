@@ -139,7 +139,7 @@ const Main = () => {
                     อ่านข่าว
                 </h1>
                 <p className="hero-search-subtitle reader-page-subtitle">
-                    บทความและข่าวสารที่คุณบันทึกไว้า่านแบบ Deep Read
+                    บทความและข่าวสารที่คุณบันทึกไว้อ่านแบบ Deep Read
                 </p>
             </header>
 
