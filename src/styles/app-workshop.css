@@ -266,6 +266,11 @@
   transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
 }
 
+.foro-workshop-app[data-resolved-theme="dark"] .foro-theme-trigger {
+  color: var(--app-ink);
+  background: #fff;
+}
+
 .foro-workshop-app .foro-theme-trigger:hover,
 .foro-workshop-app .foro-theme-trigger[aria-expanded="true"] {
   background: var(--app-cyan);
@@ -699,11 +704,17 @@
 
 /* Post List */
 .foro-workshop-app .post-list-rail {
+  min-height: 0;
+  overflow: hidden;
   color: var(--app-foreground);
   background: var(--app-surface);
+  border-left: 0 !important;
+  border-radius: inherit;
 }
 
 .foro-workshop-app .post-list-header {
+  flex: 0 0 auto;
+  padding: 20px 16px 18px;
   color: var(--app-ink);
   background: var(--app-cyan);
   border-bottom: var(--app-border);
@@ -713,6 +724,11 @@
 .foro-workshop-app .post-list-header [class~="text-slate-400"],
 .foro-workshop-app .post-list-header [class~="text-gray-400"] {
   color: var(--app-ink);
+}
+
+.foro-workshop-app .post-list-header-mark {
+  width: 22px;
+  height: 22px;
 }
 
 .foro-workshop-app .post-list-header button {
@@ -740,7 +756,18 @@
 }
 
 .foro-workshop-app .post-list-section-label {
+  padding-top: 24px;
+  padding-bottom: 8px;
   color: var(--app-cyan-text);
+}
+
+.foro-workshop-app .post-list-scroll {
+  padding-right: 16px;
+  padding-left: 16px;
+}
+
+.foro-workshop-app .post-list-row-main {
+  min-height: 64px;
 }
 
 .foro-workshop-app .post-list-scroll input {
