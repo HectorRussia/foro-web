@@ -21,11 +21,11 @@ const CTASection = ({ onOpenLogin }: CTASectionProps) => {
     };
 
     return (
-        <section className="py-20 px-6 relative overflow-hidden">
+        <section className="landing-section landing-cta py-20 px-6 relative overflow-hidden">
             {/* Background Glow */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-blue-600/5 blur-[100px] pointer-events-none" />
 
-            <div className="max-w-3xl mx-auto text-center relative z-10">
+            <div className="landing-cta-board max-w-3xl mx-auto text-center relative z-10">
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
                     whileInView={{ opacity: 1, y: 0 }}
@@ -51,7 +51,7 @@ const CTASection = ({ onOpenLogin }: CTASectionProps) => {
                     >
                         <button
                             onClick={handlePrimaryAction}
-                            className="bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-8 rounded-xl text-lg shadow-xl shadow-blue-500/30 flex items-center gap-2 mx-auto transition-all group"
+                            className="landing-primary-cta bg-blue-500 hover:bg-blue-600 text-white font-black py-4 px-8 rounded-xl text-lg shadow-xl shadow-blue-500/30 flex items-center gap-2 mx-auto transition-all group"
                         >
                             {isAuthenticated ? 'ไปที่แดชบอร์ด' : 'เริ่มต้นใช้งานฟรี'}
                             <HiArrowRight className="text-xl group-hover:translate-x-1 transition-transform" />

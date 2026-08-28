@@ -61,7 +61,7 @@ const InterestsSection = () => {
     };
 
     return (
-        <section className="py-24 px-6 relative overflow-hidden">
+        <section className="landing-section landing-interests py-24 px-6 relative overflow-hidden">
             <div className="max-w-6xl mx-auto text-center mb-16">
                 <motion.h2
                     initial={{ opacity: 0, y: 20 }}
@@ -97,7 +97,7 @@ const InterestsSection = () => {
                         whileHover={{ scale: 1.02 }}
                         whileTap={{ scale: 0.98 }}
                         onClick={() => setActiveTab(prev => prev === cat.id ? '' : cat.id)}
-                        className={`
+                        className={`landing-chip
                             relative py-4 px-6 rounded-2xl border transition-all duration-300 flex items-center justify-center gap-3 overflow-hidden group
                             ${activeTab === cat.id ? getActiveButtonColor(cat.color) + ' text-white border-transparent' : getBgColor(cat.color, false)}
                         `}
@@ -112,7 +112,7 @@ const InterestsSection = () => {
             </motion.div>
 
             {/* News Cards */}
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-6xl mx-auto">
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={activeTab}
@@ -125,7 +125,7 @@ const InterestsSection = () => {
                         {categoryNews[activeTab]?.map((news) => (
                             <div
                                 key={news.id}
-                                className="bg-[#0f172a]/60 backdrop-blur-xl border border-white/5 p-6 rounded-[32px] hover:border-white/10 transition-colors group cursor-default"
+                                className="landing-news-card bg-[#0f172a]/60 backdrop-blur-xl border border-white/5 p-6 rounded-[32px] hover:border-white/10 transition-colors group cursor-default"
                             >
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className={`w-10 h-10 ${news.color || 'bg-blue-500'} rounded-full flex items-center justify-center text-sm font-black shadow-lg shadow-black/20 text-white`}>

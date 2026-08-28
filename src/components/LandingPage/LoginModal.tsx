@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { FaTimes } from 'react-icons/fa';
 import { getUnauthenticatedAuthUrl } from '../../config/auth';
 
@@ -18,6 +18,45 @@ const GoogleIcon = () => (
 
 const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     const closeButtonRef = useRef<HTMLButtonElement>(null);
+    const redirectTimerRef = useRef<number | null>(null);
+    const [isRedirecting, setIsRedirecting] = useState(false);
+
+    const handleClose = useCallback(() => {
+        if (redirectTimerRef.current !== null) {
+            window.clearTimeout(redirectTimerRef.current);
+            redirectTimerRef.current = null;
+        }
+        setIsRedirecting(false);
+        onClose();
+    }, [onClose]);
+
+    const handleGoogleLogin = (event: MouseEvent<HTMLAnchorElement>) => {
+        event.preventDefault();
+
+        if (isRedirecting) {
+            return;
+        }
+
+        const authUrl = event.currentTarget.href;
+        setIsRedirecting(true);
+        redirectTimerRef.current = window.setTimeout(() => {
+            window.location.assign(authUrl);
+        }, 600);
+    };
+
+    useEffect(() => {
+        const resetRedirectingState = () => {
+            redirectTimerRef.current = null;
+            setIsRedirecting(false);
+        };
+        window.addEventListener('pageshow', resetRedirectingState);
+        return () => {
+            window.removeEventListener('pageshow', resetRedirectingState);
+            if (redirectTimerRef.current !== null) {
+                window.clearTimeout(redirectTimerRef.current);
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -25,12 +64,12 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
         closeButtonRef.current?.focus();
 
         const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.key === 'Escape') onClose();
+            if (event.key === 'Escape') handleClose();
         };
 
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
-    }, [isOpen, onClose]);
+    }, [handleClose, isOpen]);
 
     if (!isOpen) return null;
 
@@ -43,7 +82,7 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                 type="button"
                 aria-label="ปิดหน้าต่างเข้าสู่ระบบ"
                 className="absolute inset-0 cursor-default bg-[#020914]/80 backdrop-blur-md"
-                onClick={onClose}
+                onClick={handleClose}
             />
 
             <section
@@ -58,15 +97,15 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                 <button
                     ref={closeButtonRef}
                     type="button"
-                    onClick={onClose}
+                    onClick={handleClose}
                     aria-label="ปิดหน้าต่างเข้าสู่ระบบ"
-                    className="absolute right-4 top-4 inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-400 sm:right-5 sm:top-5"
+                    className="absolute right-4 top-4 z-10 inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition-colors hover:bg-white/10 hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-400 sm:right-5 sm:top-5"
                 >
                     <FaTimes aria-hidden="true" />
                 </button>
 
                 <div className="relative text-center">
-                    <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#030e17] p-3 shadow-lg shadow-blue-950/30">
+                    <div className="landing-login-logo mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#030e17] p-3 shadow-lg shadow-blue-950/30">
                         <img
                             src="/images/LOGO-FORO/logo_last.png"
                             alt="FORO"
@@ -90,10 +129,25 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
 
                     <a
                         href={getUnauthenticatedAuthUrl()}
-                        className="group flex w-full items-center justify-center gap-3 rounded-xl border border-white/15 bg-white px-5 py-3.5 font-bold text-slate-900 shadow-lg shadow-black/20 transition-all hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-xl focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#081724] active:translate-y-0"
+                        onClick={handleGoogleLogin}
+                        aria-busy={isRedirecting}
+                        aria-disabled={isRedirecting}
+                        className={`group flex w-full items-center justify-center gap-3 rounded-xl border border-white/15 bg-white px-5 py-3.5 font-bold text-slate-900 shadow-lg shadow-black/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#081724] ${isRedirecting ? 'cursor-wait opacity-75' : 'hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-xl active:translate-y-0'}`}
                     >
-                        <GoogleIcon />
-                        <span>ดำเนินการต่อด้วย Google</span>
+                        {isRedirecting ? (
+                            <>
+                                <span
+                                    aria-hidden="true"
+                                    className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
+                                />
+                                <span>กำลังพาไปยัง Google...</span>
+                            </>
+                        ) : (
+                            <>
+                                <GoogleIcon />
+                                <span>ดำเนินการต่อด้วย Google</span>
+                            </>
+                        )}
                     </a>
 
                     <p className="mt-6 text-xs leading-relaxed text-slate-500">
