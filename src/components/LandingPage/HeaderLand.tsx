@@ -12,7 +12,7 @@ const HeaderLand = ({ onOpenLogin }: HeaderLandProps) => {
     return (
         <>
             {/* ── Header ── */}
-            <nav className="fixed top-0 left-0 right-0 z-50 px-6 py-5 flex justify-between items-center backdrop-blur-md bg-[#030e17]/50 border-b border-white/5">
+            <nav className="landing-header fixed top-0 left-0 right-0 z-50 px-6 py-5 flex justify-between items-center backdrop-blur-md bg-[#030e17]/50 border-b border-white/5">
                 <div className="flex items-center gap-2.5">
                     <img src="/images/LOGO-FORO/logo_last.png" alt="FORO Logo" className="h-10 w-auto object-contain" />
                 </div>

@@ -9,6 +9,7 @@ import CTASection from '../components/LandingPage/CTASection';
 import FooterLand from '../components/LandingPage/FooterLand';
 import LoginModal from '../components/LandingPage/LoginModal';
 import { organizationSchema, schemaData } from '../constants/SchemaMarkup';
+import '../styles/landing-workshop.css';
 
 const LandingPage = () => {
     const [newsIndex, setNewsIndex] = useState(0);
@@ -22,7 +23,7 @@ const LandingPage = () => {
     }, []);
 
     return (
-        <div className="min-h-screen bg-[#030e17] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative">
+        <div className="foro-workshop-landing min-h-screen bg-[#030e17] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative">
             {/* ── SEO Schema Markup ── */}
             <script type="application/ld+json">
                 {JSON.stringify(schemaData)}

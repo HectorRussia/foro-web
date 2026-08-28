@@ -1,0 +1,499 @@
+.foro-workshop-landing {
+  --workshop-paper: #fff8e8;
+  --workshop-surface: #fffdf7;
+  --workshop-ink: #171313;
+  --workshop-orange: #ff6038;
+  --workshop-yellow: #ffd84a;
+  --workshop-cyan: #56d2ee;
+  --workshop-green: #a8dc73;
+  --workshop-lavender: #c4b7f2;
+  --workshop-muted: #665d55;
+  --workshop-border: 2px solid var(--workshop-ink);
+  --workshop-shadow: 6px 6px 0 var(--workshop-ink);
+  background: var(--workshop-paper);
+  color: var(--workshop-ink);
+  font-family: "Noto Sans Thai", "Inter", sans-serif;
+}
+
+.foro-workshop-landing ::selection {
+  background: var(--workshop-yellow);
+  color: var(--workshop-ink);
+}
+
+.foro-workshop-landing h1,
+.foro-workshop-landing h2,
+.foro-workshop-landing h3,
+.foro-workshop-landing .font-black {
+  font-family: "Kanit", "Noto Sans Thai", sans-serif;
+}
+
+.foro-workshop-landing main [class*="text-gray-"],
+.foro-workshop-landing main [class*="text-slate-"],
+.foro-workshop-landing main .text-white {
+  color: var(--workshop-muted);
+}
+
+.foro-workshop-landing main h1,
+.foro-workshop-landing main h2,
+.foro-workshop-landing main h3,
+.foro-workshop-landing main h1 .block,
+.foro-workshop-landing main h2 span,
+.foro-workshop-landing main h3 span {
+  color: var(--workshop-ink);
+}
+
+.foro-workshop-landing main .text-transparent {
+  color: var(--workshop-ink);
+  -webkit-text-fill-color: var(--workshop-ink);
+  background: none;
+}
+
+.foro-workshop-landing .landing-background {
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(23, 19, 19, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(23, 19, 19, 0.08) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.foro-workshop-landing .landing-background > div {
+  width: 190px;
+  height: 190px;
+  border: var(--workshop-border);
+  border-radius: 10px;
+  filter: none;
+  opacity: 1;
+  transform: rotate(8deg);
+}
+
+.foro-workshop-landing .landing-background > div:first-child {
+  top: 108px;
+  right: -58px;
+  background: var(--workshop-cyan);
+}
+
+.foro-workshop-landing .landing-background > div:last-child {
+  bottom: 80px;
+  left: -72px;
+  background: var(--workshop-lavender);
+  transform: rotate(-10deg);
+}
+
+.foro-workshop-landing .landing-header {
+  margin: 14px auto 0;
+  left: 20px;
+  right: 20px;
+  width: min(calc(100% - 40px), 1180px);
+  padding: 10px 12px 10px 16px;
+  background: var(--workshop-surface);
+  border: var(--workshop-border);
+  border-radius: 10px;
+  box-shadow: 4px 4px 0 var(--workshop-ink);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.foro-workshop-landing .landing-header img {
+  height: 34px;
+  filter: brightness(0);
+}
+
+.foro-workshop-landing .landing-header a,
+.foro-workshop-landing .landing-header button,
+.foro-workshop-landing .landing-primary-cta {
+  min-height: 44px;
+  color: var(--workshop-ink);
+  background: var(--workshop-orange);
+  border: var(--workshop-border);
+  border-radius: 8px;
+  box-shadow: 4px 4px 0 var(--workshop-ink);
+  transition: transform 150ms ease, box-shadow 150ms ease, background 150ms ease;
+}
+
+.foro-workshop-landing .landing-header a:hover,
+.foro-workshop-landing .landing-header button:hover,
+.foro-workshop-landing .landing-primary-cta:hover {
+  color: var(--workshop-ink);
+  background: var(--workshop-yellow);
+  box-shadow: 2px 2px 0 var(--workshop-ink);
+  transform: translate(2px, 2px);
+}
+
+.foro-workshop-landing .landing-header a:focus-visible,
+.foro-workshop-landing .landing-header button:focus-visible,
+.foro-workshop-landing .landing-primary-cta:focus-visible,
+.foro-workshop-landing .landing-chip:focus-visible,
+.foro-workshop-landing .landing-filter-chip:focus-visible {
+  outline: 3px solid var(--workshop-cyan);
+  outline-offset: 3px;
+}
+
+.foro-workshop-landing .landing-hero {
+  min-height: 820px;
+  padding-top: 150px;
+  gap: 68px;
+}
+
+.foro-workshop-landing .landing-hero-copy {
+  position: relative;
+}
+
+.foro-workshop-landing .landing-hero-copy::before {
+  content: "AI NEWS WORKSHOP";
+  display: inline-block;
+  margin-bottom: 18px;
+  padding: 6px 12px;
+  color: var(--workshop-ink);
+  background: var(--workshop-yellow);
+  border: var(--workshop-border);
+  border-radius: 999px;
+  font: 800 12px/1.1 "Kanit", sans-serif;
+  letter-spacing: 0.14em;
+  transform: rotate(-2deg);
+}
+
+.foro-workshop-landing .landing-hero h1 {
+  color: var(--workshop-ink);
+  letter-spacing: -0.055em;
+}
+
+.foro-workshop-landing .landing-hero h1 > span:nth-child(2) {
+  color: #087f9a;
+  -webkit-text-fill-color: #087f9a;
+}
+
+.foro-workshop-landing .landing-hero h1 > span:nth-child(3) {
+  display: inline-block;
+  margin-top: 14px;
+  padding: 7px 13px 10px;
+  color: var(--workshop-ink);
+  -webkit-text-fill-color: var(--workshop-ink);
+  background: var(--workshop-orange);
+  border: var(--workshop-border);
+  border-radius: 8px;
+  box-shadow: 5px 5px 0 var(--workshop-ink);
+  transform: rotate(1deg);
+}
+
+.foro-workshop-landing .landing-hero-copy > p {
+  color: var(--workshop-muted);
+}
+
+.foro-workshop-landing .landing-hero-visual {
+  isolation: isolate;
+}
+
+.foro-workshop-landing .landing-hero-visual::before,
+.foro-workshop-landing .landing-hero-visual::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  border: var(--workshop-border);
+  border-radius: 8px;
+}
+
+.foro-workshop-landing .landing-hero-visual::before {
+  width: 170px;
+  height: 118px;
+  top: 25px;
+  right: 0;
+  background: var(--workshop-yellow);
+  transform: rotate(7deg);
+}
+
+.foro-workshop-landing .landing-hero-visual::after {
+  width: 120px;
+  height: 120px;
+  bottom: 36px;
+  left: 5px;
+  background: var(--workshop-green);
+  transform: rotate(-9deg);
+}
+
+.foro-workshop-landing .landing-summary-board,
+.foro-workshop-landing .landing-floating-card,
+.foro-workshop-landing .landing-news-card,
+.foro-workshop-landing .landing-comparison-panel,
+.foro-workshop-landing .landing-filter-board,
+.foro-workshop-landing .landing-filter-empty {
+  color: var(--workshop-ink);
+  background: var(--workshop-surface);
+  border: var(--workshop-border);
+  border-radius: 10px;
+  box-shadow: var(--workshop-shadow);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.foro-workshop-landing .landing-summary-board {
+  transform: rotate(-1deg);
+}
+
+.foro-workshop-landing .landing-summary-board > div:first-child,
+.foro-workshop-landing .landing-comparison-panel > div.absolute,
+.foro-workshop-landing .landing-cta > div.absolute {
+  display: none;
+}
+
+.foro-workshop-landing .landing-summary-item,
+.foro-workshop-landing .landing-filter-result,
+.foro-workshop-landing .landing-summary-point {
+  color: var(--workshop-ink);
+  background: var(--workshop-paper);
+  border: var(--workshop-border);
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-summary-item:nth-child(odd),
+.foro-workshop-landing .landing-filter-result:nth-child(2) {
+  background: #effaff;
+}
+
+.foro-workshop-landing .landing-summary-board [class*="bg-blue-500/10"],
+.foro-workshop-landing .landing-comparison-panel [class*="bg-blue-500/10"] {
+  color: var(--workshop-ink);
+  background: var(--workshop-yellow);
+  border-color: var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-section {
+  position: relative;
+  z-index: 1;
+}
+
+.foro-workshop-landing .landing-section::before {
+  content: "";
+  position: absolute;
+  inset: 24px max(18px, calc((100vw - 1280px) / 2));
+  z-index: -1;
+  border: 2px dashed rgba(23, 19, 19, 0.35);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.foro-workshop-landing .landing-section h2 {
+  color: var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-chip,
+.foro-workshop-landing .landing-filter-chip {
+  min-height: 48px;
+  color: var(--workshop-ink);
+  background: var(--workshop-surface);
+  border: var(--workshop-border);
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-chip:hover,
+.foro-workshop-landing .landing-filter-chip:hover {
+  color: var(--workshop-ink);
+  background: var(--workshop-cyan);
+  border-color: var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-chip[class*="border-transparent"],
+.foro-workshop-landing .landing-filter-chip[class*="bg-"]:not([class*="0f172a"]) {
+  color: var(--workshop-ink);
+  background: var(--workshop-yellow);
+  border-color: var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-news-card:nth-child(1) { background: var(--workshop-yellow); }
+.foro-workshop-landing .landing-news-card:nth-child(2) { background: var(--workshop-cyan); }
+.foro-workshop-landing .landing-news-card:nth-child(3) { background: var(--workshop-lavender); }
+
+.foro-workshop-landing .landing-news-card:hover {
+  border-color: var(--workshop-ink);
+  transform: translate(-2px, -2px);
+  box-shadow: 8px 8px 0 var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-comparison-panel:first-child {
+  background: var(--workshop-surface);
+}
+
+.foro-workshop-landing .landing-comparison-panel--summary {
+  background: var(--workshop-cyan);
+}
+
+.foro-workshop-landing .landing-comparison-item {
+  padding-bottom: 18px;
+  border-bottom: 2px dashed rgba(23, 19, 19, 0.3);
+}
+
+.foro-workshop-landing .landing-comparison-item:last-child {
+  border-bottom: 0;
+}
+
+.foro-workshop-landing .landing-smart-filter {
+  background: var(--workshop-lavender);
+  border-top: var(--workshop-border);
+  border-bottom: var(--workshop-border);
+}
+
+.foro-workshop-landing .landing-filter-board {
+  background: var(--workshop-surface);
+}
+
+.foro-workshop-landing .landing-filter-empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--workshop-surface),
+    var(--workshop-surface) 14px,
+    #fff0c5 14px,
+    #fff0c5 28px
+  );
+}
+
+.foro-workshop-landing .landing-filter-empty p {
+  padding: 9px 13px;
+  color: var(--workshop-ink);
+  -webkit-text-fill-color: var(--workshop-ink);
+  background: var(--workshop-yellow);
+  border: var(--workshop-border);
+  border-radius: 999px;
+}
+
+.foro-workshop-landing .landing-cta-board {
+  padding: 54px 30px;
+  background: var(--workshop-green);
+  border: var(--workshop-border);
+  border-radius: 10px;
+  box-shadow: var(--workshop-shadow);
+}
+
+.foro-workshop-landing .landing-footer {
+  color: var(--workshop-ink);
+  background: var(--workshop-yellow);
+  border-top: var(--workshop-border);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.foro-workshop-landing .landing-footer [class*="text-gray-"] {
+  color: var(--workshop-ink);
+}
+
+.foro-workshop-landing .landing-footer button:hover,
+.foro-workshop-landing .landing-footer a:hover {
+  color: #7a220e;
+  text-decoration: underline;
+}
+
+.foro-workshop-landing [role="dialog"] {
+  color: var(--workshop-ink);
+  background: var(--workshop-surface);
+  border: var(--workshop-border);
+  border-radius: 10px;
+  box-shadow: 8px 8px 0 var(--workshop-ink);
+}
+
+.foro-workshop-landing [role="dialog"] > div.pointer-events-none {
+  display: none;
+}
+
+.foro-workshop-landing [role="dialog"] h2,
+.foro-workshop-landing [role="dialog"] [class*="text-slate-"],
+.foro-workshop-landing [role="dialog"] [class*="text-blue-"] {
+  color: var(--workshop-ink);
+}
+
+.foro-workshop-landing [role="dialog"] img {
+  filter: brightness(0);
+}
+
+.foro-workshop-landing [role="dialog"] .landing-login-logo {
+  background: var(--workshop-yellow);
+  border: var(--workshop-border);
+  border-radius: 8px;
+  box-shadow: 3px 3px 0 var(--workshop-ink);
+}
+
+@media (max-width: 1023px) {
+  .foro-workshop-landing .landing-hero {
+    min-height: auto;
+    gap: 30px;
+  }
+
+  .foro-workshop-landing .landing-hero-copy {
+    max-width: 760px;
+  }
+
+  .foro-workshop-landing .landing-hero-visual {
+    transform: none;
+  }
+}
+
+@media (max-width: 639px) {
+  .foro-workshop-landing .landing-header {
+    top: 0;
+    left: 10px;
+    right: 10px;
+    width: calc(100% - 20px);
+    margin-top: 10px;
+  }
+
+  .foro-workshop-landing .landing-header img {
+    max-width: 92px;
+  }
+
+  .foro-workshop-landing .landing-header a,
+  .foro-workshop-landing .landing-header button {
+    padding-inline: 13px;
+  }
+
+  .foro-workshop-landing .landing-hero {
+    padding: 122px 18px 54px;
+  }
+
+  .foro-workshop-landing .landing-hero h1 {
+    font-size: clamp(3rem, 16vw, 4.3rem);
+  }
+
+  .foro-workshop-landing .landing-hero h1 > span:nth-child(3) {
+    font-size: clamp(1.9rem, 10vw, 2.7rem);
+  }
+
+  .foro-workshop-landing .landing-hero-copy > p br {
+    display: none;
+  }
+
+  .foro-workshop-landing .landing-hero-visual {
+    height: 535px;
+  }
+
+  .foro-workshop-landing .landing-summary-board {
+    padding: 22px;
+    transform: none;
+  }
+
+  .foro-workshop-landing .landing-section {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .foro-workshop-landing .landing-section::before {
+    inset-inline: 8px;
+  }
+
+  .foro-workshop-landing .landing-comparison-panel {
+    padding: 22px;
+  }
+
+  .foro-workshop-landing .landing-cta-board {
+    padding: 42px 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foro-workshop-landing *,
+  .foro-workshop-landing *::before,
+  .foro-workshop-landing *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

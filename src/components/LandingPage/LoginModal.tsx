@@ -66,7 +66,7 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                 </button>
 
                 <div className="relative text-center">
-                    <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#030e17] p-3 shadow-lg shadow-blue-950/30">
+                    <div className="landing-login-logo mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl border border-white/10 bg-[#030e17] p-3 shadow-lg shadow-blue-950/30">
                         <img
                             src="/images/LOGO-FORO/logo_last.png"
                             alt="FORO"
