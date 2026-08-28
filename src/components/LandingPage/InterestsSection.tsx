@@ -112,7 +112,7 @@ const InterestsSection = () => {
             </motion.div>
 
             {/* News Cards */}
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-6xl mx-auto">
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={activeTab}

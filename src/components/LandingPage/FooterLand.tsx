@@ -60,14 +60,14 @@ const FooterLand = () => {
             {/* Terms and Policy Modal (Fixed Positioning) */}
             <AnimatePresence>
                 {showTerms && (
-                    <div className="fixed inset-0 z-9999 flex items-center justify-center p-4 md:p-6 overflow-hidden">
+                    <div className="landing-policy-shell fixed inset-0 z-9999 flex items-center justify-center p-4 md:p-6 overflow-hidden">
                         {/* Backdrop */}
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             onClick={() => setShowTerms(false)}
-                            className="absolute inset-0 bg-black/90 backdrop-blur-sm"
+                            className="landing-policy-backdrop absolute inset-0 bg-black/90 backdrop-blur-sm"
                         />
 
                         {/* Modal Content */}
@@ -76,12 +76,15 @@ const FooterLand = () => {
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.95, y: 20 }}
                             transition={{ type: "spring", duration: 0.5, bounce: 0.3 }}
-                            className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative z-10"
+                            className="landing-policy-dialog bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden relative z-10"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="landing-policy-title"
                         >
                             {/* Modal Header */}
-                            <div className="p-6 md:p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+                            <div className="landing-policy-header p-6 md:p-8 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
                                 <div className="flex-1">
-                                    <h3 className="text-xl md:text-2xl font-black text-gray-900 leading-tight">
+                                    <h3 id="landing-policy-title" className="text-xl md:text-2xl font-black text-gray-900 leading-tight">
                                         {modalMode === 'terms'
                                             ? (lang === 'th' ? 'ข้อกำหนดและเงื่อนไขการใช้งาน' : 'Terms of Service')
                                             : (lang === 'th' ? 'นโยบายความเป็นส่วนตัว' : 'Privacy Policy')
@@ -92,7 +95,7 @@ const FooterLand = () => {
                                             {t[lang].lastUpdated}
                                         </p>
                                         <span className="text-gray-300">|</span>
-                                        <div className="flex bg-gray-200 rounded-lg p-0.5">
+                                        <div className="landing-policy-language flex bg-gray-200 rounded-lg p-0.5">
                                             <button
                                                 onClick={() => setLang('th')}
                                                 className={`px-2 py-0.5 text-[10px] font-black rounded-md transition-all ${lang === 'th' ? 'bg-white text-[#001f3f] shadow-sm' : 'text-gray-500'}`}
@@ -110,7 +113,8 @@ const FooterLand = () => {
                                 </div>
                                 <button
                                     onClick={() => setShowTerms(false)}
-                                    className="p-2 ml-4 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600 outline-none"
+                                    aria-label="ปิดข้อกำหนดและนโยบาย"
+                                    className="landing-policy-close p-2 ml-4 hover:bg-gray-100 rounded-full transition-colors text-gray-400 hover:text-gray-600 outline-none"
                                 >
                                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -119,7 +123,7 @@ const FooterLand = () => {
                             </div>
 
                             {/* Modal Content */}
-                            <div className="p-6 md:p-10 overflow-y-auto flex-1 text-sm md:text-base custom-scrollbar">
+                            <div className="landing-policy-content p-6 md:p-10 overflow-y-auto flex-1 text-sm md:text-base custom-scrollbar">
                                 {modalMode === 'terms' ? (
                                     lang === 'th' ? (
                                         <div className="space-y-6 text-gray-700 leading-relaxed font-medium">
@@ -431,10 +435,10 @@ const FooterLand = () => {
                             </div>
 
                             {/* Modal Footer */}
-                            <div className="p-6 md:p-8 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+                            <div className="landing-policy-footer p-6 md:p-8 border-t border-gray-100 bg-gray-50/50 flex justify-end">
                                 <button
                                     onClick={() => setShowTerms(false)}
-                                    className="px-12 py-4 bg-[#030e17] text-white rounded-2xl font-black hover:bg-black transition-all shadow-xl active:scale-95 text-sm md:text-base"
+                                    className="landing-policy-acknowledge px-12 py-4 bg-[#030e17] text-white rounded-2xl font-black hover:bg-black transition-all shadow-xl active:scale-95 text-sm md:text-base"
                                 >
                                     {t[lang].understand}
                                 </button>

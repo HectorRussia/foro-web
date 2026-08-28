@@ -7,7 +7,7 @@ const ComparisonSection = () => {
 
     return (
         <section className="landing-section landing-comparison py-24 px-6 relative">
-            <div className="max-w-7xl mx-auto">
+            <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
                     <motion.h2
                         initial={{ opacity: 0, y: 20 }}
