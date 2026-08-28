@@ -8,35 +8,14 @@ import SmartFilterSection from '../components/LandingPage/SmartFilterSection';
 import CTASection from '../components/LandingPage/CTASection';
 import FooterLand from '../components/LandingPage/FooterLand';
 import LoginModal from '../components/LandingPage/LoginModal';
-import type { LandingTheme } from '../components/LandingPage/ThemeSwitcher';
 import { organizationSchema, schemaData } from '../constants/SchemaMarkup';
+import { useTheme } from '../hooks/useTheme';
 import '../styles/landing-workshop.css';
-
-const LANDING_THEME_STORAGE_KEY = 'foro-landing-theme';
-
-const getInitialTheme = (): LandingTheme => {
-    if (typeof window === 'undefined') return 'system';
-
-    try {
-        const storedTheme = window.localStorage.getItem(LANDING_THEME_STORAGE_KEY);
-        return storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
-            ? storedTheme
-            : 'system';
-    } catch {
-        return 'system';
-    }
-};
-
-const getSystemTheme = (): 'light' | 'dark' => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return 'light';
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-};
 
 const LandingPage = () => {
     const [newsIndex, setNewsIndex] = useState(0);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-    const [theme, setTheme] = useState<LandingTheme>(getInitialTheme);
-    const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(getSystemTheme);
+    const { theme, resolvedTheme } = useTheme();
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -44,29 +23,6 @@ const LandingPage = () => {
         }, 5000);
         return () => clearInterval(timer);
     }, []);
-
-    useEffect(() => {
-        if (typeof window.matchMedia !== 'function') return;
-
-        const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-        const syncSystemTheme = (event: MediaQueryListEvent) => {
-            setSystemTheme(event.matches ? 'dark' : 'light');
-        };
-
-        mediaQuery.addEventListener('change', syncSystemTheme);
-        return () => mediaQuery.removeEventListener('change', syncSystemTheme);
-    }, []);
-
-    const handleThemeChange = (nextTheme: LandingTheme) => {
-        setTheme(nextTheme);
-        try {
-            window.localStorage.setItem(LANDING_THEME_STORAGE_KEY, nextTheme);
-        } catch {
-            // The selected theme still applies for this session when storage is unavailable.
-        }
-    };
-
-    const resolvedTheme = theme === 'system' ? systemTheme : theme;
 
     return (
         <div
@@ -86,11 +42,7 @@ const LandingPage = () => {
             <BackGround />
 
             {/* ── Header ── */}
-            <HeaderLand
-                onOpenLogin={() => setIsLoginModalOpen(true)}
-                theme={theme}
-                onThemeChange={handleThemeChange}
-            />
+            <HeaderLand onOpenLogin={() => setIsLoginModalOpen(true)} />
 
             <main>
                 {/* ── Hero Section ── */}

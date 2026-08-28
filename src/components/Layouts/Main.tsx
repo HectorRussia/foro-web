@@ -275,7 +275,7 @@ const Main = () => {
             {/* Delete Modal */}
             {isDeleteModalOpen && (
                 <div className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-                    <div className="bg-[#111112] w-full max-w-sm rounded-4xl border border-white/5 p-8 text-center shadow-2xl">
+                    <div className="app-workshop-dialog bg-[#111112] w-full max-w-sm rounded-4xl border border-white/5 p-8 text-center shadow-2xl">
                         <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
                             <FaTrash className="text-3xl text-red-500" />
                         </div>

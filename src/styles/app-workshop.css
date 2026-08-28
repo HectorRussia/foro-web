@@ -1,0 +1,1112 @@
+.foro-workshop-app {
+  --app-paper: #fff8e8;
+  --app-surface: #fffdf7;
+  --app-surface-alt: #f4ead3;
+  --app-foreground: #171313;
+  --app-ink: #171313;
+  --app-muted: #665d55;
+  --app-dim: #887c70;
+  --app-orange: #ff6038;
+  --app-yellow: #ffd84a;
+  --app-cyan: #56d2ee;
+  --app-cyan-text: #087f9a;
+  --app-green: #a8dc73;
+  --app-lavender: #c4b7f2;
+  --app-danger: #ef4444;
+  --app-grid-line: rgba(23, 19, 19, 0.08);
+  --app-divider: rgba(23, 19, 19, 0.2);
+  --app-soft-fill: rgba(23, 19, 19, 0.045);
+  --app-overlay: rgba(23, 19, 19, 0.72);
+  --app-border: 2px solid var(--app-ink);
+  --app-shadow: 6px 6px 0 var(--app-ink);
+  --app-shadow-small: 3px 3px 0 var(--app-ink);
+  --bg-950: var(--app-paper);
+  --bg-900: var(--app-surface);
+  --bg-850: var(--app-surface-alt);
+  --bg-800: var(--app-surface-alt);
+  --accent-blue: var(--app-cyan-text);
+  --accent-purple: var(--app-lavender);
+  --text-main: var(--app-foreground);
+  --text-muted: var(--app-muted);
+  --text-dim: var(--app-dim);
+  --glass-border: var(--app-divider);
+  --card-border: var(--app-divider);
+  min-height: 100dvh;
+  background: var(--app-paper);
+  color: var(--app-foreground);
+  font-family: "Noto Sans Thai", "Inter", sans-serif;
+}
+
+.foro-workshop-app[data-resolved-theme="dark"] {
+  --app-paper: #181414;
+  --app-surface: #242020;
+  --app-surface-alt: #2b2522;
+  --app-foreground: #fff8e8;
+  --app-muted: #cec2ae;
+  --app-dim: #a99d8e;
+  --app-orange: #ff7956;
+  --app-yellow: #f7dc71;
+  --app-cyan: #80d6e9;
+  --app-cyan-text: #80d6e9;
+  --app-green: #b9dd87;
+  --app-lavender: #c9c0eb;
+  --app-grid-line: rgba(255, 248, 232, 0.09);
+  --app-divider: rgba(255, 248, 232, 0.2);
+  --app-soft-fill: rgba(255, 248, 232, 0.055);
+  --app-overlay: rgba(10, 8, 8, 0.82);
+}
+
+.foro-workshop-app,
+.foro-workshop-app *,
+.foro-workshop-app *::before,
+.foro-workshop-app *::after {
+  box-sizing: border-box;
+}
+
+.foro-workshop-app ::selection {
+  background: var(--app-yellow);
+  color: var(--app-ink);
+}
+
+.foro-workshop-app h1,
+.foro-workshop-app h2,
+.foro-workshop-app h3,
+.foro-workshop-app .font-black {
+  font-family: "Kanit", "Noto Sans Thai", sans-serif;
+}
+
+.foro-workshop-app button,
+.foro-workshop-app input,
+.foro-workshop-app textarea,
+.foro-workshop-app select {
+  font: inherit;
+}
+
+.foro-workshop-app button:focus-visible,
+.foro-workshop-app a:focus-visible,
+.foro-workshop-app input:focus-visible,
+.foro-workshop-app textarea:focus-visible,
+.foro-workshop-app select:focus-visible,
+.foro-workshop-app [role="button"]:focus-visible {
+  outline: 3px solid var(--app-cyan);
+  outline-offset: 2px;
+}
+
+/* Shared shell */
+.foro-workshop-app .foro-page-shell {
+  gap: 12px;
+  background-color: var(--app-paper);
+  background-image:
+    linear-gradient(var(--app-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+  color: var(--app-foreground);
+  font-family: "Noto Sans Thai", "Inter", sans-serif;
+}
+
+.foro-workshop-app .foro-center-stage {
+  gap: 12px;
+}
+
+.foro-workshop-app .foro-workspace-panel,
+.foro-workshop-app .foro-workspace-main,
+.foro-workshop-app .foro-right-rail,
+.foro-workshop-app .root-sidebar {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 10px;
+  box-shadow: var(--app-shadow);
+}
+
+.foro-workshop-app .foro-workspace-panel,
+.foro-workshop-app .foro-workspace-main {
+  background-image:
+    linear-gradient(var(--app-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.foro-workshop-app .foro-workspace-panel,
+.foro-workshop-app .foro-workspace-main,
+.foro-workshop-app .foro-home-workspace,
+.foro-workshop-app .foro-read-workspace {
+  scrollbar-color: var(--app-divider) transparent;
+}
+
+.foro-workshop-app .foro-workspace-panel::-webkit-scrollbar-thumb,
+.foro-workshop-app .foro-workspace-main::-webkit-scrollbar-thumb,
+.foro-workshop-app .foro-home-workspace::-webkit-scrollbar-thumb,
+.foro-workshop-app .foro-read-workspace::-webkit-scrollbar-thumb {
+  background: var(--app-divider);
+}
+
+/* Sidebar and navigation */
+.foro-workshop-app .root-sidebar {
+  overflow: visible;
+}
+
+.foro-workshop-app .root-sidebar-logo {
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 78px;
+  padding: 14px 14px;
+  background: var(--app-yellow);
+  border-bottom: var(--app-border);
+  border-radius: 8px 8px 0 0;
+}
+
+.foro-workshop-app .root-sidebar-logo img {
+  filter: brightness(0);
+}
+
+.foro-workshop-app .root-sidebar-scroll {
+  background: var(--app-surface);
+}
+
+.foro-workshop-app .root-nav-item {
+  min-height: 50px;
+  color: var(--app-muted);
+  border: 2px solid transparent;
+  border-radius: 8px;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.foro-workshop-app .root-nav-item:hover {
+  color: var(--app-ink);
+  background: var(--app-cyan);
+  border-color: var(--app-ink);
+  transform: translate(-1px, -1px);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .root-nav-item.active {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  border-color: var(--app-ink);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .root-nav-item.active::before {
+  display: none;
+}
+
+.foro-workshop-app .root-nav-icon-shell,
+.foro-workshop-app .root-nav-item:hover .root-nav-icon-shell,
+.foro-workshop-app .root-nav-item.active .root-nav-icon-shell {
+  color: currentColor;
+}
+
+.foro-workshop-app .root-sidebar-footer {
+  background: var(--app-surface);
+  border-radius: 0 0 8px 8px;
+}
+
+.foro-workshop-app .root-sidebar-profile-panel {
+  min-height: 76px;
+  color: var(--app-ink);
+  background: var(--app-lavender);
+  border: var(--app-border);
+  border-radius: 8px;
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .root-sidebar-profile-panel:hover,
+.foro-workshop-app .root-sidebar-profile-panel.is-open {
+  border-color: var(--app-ink);
+  background: var(--app-lavender);
+  box-shadow: 5px 5px 0 var(--app-ink);
+}
+
+.foro-workshop-app .root-sidebar-profile-avatar {
+  color: var(--app-ink);
+  background: var(--app-cyan);
+  border: var(--app-border);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.foro-workshop-app .root-sidebar-profile-name,
+.foro-workshop-app .root-sidebar-profile-role,
+.foro-workshop-app .root-sidebar-profile-chevron,
+.foro-workshop-app .root-sidebar-profile-panel:hover .root-sidebar-profile-chevron,
+.foro-workshop-app .root-sidebar-profile-chevron.open {
+  color: var(--app-ink);
+}
+
+.foro-workshop-app .root-sidebar-profile-badge {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  border: 1px solid var(--app-ink);
+}
+
+.foro-workshop-app .root-profile-menu {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 8px;
+  box-shadow: var(--app-shadow);
+}
+
+/* Shared theme menu */
+.foro-workshop-app .foro-theme-switcher {
+  position: relative;
+  z-index: 80;
+}
+
+.foro-workshop-app .foro-theme-trigger {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--app-ink);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 8px;
+  box-shadow: var(--app-shadow-small);
+  transition: background-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.foro-workshop-app .foro-theme-trigger:hover,
+.foro-workshop-app .foro-theme-trigger[aria-expanded="true"] {
+  background: var(--app-cyan);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--app-ink);
+}
+
+.foro-workshop-app .foro-theme-menu {
+  z-index: 100;
+  width: 176px;
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 8px;
+  box-shadow: var(--app-shadow);
+}
+
+.foro-workshop-app .foro-theme-option {
+  color: var(--app-foreground);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: 6px;
+}
+
+.foro-workshop-app .foro-theme-option:hover {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  border-color: var(--app-ink);
+}
+
+.foro-workshop-app .foro-theme-option[aria-checked="true"] {
+  color: var(--app-ink);
+  background: var(--app-cyan);
+  border-color: var(--app-ink);
+}
+
+.foro-workshop-app .app-desktop-theme-control {
+  flex: 0 0 auto;
+}
+
+.foro-workshop-app .app-mobile-theme-control {
+  position: fixed;
+  right: 14px;
+  bottom: 92px;
+  z-index: 70;
+}
+
+.foro-workshop-app .app-mobile-theme-control .foro-theme-menu {
+  top: auto;
+  right: 0;
+  bottom: calc(100% + 10px);
+}
+
+/* Mobile navigation */
+.foro-workshop-app .app-mobile-nav-shell {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 10px;
+  box-shadow: 0 -4px 0 var(--app-ink);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+.foro-workshop-app .app-mobile-nav-item {
+  min-height: 54px;
+  color: var(--app-muted);
+  border: 2px solid transparent;
+  border-radius: 8px;
+}
+
+.foro-workshop-app .app-mobile-nav-item:hover {
+  color: var(--app-ink);
+  background: var(--app-cyan);
+  border-color: var(--app-ink);
+}
+
+.foro-workshop-app .app-mobile-nav-item.active {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  border-color: var(--app-ink);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .app-mobile-nav-item span {
+  color: currentColor !important;
+}
+
+/* Common typography and Tailwind color bridges */
+.foro-workshop-app [class~="text-white"],
+.foro-workshop-app [class~="text-white/90"],
+.foro-workshop-app [class~="text-white/95"],
+.foro-workshop-app [class~="text-gray-100"],
+.foro-workshop-app [class~="text-gray-200"],
+.foro-workshop-app [class~="text-slate-100"],
+.foro-workshop-app [class~="text-slate-200"] {
+  color: var(--app-foreground);
+}
+
+.foro-workshop-app [class~="text-gray-300"],
+.foro-workshop-app [class~="text-gray-400"],
+.foro-workshop-app [class~="text-slate-300"],
+.foro-workshop-app [class~="text-slate-400"],
+.foro-workshop-app [class~="text-[var(--text-muted)]"] {
+  color: var(--app-muted);
+}
+
+.foro-workshop-app [class~="text-gray-500"],
+.foro-workshop-app [class~="text-gray-600"],
+.foro-workshop-app [class~="text-slate-500"],
+.foro-workshop-app [class~="text-slate-600"],
+.foro-workshop-app [class~="text-[var(--text-dim)]"] {
+  color: var(--app-dim);
+}
+
+.foro-workshop-app [class~="text-blue-300"],
+.foro-workshop-app [class~="text-blue-400"],
+.foro-workshop-app [class~="text-blue-500"],
+.foro-workshop-app [class~="text-cyan-300"],
+.foro-workshop-app [class~="text-cyan-400"] {
+  color: var(--app-cyan-text);
+}
+
+.foro-workshop-app [class~="text-transparent"] {
+  color: var(--app-foreground);
+  background-image: none;
+  -webkit-text-fill-color: var(--app-foreground);
+}
+
+.foro-workshop-app [class~="bg-[#030e17]"],
+.foro-workshop-app [class~="bg-[#020a11]"],
+.foro-workshop-app [class~="bg-[#0b111d]"],
+.foro-workshop-app [class~="bg-[#0c121b]"],
+.foro-workshop-app [class~="bg-[#0D0D0E]"],
+.foro-workshop-app [class~="bg-[#0f172a]"],
+.foro-workshop-app [class~="bg-[#0f172a]/40"],
+.foro-workshop-app [class~="bg-[#0f172a]/50"],
+.foro-workshop-app [class~="bg-[#0f172a]/60"],
+.foro-workshop-app [class~="bg-[#0f172a]/80"],
+.foro-workshop-app [class~="bg-[#020914]/80"],
+.foro-workshop-app [class~="bg-[#071020]"],
+.foro-workshop-app [class~="bg-[#081724]"],
+.foro-workshop-app [class~="bg-[#0a1622]/90"],
+.foro-workshop-app [class~="bg-[#0f0f10]/98"],
+.foro-workshop-app [class~="bg-[#101114]"],
+.foro-workshop-app [class~="bg-[#101a2a]"],
+.foro-workshop-app [class~="bg-[#111827]/70"],
+.foro-workshop-app [class~="bg-[#111827]/80"],
+.foro-workshop-app [class~="bg-[#101011]/98"],
+.foro-workshop-app [class~="bg-[#111112]"],
+.foro-workshop-app [class~="bg-[#111112]/50"],
+.foro-workshop-app [class~="bg-[#111112]/98"],
+.foro-workshop-app [class~="bg-[#121214]/95"],
+.foro-workshop-app [class~="bg-[#161617]"],
+.foro-workshop-app [class~="bg-[#181819]"],
+.foro-workshop-app [class~="bg-[#18181a]"],
+.foro-workshop-app [class~="bg-[#191919]"],
+.foro-workshop-app [class~="bg-[#1a1a1b]/50"],
+.foro-workshop-app [class~="bg-[#1a1a1b]"],
+.foro-workshop-app [class~="bg-[#1a1a1c]"],
+.foro-workshop-app [class~="bg-[#1a1a1c]/98"],
+.foro-workshop-app [class~="bg-[#202021]"],
+.foro-workshop-app [class~="bg-[#242427]"],
+.foro-workshop-app [class~="bg-[#253248]"],
+.foro-workshop-app [class~="bg-[#1a1c22]"],
+.foro-workshop-app [class~="bg-[#111214]"],
+.foro-workshop-app [class~="bg-[#101a2a]/50"],
+.foro-workshop-app [class~="bg-[#0f1720]"],
+.foro-workshop-app [class~="bg-[#111b28]"],
+.foro-workshop-app [class~="bg-[#151516]"],
+.foro-workshop-app [class~="bg-[#171717]"],
+.foro-workshop-app [class~="bg-[#171718]"],
+.foro-workshop-app [class~="bg-[#0f1419]/80"],
+.foro-workshop-app [class~="bg-[#1c1c1c]"],
+.foro-workshop-app [class~="bg-[#1e293b]/30"],
+.foro-workshop-app [class~="bg-[#1e293b]/50"],
+.foro-workshop-app [class~="bg-[#2d3b4e]"],
+.foro-workshop-app [class~="bg-[#334155]"],
+.foro-workshop-app [class~="bg-slate-900/50"],
+.foro-workshop-app [class~="bg-slate-800/50"],
+.foro-workshop-app [class~="bg-slate-700/50"],
+.foro-workshop-app [class~="bg-slate-700"],
+.foro-workshop-app [class~="bg-[#1e293b]"] {
+  background-color: var(--app-surface);
+  background-image: none;
+}
+
+.foro-workshop-app [class~="bg-[#12203b]"],
+.foro-workshop-app [class~="bg-[#203a68]"],
+.foro-workshop-app [class~="bg-[#2d8eff]"],
+.foro-workshop-app [class~="bg-[#3fa0ff]"] {
+  color: var(--app-ink);
+  background: var(--app-cyan);
+}
+
+.foro-workshop-app [class~="bg-black/30"],
+.foro-workshop-app [class~="bg-black/40"],
+.foro-workshop-app [class~="bg-white/2"],
+.foro-workshop-app [class~="bg-white/3"],
+.foro-workshop-app [class~="bg-white/4"],
+.foro-workshop-app [class~="bg-white/5"],
+.foro-workshop-app [class~="bg-white/6"],
+.foro-workshop-app [class~="bg-white/7"],
+.foro-workshop-app [class~="bg-white/8"],
+.foro-workshop-app [class~="bg-white/10"] {
+  background-color: var(--app-soft-fill);
+}
+
+.foro-workshop-app [class~="border-white/5"],
+.foro-workshop-app [class~="border-white/6"],
+.foro-workshop-app [class~="border-white/8"],
+.foro-workshop-app [class~="border-white/10"],
+.foro-workshop-app [class~="border-white/12"],
+.foro-workshop-app [class~="border-slate-700"],
+.foro-workshop-app [class~="border-slate-700/50"],
+.foro-workshop-app [class~="border-gray-700"],
+.foro-workshop-app [class~="border-[#1e293b]"] {
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app input,
+.foro-workshop-app textarea,
+.foro-workshop-app select {
+  color: var(--app-foreground);
+  background-color: var(--app-surface);
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app input::placeholder,
+.foro-workshop-app textarea::placeholder {
+  color: var(--app-dim);
+  opacity: 1;
+}
+
+.foro-workshop-app input:focus,
+.foro-workshop-app textarea:focus,
+.foro-workshop-app select:focus {
+  border-color: var(--app-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-cyan) 42%, transparent);
+}
+
+.foro-workshop-app button[class~="bg-blue-600"],
+.foro-workshop-app button[class~="bg-blue-500"],
+.foro-workshop-app button[class~="bg-white"],
+.foro-workshop-app button[class*="from-blue-"],
+.foro-workshop-app button[class*="from-[#3b82f6]"],
+.foro-workshop-app .btn-pill.primary {
+  color: var(--app-ink);
+  background: var(--app-orange);
+  border: 2px solid var(--app-ink);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app button[class~="bg-blue-600"]:hover,
+.foro-workshop-app button[class~="bg-blue-500"]:hover,
+.foro-workshop-app button[class~="bg-white"]:hover,
+.foro-workshop-app button[class*="from-blue-"]:hover,
+.foro-workshop-app button[class*="from-[#3b82f6]"]:hover,
+.foro-workshop-app .btn-pill.primary:hover {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  transform: translate(-1px, -1px);
+  box-shadow: 4px 4px 0 var(--app-ink);
+}
+
+.foro-workshop-app button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  box-shadow: none;
+  transform: none;
+}
+
+/* Page headings and toolbars */
+.foro-workshop-app .root-home-title,
+.foro-workshop-app .reader-page-title,
+.foro-workshop-app .hero-search-title {
+  color: var(--app-foreground);
+  background: none;
+  font-family: "Kanit", "Noto Sans Thai", sans-serif;
+  -webkit-text-fill-color: var(--app-foreground);
+}
+
+.foro-workshop-app .root-home-subtitle,
+.foro-workshop-app .reader-page-subtitle,
+.foro-workshop-app .hero-search-subtitle {
+  color: var(--app-muted);
+}
+
+.foro-workshop-app .root-home-header,
+.foro-workshop-app .reader-header {
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app .home-control-panel,
+.foro-workshop-app .reader-toolbar,
+.foro-workshop-app .feed-section-header {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 10px;
+  box-shadow: var(--app-shadow);
+}
+
+.foro-workshop-app .reader-toolbar {
+  align-items: center;
+  padding: 12px;
+}
+
+.foro-workshop-app .reader-search-input-wrap,
+.foro-workshop-app .reader-layout-button,
+.foro-workshop-app .reader-sort-pill,
+.foro-workshop-app .home-ai-quick-preset-btn,
+.foro-workshop-app .root-home-filter-btn,
+.foro-workshop-app .root-home-sync-btn,
+.foro-workshop-app .header-secondary-action {
+  color: var(--app-foreground);
+  background: var(--app-surface-alt);
+  border: 2px solid var(--app-ink);
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.foro-workshop-app .reader-search-input,
+.foro-workshop-app .reader-search-input-wrap:focus-within {
+  color: var(--app-foreground);
+  background: transparent;
+}
+
+.foro-workshop-app .reader-search-input-wrap:focus-within {
+  border-color: var(--app-ink);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-cyan) 42%, transparent);
+}
+
+.foro-workshop-app .reader-sort-pill.active,
+.foro-workshop-app .home-ai-quick-preset-btn.is-active,
+.foro-workshop-app .root-home-filter-btn.active,
+.foro-workshop-app .root-home-filter-btn.has-active-result {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  border-color: var(--app-ink);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .root-home-sync-btn,
+.foro-workshop-app .root-home-sync-btn.primary {
+  color: var(--app-ink);
+  background: var(--app-orange);
+}
+
+.foro-workshop-app .home-selected-list-bar-text {
+  color: var(--app-foreground);
+  -webkit-text-fill-color: var(--app-foreground);
+}
+
+.foro-workshop-app .home-selected-list-bar.is-active-list .home-selected-list-bar-text {
+  color: var(--active-list-accent);
+  background: none;
+  filter: none;
+  -webkit-text-fill-color: var(--active-list-accent);
+}
+
+/* Feed and reader cards */
+.foro-workshop-app .feed-card,
+.foro-workshop-app .dashboard-card,
+.foro-workshop-app .bookmark-card,
+.foro-workshop-app .foro-filter-summary-card {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: 2px solid var(--app-ink);
+  border-radius: 10px;
+  box-shadow: 3px 3px 0 var(--app-ink);
+}
+
+.foro-workshop-app .feed-card:hover,
+.foro-workshop-app .dashboard-card:hover,
+.foro-workshop-app .bookmark-card:hover {
+  transform: translate(-2px, -2px);
+  border-color: var(--app-ink);
+  box-shadow: 6px 6px 0 var(--app-ink);
+}
+
+.foro-workshop-app .feed-card-body-copy,
+.foro-workshop-app .feed-card-author-name,
+.foro-workshop-app .foro-filter-summary-title,
+.foro-workshop-app .foro-filter-summary-item-text {
+  color: var(--app-foreground);
+}
+
+.foro-workshop-app .feed-card-author-handle,
+.foro-workshop-app .feed-card-rss-summary,
+.foro-workshop-app .feed-card-stats,
+.foro-workshop-app .foro-filter-summary-date,
+.foro-workshop-app .foro-filter-summary-note {
+  color: var(--app-muted);
+}
+
+.foro-workshop-app .feed-card-author-avatar,
+.foro-workshop-app .feed-card-media {
+  border: 2px solid var(--app-ink);
+  border-radius: 8px;
+}
+
+.foro-workshop-app .feed-card-footer {
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app .feed-card-time-badge,
+.foro-workshop-app .feed-card-source-badge,
+.foro-workshop-app .feed-card-inline-action,
+.foro-workshop-app .foro-filter-citation-badge,
+.foro-workshop-app .ai-filtered-badge,
+.foro-workshop-app .home-feed-count-badge {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  border: 1px solid var(--app-ink);
+}
+
+.foro-workshop-app .feed-card-read-action {
+  color: var(--app-ink);
+  background: var(--app-cyan);
+}
+
+.foro-workshop-app .foro-filter-summary-card {
+  background: var(--app-cyan);
+  color: var(--app-ink);
+}
+
+.foro-workshop-app .foro-filter-summary-card * {
+  border-color: color-mix(in srgb, var(--app-ink) 30%, transparent);
+}
+
+/* Post List */
+.foro-workshop-app .post-list-rail {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+}
+
+.foro-workshop-app .post-list-header {
+  color: var(--app-ink);
+  background: var(--app-cyan);
+  border-bottom: var(--app-border);
+}
+
+.foro-workshop-app .post-list-header-mark,
+.foro-workshop-app .post-list-header [class~="text-slate-400"],
+.foro-workshop-app .post-list-header [class~="text-gray-400"] {
+  color: var(--app-ink);
+}
+
+.foro-workshop-app .post-list-header button {
+  color: var(--app-ink);
+  border-radius: 8px;
+}
+
+.foro-workshop-app .post-list-header button:hover {
+  background: var(--app-yellow);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .post-list-header .absolute,
+.foro-workshop-app .post-list-scroll > [class*="overflow-hidden"],
+.foro-workshop-app .post-list-row-main {
+  color: var(--app-foreground);
+  background-color: var(--app-surface);
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app .post-list-row-main:hover,
+.foro-workshop-app .post-list-row-main[class*="bg-white/8"] {
+  border-color: var(--app-ink);
+  background: var(--app-surface-alt);
+}
+
+.foro-workshop-app .post-list-section-label {
+  color: var(--app-cyan-text);
+}
+
+.foro-workshop-app .post-list-scroll input {
+  border: 2px solid var(--app-ink);
+  border-radius: 8px;
+}
+
+.foro-workshop-app .post-list-row-main > div:first-child {
+  border: 2px solid var(--app-ink);
+  box-shadow: 2px 2px 0 var(--app-ink) !important;
+}
+
+.foro-workshop-app .post-list-row-main > div:first-child svg {
+  color: currentColor;
+}
+
+/* Empty, loading and status states */
+.foro-workshop-app .home-splash,
+.foro-workshop-app [class*="border-dashed"] {
+  color: var(--app-foreground);
+  background-color: color-mix(in srgb, var(--app-surface) 92%, transparent);
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app .home-splash-title {
+  color: var(--app-foreground);
+  text-shadow: none;
+}
+
+.foro-workshop-app .home-load-more-btn,
+.foro-workshop-app .home-feed-status-toast {
+  color: var(--app-ink);
+  background: var(--app-green);
+  border: var(--app-border);
+  border-radius: 8px;
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app [class~="animate-pulse"] {
+  border-color: var(--app-divider);
+}
+
+/* Blueprint decoration replacing the constellation */
+.foro-workshop-app .home-blueprint {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background-image:
+    linear-gradient(var(--app-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.foro-workshop-app .home-blueprint-path {
+  position: absolute;
+  inset: 12% 9%;
+  border: 2px dashed var(--app-divider);
+  border-radius: 10px;
+  transform: rotate(-1deg);
+}
+
+.foro-workshop-app .home-blueprint-block {
+  position: absolute;
+  width: 88px;
+  height: 64px;
+  border: var(--app-border);
+  border-radius: 8px;
+  box-shadow: var(--app-shadow-small);
+  animation: app-blueprint-enter 420ms ease-out both;
+}
+
+.foro-workshop-app .home-blueprint-block:nth-child(2) {
+  top: 15%;
+  right: 10%;
+  background: var(--app-yellow);
+  transform: rotate(7deg);
+}
+
+.foro-workshop-app .home-blueprint-block:nth-child(3) {
+  bottom: 16%;
+  left: 9%;
+  background: var(--app-green);
+  transform: rotate(-8deg);
+  animation-delay: 80ms;
+}
+
+.foro-workshop-app .home-blueprint-block:nth-child(4) {
+  right: 24%;
+  bottom: 9%;
+  width: 64px;
+  height: 64px;
+  background: var(--app-lavender);
+  transform: rotate(4deg);
+  animation-delay: 150ms;
+}
+
+.foro-workshop-app .home-blueprint-dot {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border: 2px solid var(--app-ink);
+  border-radius: 50%;
+  background: var(--app-cyan);
+}
+
+.foro-workshop-app .home-blueprint-dot:nth-child(5) { top: 28%; left: 24%; }
+.foro-workshop-app .home-blueprint-dot:nth-child(6) { top: 54%; right: 30%; background: var(--app-orange); }
+.foro-workshop-app .home-blueprint-dot:nth-child(7) { bottom: 22%; left: 48%; background: var(--app-yellow); }
+
+@keyframes app-blueprint-enter {
+  from { opacity: 0; transform: translateY(12px) rotate(0); }
+  to { opacity: 1; }
+}
+
+/* Dialogs and overlays rendered inside the protected root */
+.foro-workshop-app [role="dialog"],
+.foro-workshop-app .fixed > [class*="max-w-"][class*="bg-[#"],
+.foro-workshop-app .fixed > [class*="rounded-"][class*="bg-[#"] {
+  color: var(--app-foreground);
+  background-color: var(--app-surface);
+  background-image: none;
+  border: var(--app-border);
+  border-radius: 10px;
+  box-shadow: 8px 8px 0 var(--app-ink);
+}
+
+.foro-workshop-app .fixed[class*="bg-black/60"],
+.foro-workshop-app .fixed[class*="bg-black/80"],
+.foro-workshop-app .fixed[class*="bg-black/85"] {
+  background: var(--app-overlay);
+}
+
+.foro-workshop-app .app-media-lightbox {
+  color: #fff8e8;
+  background: rgba(10, 8, 8, 0.94);
+}
+
+.foro-workshop-app .app-media-lightbox button {
+  color: var(--app-ink);
+  background: var(--app-surface);
+  border: 2px solid var(--app-ink);
+  border-radius: 8px;
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .app-workshop-dialog,
+.foro-workshop-app .app-popover {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 10px;
+  box-shadow: var(--app-shadow);
+}
+
+.foro-workshop-app .app-feature-panel {
+  color: var(--app-foreground);
+  background: var(--app-yellow);
+  border: var(--app-border);
+  border-radius: 10px;
+  box-shadow: var(--app-shadow);
+}
+
+.foro-workshop-app .app-feature-panel,
+.foro-workshop-app .app-feature-panel h1,
+.foro-workshop-app .app-feature-panel p,
+.foro-workshop-app .app-feature-panel svg {
+  color: var(--app-ink);
+  -webkit-text-fill-color: var(--app-ink);
+}
+
+.foro-workshop-app .app-dense-card,
+.foro-workshop-app .bookmark-card {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: 2px solid var(--app-ink);
+  border-radius: 10px;
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .app-dense-card:hover,
+.foro-workshop-app .bookmark-card:hover {
+  transform: translate(-2px, -2px);
+  border-color: var(--app-ink);
+  background: var(--app-surface);
+  box-shadow: 6px 6px 0 var(--app-ink);
+}
+
+.foro-workshop-app .bookmark-card-glow {
+  background: radial-gradient(circle at top right, color-mix(in srgb, var(--app-cyan) 35%, transparent), transparent 70%);
+}
+
+.foro-workshop-app .bookmark-card-skeleton {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--app-surface),
+    var(--app-surface) 14px,
+    var(--app-surface-alt) 14px,
+    var(--app-surface-alt) 28px
+  );
+}
+
+.foro-workshop-app .app-segmented-control,
+.foro-workshop-app .app-input-shell,
+.foro-workshop-app .foro-bookmark-page [class~="inline-flex"][class~="p-1"] {
+  color: var(--app-foreground);
+  background: var(--app-surface-alt);
+  border: var(--app-border);
+  border-radius: 10px;
+}
+
+.foro-workshop-app .app-segmented-control button,
+.foro-workshop-app .foro-bookmark-page [class~="inline-flex"][class~="p-1"] button {
+  color: var(--app-muted);
+  border: 2px solid transparent;
+  border-radius: 8px;
+}
+
+.foro-workshop-app .app-segmented-control button[class*="from-blue-"],
+.foro-workshop-app .foro-bookmark-page [class~="inline-flex"][class~="p-1"] button[class~="bg-white/10"] {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  border-color: var(--app-ink);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .app-input-shell:focus-within {
+  border-color: var(--app-ink);
+  background: var(--app-surface);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--app-cyan) 42%, transparent);
+}
+
+/* Page-specific balanced surfaces */
+.foro-workshop-app .foro-category-page main > .space-y-6 > .relative input,
+.foro-workshop-app .foro-realtime-search-page input,
+.foro-workshop-app .foro-realtime-search-page select,
+.foro-workshop-app .foro-advance-search-page input,
+.foro-workshop-app .foro-advance-search-page select,
+.foro-workshop-app .foro-advance-search-page textarea {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: 2px solid var(--app-ink);
+  border-radius: 8px;
+}
+
+.foro-workshop-app .foro-category-page .grid > .app-dense-card,
+.foro-workshop-app .foro-follow-page .grid > .app-dense-card,
+.foro-workshop-app .foro-target-page .grid > .app-dense-card {
+  min-width: 0;
+}
+
+.foro-workshop-app .foro-category-news-page .foro-workspace-main > div:first-child,
+.foro-workshop-app .foro-realtime-search-page .foro-workspace-main > div:first-child,
+.foro-workshop-app .foro-advance-search-page header,
+.foro-workshop-app .foro-content-page .foro-workspace-panel > div > div:first-child {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app .foro-content-page .foro-workspace-panel > div > div:first-child button {
+  color: var(--app-foreground);
+  background: var(--app-surface-alt);
+  border: 2px solid var(--app-ink);
+  border-radius: 8px;
+}
+
+.foro-workshop-app .foro-content-page .foro-workspace-panel > div > div:first-child button[class*="from-[#6c63ff]"] {
+  color: var(--app-ink);
+  background: var(--app-yellow);
+  box-shadow: var(--app-shadow-small);
+}
+
+.foro-workshop-app .foro-content-page article,
+.foro-workshop-app .foro-content-page [class~="rounded-4xl"][class~="border"],
+.foro-workshop-app .foro-content-page [class~="rounded-[40px]"][class~="border"] {
+  color: var(--app-foreground);
+  background: var(--app-surface);
+  border: var(--app-border);
+  border-radius: 10px;
+  box-shadow: var(--app-shadow);
+}
+
+/* Route-level dense surfaces */
+.foro-workshop-app .foro-workspace-main > header,
+.foro-workshop-app .foro-workspace-main > div:first-child,
+.foro-workshop-app .foro-workspace-panel > div > div:first-child[class*="border-b"] {
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app [class~="rounded-2xl"][class~="border"],
+.foro-workshop-app [class~="rounded-3xl"][class~="border"],
+.foro-workshop-app [class~="rounded-[20px]"][class~="border"],
+.foro-workshop-app [class~="rounded-[22px]"][class~="border"],
+.foro-workshop-app [class~="rounded-[24px]"][class~="border"] {
+  border-color: var(--app-divider);
+}
+
+.foro-workshop-app [class~="rounded-2xl"][class~="border"]:hover,
+.foro-workshop-app [class~="rounded-3xl"][class~="border"]:hover,
+.foro-workshop-app [class~="rounded-[20px]"][class~="border"]:hover,
+.foro-workshop-app [class~="rounded-[22px]"][class~="border"]:hover,
+.foro-workshop-app [class~="rounded-[24px]"][class~="border"]:hover {
+  border-color: var(--app-ink);
+}
+
+.foro-workshop-app [class~="bg-red-600"][class~="text-white"],
+.foro-workshop-app [class~="bg-red-500"][class~="text-white"] {
+  color: #fff;
+}
+
+@media (max-width: 1023px) {
+  .foro-workshop-app .foro-page-shell {
+    padding: 0;
+    background: var(--app-surface);
+  }
+
+  .foro-workshop-app .foro-workspace-panel,
+  .foro-workshop-app .foro-workspace-main,
+  .foro-workshop-app .foro-right-rail,
+  .foro-workshop-app .root-sidebar {
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .foro-workshop-app .foro-workspace-panel,
+  .foro-workshop-app .foro-workspace-main {
+    border: 0;
+  }
+
+  .foro-workshop-app .root-home-header,
+  .foro-workshop-app .reader-header {
+    padding-top: 18px;
+  }
+
+  .foro-workshop-app .home-control-panel,
+  .foro-workshop-app .reader-toolbar,
+  .foro-workshop-app .feed-section-header {
+    box-shadow: var(--app-shadow-small);
+  }
+}
+
+@media (max-width: 639px) {
+  .foro-workshop-app .app-mobile-theme-control {
+    right: 12px;
+    bottom: 88px;
+  }
+
+  .foro-workshop-app .root-home-title,
+  .foro-workshop-app .reader-page-title,
+  .foro-workshop-app .hero-search-title {
+    font-size: 34px;
+  }
+
+  .foro-workshop-app .home-blueprint-block {
+    transform: scale(0.78) rotate(5deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .foro-workshop-app *,
+  .foro-workshop-app *::before,
+  .foro-workshop-app *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

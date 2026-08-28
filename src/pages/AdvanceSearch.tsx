@@ -320,7 +320,7 @@ const AdvancedSearchStream = () => {
     };
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-advance-search-page">
             <Sidebar />
 
             <div className="foro-center-stage">

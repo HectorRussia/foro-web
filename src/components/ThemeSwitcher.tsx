@@ -1,12 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FaDesktop, FaMoon, FaSun } from 'react-icons/fa';
-
-export type LandingTheme = 'light' | 'dark' | 'system';
-
-interface ThemeSwitcherProps {
-    theme: LandingTheme;
-    onThemeChange: (theme: LandingTheme) => void;
-}
+import { useTheme } from '../hooks/useTheme';
 
 const themeOptions = [
     { value: 'light' as const, label: 'Light', Icon: FaSun },
@@ -14,7 +8,8 @@ const themeOptions = [
     { value: 'system' as const, label: 'System', Icon: FaDesktop },
 ];
 
-const ThemeSwitcher = ({ theme, onThemeChange }: ThemeSwitcherProps) => {
+const ThemeSwitcher = () => {
+    const { theme, setTheme } = useTheme();
     const [isOpen, setIsOpen] = useState(false);
     const rootRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
@@ -44,18 +39,18 @@ const ThemeSwitcher = ({ theme, onThemeChange }: ThemeSwitcherProps) => {
         };
     }, [isOpen]);
 
-    const selectTheme = (nextTheme: LandingTheme) => {
-        onThemeChange(nextTheme);
+    const selectTheme = (nextTheme: typeof themeOptions[number]['value']) => {
+        setTheme(nextTheme);
         setIsOpen(false);
         triggerRef.current?.focus();
     };
 
     return (
-        <div ref={rootRef} className="landing-theme-switcher relative">
+        <div ref={rootRef} className="foro-theme-switcher landing-theme-switcher relative">
             <button
                 ref={triggerRef}
                 type="button"
-                className="landing-theme-trigger inline-flex h-11 w-11 items-center justify-center"
+                className="foro-theme-trigger landing-theme-trigger inline-flex h-11 w-11 items-center justify-center"
                 aria-label={`ธีมเว็บไซต์: ${activeTheme.label}`}
                 aria-haspopup="menu"
                 aria-expanded={isOpen}
@@ -67,7 +62,7 @@ const ThemeSwitcher = ({ theme, onThemeChange }: ThemeSwitcherProps) => {
 
             {isOpen && (
                 <div
-                    className="landing-theme-menu absolute right-0 top-[calc(100%+10px)] w-44 p-2"
+                    className="foro-theme-menu landing-theme-menu absolute right-0 top-[calc(100%+10px)] w-44 p-2"
                     role="menu"
                     aria-label="เลือกธีมเว็บไซต์"
                 >
@@ -75,7 +70,7 @@ const ThemeSwitcher = ({ theme, onThemeChange }: ThemeSwitcherProps) => {
                         <button
                             key={value}
                             type="button"
-                            className="landing-theme-option flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left text-sm font-bold"
+                            className="foro-theme-option landing-theme-option flex min-h-11 w-full items-center gap-3 px-3 py-2 text-left text-sm font-bold"
                             role="menuitemradio"
                             aria-checked={theme === value}
                             onClick={() => selectTheme(value)}
@@ -92,3 +87,4 @@ const ThemeSwitcher = ({ theme, onThemeChange }: ThemeSwitcherProps) => {
 };
 
 export default ThemeSwitcher;
+

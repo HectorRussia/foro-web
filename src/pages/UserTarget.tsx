@@ -516,7 +516,7 @@ const UserTarget = () => {
     };
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-target-page">
             <Sidebar />
             <div className="foro-center-stage">
                 <section className="foro-workspace-panel relative p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
@@ -537,7 +537,7 @@ const UserTarget = () => {
                     </div>
 
                     {/* ── Tabs (Segmented Control) ── */}
-                    <div className="flex max-w-full flex-wrap items-center gap-2 p-1.5 bg-[#181819] border border-white/8 rounded-2xl mb-3 w-fit shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
+                    <div className="app-segmented-control flex max-w-full flex-wrap items-center gap-2 p-1.5 bg-[#181819] border border-white/8 rounded-2xl mb-3 w-fit shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]">
                         <button
                             onClick={() => setActiveTab('recommend')}
                             className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-xs transition-all duration-300 ${activeTab === 'recommend'
@@ -581,7 +581,7 @@ const UserTarget = () => {
                             <div className="w-full max-w-[620px] mb-7">
                                 <form onSubmit={handleSearch} className="flex flex-col sm:flex-row sm:items-center gap-3">
                                     {/* Input Container */}
-                                    <div className="flex min-h-[52px] flex-1 items-center gap-4 bg-[#1a1a1b] border border-white/8 rounded-2xl px-5 py-3.5 transition-all duration-300 focus-within:border-white/15 focus-within:bg-[#202021]">
+                                    <div className="app-input-shell flex min-h-[52px] flex-1 items-center gap-4 bg-[#1a1a1b] border border-white/8 rounded-2xl px-5 py-3.5 transition-all duration-300 focus-within:border-white/15 focus-within:bg-[#202021]">
                                         <FaMagnifyingGlass className="text-gray-500 text-base" />
                                         <input
                                             type="text"
@@ -649,7 +649,7 @@ const UserTarget = () => {
                                             initial={{ opacity: 0, y: 20 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             transition={{ delay: idx * 0.05 }}
-                                            className="group flex items-center gap-3 bg-[#111112] border border-white/5 p-3 md:p-4 rounded-2xl hover:border-blue-500/40 hover:bg-[#1a1a1c] transition-all duration-300"
+                                            className="app-dense-card group flex items-center gap-3 bg-[#111112] border border-white/5 p-3 md:p-4 rounded-2xl hover:border-blue-500/40 hover:bg-[#1a1a1c] transition-all duration-300"
                                         >
                                             {/* Avatar */}
                                             {user.profile_image_url_https && (
@@ -745,7 +745,7 @@ const UserTarget = () => {
                                                     animate={{ opacity: 1, y: 0 }}
                                                     transition={{ delay: idx * 0.05 }}
                                                     whileHover={{ y: -3 }}
-                                                    className="group relative flex min-h-[290px] flex-col overflow-visible rounded-[22px] border border-[#1d3555]/75 bg-[#0c121b] p-4 shadow-[0_18px_44px_rgba(0,0,0,0.28)] transition-all duration-300 hover:border-blue-500/60"
+                                                    className="app-dense-card group relative flex min-h-[290px] flex-col overflow-visible rounded-[22px] border border-[#1d3555]/75 bg-[#0c121b] p-4 shadow-[0_18px_44px_rgba(0,0,0,0.28)] transition-all duration-300 hover:border-blue-500/60"
                                                 >
                                                     <div className="flex items-start justify-between gap-4">
                                                         <div className="rounded-full border border-blue-400/40 bg-blue-500/15 px-3 py-1 text-[10px] font-black text-blue-100">
@@ -966,7 +966,7 @@ const UserTarget = () => {
                                                 initial={{ opacity: 0, y: 10 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: idx * 0.05 }}
-                                                className="group relative bg-[#161617] border border-white/5 rounded-[24px] p-4 hover:border-white/10 transition-all duration-300"
+                                                className="app-dense-card group relative bg-[#161617] border border-white/5 rounded-[24px] p-4 hover:border-white/10 transition-all duration-300"
                                             >
                                                 <div className="flex items-center gap-4">
                                                     {/* Avatar */}
