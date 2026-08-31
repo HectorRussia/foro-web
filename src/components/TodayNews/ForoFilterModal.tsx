@@ -64,11 +64,14 @@ export const ForoFilterModal = ({
                                 {/* Modal Container */}
                                 <div className="fixed inset-0 z-101 flex items-center justify-center p-4 pointer-events-none sm:p-6">
                                     <motion.div
+                                        role="dialog"
+                                        aria-modal="true"
+                                        aria-labelledby="foro-filter-title"
                                         initial={{ opacity: 0, scale: 0.94, y: 18 }}
                                         animate={{ opacity: 1, scale: 1, y: 0 }}
                                         exit={{ opacity: 0, scale: 0.94, y: 18 }}
                                         onClick={(e) => e.stopPropagation()}
-                                        className="pointer-events-auto relative w-full max-w-140 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-4xl border border-white/8 border-t-2 border-t-blue-500/80 bg-[#121214]/95 p-4 shadow-[0_40px_120px_rgba(0,0,0,0.82)] backdrop-blur-2xl sm:p-6"
+                                        className="app-workshop-dialog pointer-events-auto relative w-full max-w-140 max-h-[calc(100vh-2rem)] overflow-y-auto rounded-4xl border border-white/8 border-t-2 border-t-blue-500/80 bg-[#121214]/95 p-4 shadow-[0_40px_120px_rgba(0,0,0,0.82)] backdrop-blur-2xl sm:p-6"
                                     >
                                         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.16),transparent_42%)]" />
                                         <div className="relative space-y-4 sm:space-y-5">
@@ -79,7 +82,7 @@ export const ForoFilterModal = ({
                                                 </div>
                                                 <div className="min-w-0 pt-0.5">
                                                     <p className="text-[11px] font-black uppercase tracking-[0.28em] text-blue-400/70">ANALYSIS MODE</p>
-                                                    <h2 className="mt-1 text-[24px] font-black leading-none tracking-tight text-white sm:text-[28px]">FORO Filter</h2>
+                                                    <h2 id="foro-filter-title" className="mt-1 text-[24px] font-black leading-none tracking-tight text-white sm:text-[28px]">FORO Filter</h2>
                                                     <p className="mt-2 max-w-xl text-sm leading-relaxed text-slate-400">บอก FORO ว่าอยากให้ช่วยมองประเด็นนี้แบบไหน</p>
                                                 </div>
                                             </div>

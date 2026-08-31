@@ -6,8 +6,8 @@ import { newsData } from '../../constants/LandingPage';
 const ComparisonSection = () => {
 
     return (
-        <section className="py-24 px-6 relative">
-            <div className="max-w-7xl mx-auto">
+        <section className="landing-section landing-comparison py-24 px-6 relative">
+            <div className="max-w-6xl mx-auto">
                 <div className="text-center mb-16">
                     <motion.h2
                         initial={{ opacity: 0, y: 20 }}
@@ -36,7 +36,7 @@ const ComparisonSection = () => {
                         initial={{ opacity: 0, x: -30 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }}
-                        className="bg-[#0f172a]/40 backdrop-blur-2xl border border-white/5 rounded-[40px] p-8 flex flex-col"
+                        className="landing-comparison-panel bg-[#0f172a]/40 backdrop-blur-2xl border border-white/5 rounded-[40px] p-8 flex flex-col"
                     >
                         <div className="flex items-center justify-between mb-10">
                             <div className="flex items-center gap-3">
@@ -49,7 +49,7 @@ const ComparisonSection = () => {
 
                         <div className="space-y-8 flex-1">
                             {newsData.map((news) => (
-                                <div key={news.id} className="flex gap-4">
+                                <div key={news.id} className="landing-comparison-item flex gap-4">
                                     <div className={`w-10 h-10 shrink-0 ${news.color} rounded-full flex items-center justify-center text-sm font-black text-white shadow-lg`}>
                                         {news.icon}
                                     </div>
@@ -72,7 +72,7 @@ const ComparisonSection = () => {
                         initial={{ opacity: 0, x: 30 }}
                         whileInView={{ opacity: 1, x: 0 }}
                         viewport={{ once: true }}
-                        className="bg-[#0f172a]/60 backdrop-blur-3xl border border-blue-500/10 rounded-[40px] p-8 flex flex-col relative overflow-hidden"
+                        className="landing-comparison-panel landing-comparison-panel--summary bg-[#0f172a]/60 backdrop-blur-3xl border border-blue-500/10 rounded-[40px] p-8 flex flex-col relative overflow-hidden"
                     >
                         {/* Glow effect */}
                         <div className="absolute top-0 right-0 w-40 h-40 bg-blue-500/5 blur-[80px]" />
@@ -98,7 +98,7 @@ const ComparisonSection = () => {
                                     whileInView={{ opacity: 1, y: 0 }}
                                     viewport={{ once: true }}
                                     transition={{ delay: 0.2 + idx * 0.1 }}
-                                    className="bg-[#030e17]/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4 group hover:border-blue-500/20 transition-all"
+                                    className="landing-summary-point bg-[#030e17]/50 border border-white/5 p-5 rounded-2xl flex items-center gap-4 group hover:border-blue-500/20 transition-all"
                                 >
                                     <div className={`w-6 h-6 shrink-0 ${news.color} rounded-full flex items-center justify-center text-[10px] font-black text-white shadow-lg`}>
                                         {idx + 1}

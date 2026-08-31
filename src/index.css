@@ -2069,7 +2069,6 @@ select {
 .foro-home-page {
   --font-ui: "Inter", "Noto Sans Thai", sans-serif;
   --font-card: "Inter", "Noto Sans Thai", sans-serif;
-  padding: 12px 8px;
   font-family: var(--font-ui);
 }
 
@@ -2494,7 +2493,6 @@ select {
 .foro-read-page {
   --font-ui: "Inter", "Noto Sans Thai", sans-serif;
   --font-card: "Inter", "Noto Sans Thai", sans-serif;
-  padding: 12px 8px;
   font-family: var(--font-ui);
 }
 

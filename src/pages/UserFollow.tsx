@@ -99,7 +99,7 @@ export const UserFollow = () => {
     }, []);
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-follow-page">
             <Sidebar />
             <div className="foro-center-stage">
                 <main className="foro-workspace-main">
@@ -115,13 +115,13 @@ export const UserFollow = () => {
                     {isLoading ? (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                             {[...Array(10)].map((_, i) => (
-                                <div key={i} className="bg-[#0f172a] rounded-xl h-48 animate-pulse border border-[#1e293b]"></div>
+                                <div key={i} className="app-dense-card bg-[#0f172a] rounded-xl h-48 animate-pulse border border-[#1e293b]"></div>
                             ))}
                         </div>
                     ) : (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
                             {users.map((user) => (
-                                <div key={user.id} className="group relative bg-[#0f172a] border border-[#1e293b] rounded-xl p-4 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col items-center text-center">
+                                <div key={user.id} className="app-dense-card group relative bg-[#0f172a] border border-[#1e293b] rounded-xl p-4 hover:border-blue-500/50 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 flex flex-col items-center text-center">
                                     {/* Decorative Gradient */}
                                     <div className="absolute inset-0 bg-linear-to-b from-blue-500/5 to-transparent rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
 
@@ -138,7 +138,7 @@ export const UserFollow = () => {
 
                                     {/* Dropdown Menu */}
                                     {activeMenuId === user.id && (
-                                        <div className="menu-dropdown absolute top-9 right-2 bg-[#1e293b] border border-[#334155] rounded-lg shadow-xl z-30 overflow-hidden animate-fade-in p-1 min-w-[100px]">
+                                        <div className="app-popover menu-dropdown absolute top-9 right-2 bg-[#1e293b] border border-[#334155] rounded-lg shadow-xl z-30 overflow-hidden animate-fade-in p-1 min-w-[100px]">
                                             <button
                                                 onClick={(e) => {
                                                     e.stopPropagation();
@@ -208,7 +208,7 @@ export const UserFollow = () => {
             {/* Confirmation Modal */}
             {userToDelete && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-scale-up">
+                    <div className="app-workshop-dialog bg-[#0f172a] border border-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-2xl animate-scale-up">
                         <div className="text-center">
                             <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <FaUserMinus className="text-3xl text-red-500" />
@@ -238,9 +238,10 @@ export const UserFollow = () => {
 
             <Toaster position="bottom-right" toastOptions={{
                 style: {
-                    background: '#1e293b',
-                    color: '#fff',
-                    border: '1px solid #334155',
+                    background: 'var(--app-surface)',
+                    color: 'var(--app-foreground)',
+                    border: '2px solid var(--app-ink)',
+                    boxShadow: '4px 4px 0 var(--app-ink)',
                 },
             }} />
         </div>

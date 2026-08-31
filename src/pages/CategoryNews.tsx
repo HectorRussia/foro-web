@@ -107,7 +107,7 @@ const CategoryNews = () => {
     };
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-category-news-page">
             <Sidebar />
             <div className="foro-center-stage">
                 <main className="foro-workspace-main">

@@ -29,7 +29,7 @@ const SmartFilterSection = () => {
     };
 
     return (
-        <section className="py-20 px-6 relative">
+        <section className="landing-section landing-smart-filter py-20 px-6 relative">
             <div className="max-w-2xl mx-auto text-center mb-10">
                 <motion.h2
                     initial={{ opacity: 0, y: 20 }}
@@ -64,7 +64,7 @@ const SmartFilterSection = () => {
                                 setActiveFilter(cat.id);
                             }
                         }}
-                        className={`
+                        className={`landing-filter-chip
                             py-4 px-6 rounded-2xl border transition-all duration-300 flex items-center gap-3 font-bold text-base
                             ${getBtnStyle(cat.color, activeFilter === cat.id)}
                         `}
@@ -84,7 +84,7 @@ const SmartFilterSection = () => {
                             initial={{ opacity: 0, scale: 0.98, y: 10 }}
                             animate={{ opacity: 1, scale: 1, y: 0 }}
                             exit={{ opacity: 0, scale: 0.98, y: -10 }}
-                            className="bg-[#0f172a]/60 backdrop-blur-3xl border border-white/10 rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden"
+                            className="landing-filter-board bg-[#0f172a]/60 backdrop-blur-3xl border border-white/10 rounded-[32px] p-6 md:p-8 shadow-2xl relative overflow-hidden"
                         >
                             <div className="flex flex-col gap-5 relative z-10">
                                 {/* Query bubble */}
@@ -124,7 +124,7 @@ const SmartFilterSection = () => {
                                                 initial={{ opacity: 0, y: 15 }}
                                                 animate={{ opacity: 1, y: 0 }}
                                                 transition={{ delay: idx * 0.1 }}
-                                                className="bg-[#030e17]/80 border border-white/5 p-4 rounded-2xl hover:border-blue-500/20 transition-all group"
+                                                className="landing-filter-result bg-[#030e17]/80 border border-white/5 p-4 rounded-2xl hover:border-blue-500/20 transition-all group"
                                             >
                                                 <div className="flex items-center gap-2 mb-3">
                                                     <div className={`w-7 h-7 shrink-0 ${item.color} rounded-full flex items-center justify-center text-[9px] font-black`}>
@@ -157,7 +157,7 @@ const SmartFilterSection = () => {
                         <motion.div
                             initial={{ opacity: 0 }}
                             animate={{ opacity: 1 }}
-                            className="w-full h-[300px] border border-dashed border-white/5 rounded-[32px] flex items-center justify-center"
+                            className="landing-filter-empty w-full h-[300px] border border-dashed border-white/5 rounded-[32px] flex items-center justify-center"
                         >
                             <p className="font-bold text-sm md:text-base uppercase tracking-widest bg-clip-text text-transparent bg-linear-to-b from-gray-500 to-transparent">
                                 เลือกฟิลเตอร์ด้านบนเพื่อเริ่มต้น

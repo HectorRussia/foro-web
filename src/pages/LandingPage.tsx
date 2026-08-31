@@ -9,10 +9,13 @@ import CTASection from '../components/LandingPage/CTASection';
 import FooterLand from '../components/LandingPage/FooterLand';
 import LoginModal from '../components/LandingPage/LoginModal';
 import { organizationSchema, schemaData } from '../constants/SchemaMarkup';
+import { useTheme } from '../hooks/useTheme';
+import '../styles/landing-workshop.css';
 
 const LandingPage = () => {
     const [newsIndex, setNewsIndex] = useState(0);
     const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+    const { theme, resolvedTheme } = useTheme();
 
     useEffect(() => {
         const timer = setInterval(() => {
@@ -22,7 +25,12 @@ const LandingPage = () => {
     }, []);
 
     return (
-        <div className="min-h-screen bg-[#030e17] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative">
+        <div
+            className="foro-workshop-landing min-h-screen bg-[#030e17] text-white font-sans selection:bg-blue-500/30 overflow-x-hidden relative"
+            data-theme={theme}
+            data-resolved-theme={resolvedTheme}
+            style={{ colorScheme: resolvedTheme }}
+        >
             {/* ── SEO Schema Markup ── */}
             <script type="application/ld+json">
                 {JSON.stringify(schemaData)}

@@ -3,7 +3,7 @@ import PostList from '../components/PostList';
 
 const PostListPage = () => {
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-post-list-page">
             <Sidebar />
             <div className="foro-center-stage">
                 <main className="foro-workspace-main flex justify-center py-6">

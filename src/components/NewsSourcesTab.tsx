@@ -295,7 +295,7 @@ const SourceCard = ({
                                 className="fixed inset-0 z-30 cursor-default"
                                 onClick={() => setIsMenuOpen(false)}
                             />
-                            <div className="absolute right-0 top-[calc(100%+8px)] z-40 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0f0f10]/98 py-2 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
+                            <div className="app-popover absolute right-0 top-[calc(100%+8px)] z-40 w-56 overflow-hidden rounded-xl border border-white/10 bg-[#0f0f10]/98 py-2 shadow-[0_18px_60px_rgba(0,0,0,0.55)] backdrop-blur-xl">
                                 <div className="border-b border-white/7 px-3 pb-2 text-[9px] font-black uppercase tracking-widest text-blue-400">
                                     Add to Post List
                                 </div>

@@ -266,7 +266,7 @@ const RealtimeSearch = () => {
     });
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-realtime-search-page">
             <Sidebar />
 
             <div className="foro-center-stage">

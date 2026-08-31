@@ -84,17 +84,13 @@ function BookmarkCard({
     const mediaUrl = parseMediaUrls(item.media_urls as string[] | string | null)[0] ?? null;
 
     return (
-        <article className="group relative flex h-full flex-col overflow-hidden rounded-[30px] border border-white/6 transition-all hover:border-blue-500/20"
+        <article className="bookmark-card group relative flex h-full flex-col overflow-hidden rounded-[30px] border border-white/6 px-6 pt-5 pb-4 transition-all hover:border-blue-500/20"
             style={{
-                background: 'linear-gradient(145deg, #111112 0%, #181819 100%)',
-                padding: '20px 24px 16px',
                 transition: '0.5s cubic-bezier(0.16, 1, 0.3, 1)',
             }}
         >
             {/* Hover Glow */}
-            <div className="pointer-events-none absolute right-0 top-0 h-32 w-32 opacity-0 transition-opacity duration-700 group-hover:opacity-100"
-                style={{ background: 'radial-gradient(circle at top right, rgba(0,112,243,0.1), transparent 70%)' }}
-            />
+            <div className="bookmark-card-glow pointer-events-none absolute right-0 top-0 h-32 w-32 opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
 
             {/* Header */}
             <div className="relative z-10 mb-4.5 flex items-start justify-between">
@@ -192,7 +188,7 @@ function BookmarkCard({
 
 function BookmarkSkeleton() {
     return (
-        <div className="flex h-64 flex-col rounded-[30px] border border-white/6 p-6" style={{ background: 'linear-gradient(145deg, #111112 0%, #181819 100%)' }}>
+        <div className="bookmark-card bookmark-card-skeleton flex h-64 flex-col rounded-[30px] border border-white/6 p-6">
             <div className="flex items-center gap-3.5">
                 <div className="h-12 w-12 animate-pulse rounded-full bg-white/5" />
                 <div className="space-y-2">
@@ -259,7 +255,7 @@ const Bookmark = () => {
     };
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-bookmark-page">
             <Sidebar />
             <div className="foro-center-stage">
                 <section className="foro-workspace-panel [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

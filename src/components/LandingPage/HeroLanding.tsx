@@ -16,14 +16,14 @@ const HeroLanding = ({ newsIndex, onOpenLogin }: HeroLandingProps) => {
     const navigate = useNavigate();
 
     return (
-        <section className="relative px-6 pt-32 pb-20 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16 min-h-[90vh]">
+        <section className="landing-hero relative px-6 pt-32 pb-20 max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16 min-h-[90vh]">
 
             {/* Left side: Text content */}
             <motion.div
                 initial={{ opacity: 0, x: -50 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ duration: 0.8 }}
-                className="flex-1 text-center lg:text-left z-10"
+                className="landing-hero-copy flex-1 text-center lg:text-left z-10"
             >
                 <motion.h1
                     className="text-6xl lg:text-8xl font-black tracking-tighter leading-none mb-6"
@@ -48,13 +48,13 @@ const HeroLanding = ({ newsIndex, onOpenLogin }: HeroLandingProps) => {
                 {isAuthenticated ? (
                     <button
                         onClick={() => navigate('/dashboard')}
-                        className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group"
+                        className="landing-primary-cta inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group"
                     >
                         <span>ไปที่แดชบอร์ด</span>
                         <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                     </button>
                 ) : (
-                    <button type="button" onClick={onOpenLogin} className="inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
+                    <button type="button" onClick={onOpenLogin} className="landing-primary-cta inline-flex items-center gap-3 px-8 py-4 bg-blue-600 hover:bg-blue-500 rounded-2xl font-black text-lg transition-all shadow-xl shadow-blue-500/30 active:scale-95 group">
                         <span>เริ่มต้นใช้งานฟรี</span>
                         <FaArrowRight className="group-hover:translate-x-1 transition-transform" />
                     </button>
@@ -62,7 +62,7 @@ const HeroLanding = ({ newsIndex, onOpenLogin }: HeroLandingProps) => {
             </motion.div>
 
             {/* Right side: Animation */}
-            <div className="flex-1 relative w-full h-[600px] flex items-center justify-center lg:translate-y-12">
+            <div className="landing-hero-visual flex-1 relative w-full h-[600px] flex items-center justify-center lg:translate-y-12">
 
                 {/* Background floating small cards (Image 2 style) */}
                 <AnimatePresence>
@@ -89,7 +89,7 @@ const HeroLanding = ({ newsIndex, onOpenLogin }: HeroLandingProps) => {
                                 delay: idx * 0.8,
                                 ease: "easeInOut"
                             }}
-                            className="absolute hidden md:block bg-[#0f172a]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl z-10 w-64 pointer-events-none"
+                            className="landing-floating-card absolute hidden md:block bg-[#0f172a]/80 backdrop-blur-xl border border-white/10 p-4 rounded-2xl shadow-2xl z-10 w-64 pointer-events-none"
                         >
                             <div className="flex items-center gap-2 mb-3">
                                 <div className={`w-6 h-6 ${item.color} rounded-full flex items-center justify-center text-xs`}>{item.icon}</div>
@@ -111,7 +111,7 @@ const HeroLanding = ({ newsIndex, onOpenLogin }: HeroLandingProps) => {
                     initial={{ opacity: 0, scale: 0.8, rotateY: 20 }}
                     animate={{ opacity: 1, scale: 1, rotateY: 0 }}
                     transition={{ duration: 1 }}
-                    className="relative z-20 w-full max-w-[460px] bg-[#0f172a]/60 backdrop-blur-3xl border border-white/10 rounded-[40px] p-8 shadow-[0_25px_80px_rgba(0,0,0,0.5)] overflow-hidden group"
+                    className="landing-summary-board relative z-20 w-full max-w-[460px] bg-[#0f172a]/60 backdrop-blur-3xl border border-white/10 rounded-[40px] p-8 shadow-[0_25px_80px_rgba(0,0,0,0.5)] overflow-hidden group"
                 >
                     {/* Card Glow */}
                     <div className="absolute -top-40 -right-40 w-80 h-80 bg-blue-500/5 blur-[100px]" />
@@ -139,7 +139,7 @@ const HeroLanding = ({ newsIndex, onOpenLogin }: HeroLandingProps) => {
                                     animate={{ opacity: 1, y: 0, scale: 1 }}
                                     exit={{ opacity: 0, x: -30, scale: 0.9 }}
                                     transition={{ duration: 0.5, delay: idx * 0.15 }}
-                                    className="bg-[#030e17]/80 border border-[#1e293b] p-5 rounded-3xl hover:border-blue-500/30 transition-colors"
+                                    className="landing-summary-item bg-[#030e17]/80 border border-[#1e293b] p-5 rounded-3xl hover:border-blue-500/30 transition-colors"
                                 >
                                     <div className="flex items-center justify-between mb-3">
                                         <div className="flex items-center gap-3">
