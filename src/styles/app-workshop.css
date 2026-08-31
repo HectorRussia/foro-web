@@ -20,6 +20,10 @@
   --app-border: 2px solid var(--app-ink);
   --app-shadow: 6px 6px 0 var(--app-ink);
   --app-shadow-small: 3px 3px 0 var(--app-ink);
+  --app-shell-padding: 12px;
+  --app-shell-gap: 12px;
+  --app-sidebar-width: 288px;
+  --app-right-rail-width: 320px;
   --bg-950: var(--app-paper);
   --bg-900: var(--app-surface);
   --bg-850: var(--app-surface-alt);
@@ -94,18 +98,15 @@
 
 /* Shared shell */
 .foro-workshop-app .foro-page-shell {
-  gap: 12px;
+  gap: var(--app-shell-gap);
+  padding: var(--app-shell-padding);
   background-color: var(--app-paper);
-  background-image:
-    linear-gradient(var(--app-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px);
-  background-size: 40px 40px;
   color: var(--app-foreground);
   font-family: "Noto Sans Thai", "Inter", sans-serif;
 }
 
 .foro-workshop-app .foro-center-stage {
-  gap: 12px;
+  gap: var(--app-shell-gap);
 }
 
 .foro-workshop-app .foro-workspace-panel,
@@ -120,17 +121,10 @@
 }
 
 .foro-workshop-app .foro-workspace-panel,
-.foro-workshop-app .foro-workspace-main {
-  background-image:
-    linear-gradient(var(--app-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.foro-workshop-app .foro-workspace-panel,
 .foro-workshop-app .foro-workspace-main,
 .foro-workshop-app .foro-home-workspace,
 .foro-workshop-app .foro-read-workspace {
+  scrollbar-gutter: stable;
   scrollbar-color: var(--app-divider) transparent;
 }
 
@@ -143,7 +137,17 @@
 
 /* Sidebar and navigation */
 .foro-workshop-app .root-sidebar {
+  width: var(--app-sidebar-width);
+  min-width: var(--app-sidebar-width);
+  height: calc(100dvh - var(--app-shell-padding) - var(--app-shell-padding));
+  flex: 0 0 var(--app-sidebar-width);
   overflow: visible;
+}
+
+.foro-workshop-app .foro-right-rail {
+  width: var(--app-right-rail-width);
+  min-width: var(--app-right-rail-width);
+  flex: 0 0 var(--app-right-rail-width);
 }
 
 .foro-workshop-app .root-sidebar-logo {
@@ -816,10 +820,6 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  background-image:
-    linear-gradient(var(--app-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--app-grid-line) 1px, transparent 1px);
-  background-size: 40px 40px;
 }
 
 .foro-workshop-app .home-blueprint-path {
