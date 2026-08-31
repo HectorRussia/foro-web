@@ -29,6 +29,17 @@ const colors = [
     '#9CA3AF',
 ];
 
+const getContrastColor = (hexColor: string) => {
+    const normalized = hexColor.replace('#', '');
+    if (!/^[0-9a-f]{6}$/i.test(normalized)) return '#171313';
+
+    const red = Number.parseInt(normalized.slice(0, 2), 16);
+    const green = Number.parseInt(normalized.slice(2, 4), 16);
+    const blue = Number.parseInt(normalized.slice(4, 6), 16);
+    const perceivedBrightness = (red * 299 + green * 587 + blue * 114) / 1000;
+    return perceivedBrightness >= 145 ? '#171313' : '#fff8e8';
+};
+
 const PostList = ({
     showBorder = true,
     activeId,
@@ -280,7 +291,7 @@ const PostList = ({
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: -6, scale: 0.96 }}
                             transition={{ duration: 0.16, ease: 'easeOut' }}
-                            className="absolute right-4 top-[calc(100%+10px)] z-30 w-53.5 overflow-hidden rounded-[18px] border border-white/8 bg-[#111112]/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl"
+                            className="app-popover absolute right-4 top-[calc(100%+10px)] z-30 w-53.5 overflow-hidden rounded-[18px] border border-white/8 bg-[#111112]/98 p-2 shadow-[0_18px_60px_rgba(0,0,0,0.48)] backdrop-blur-xl"
                         >
                             <button
                                 type="button"
@@ -429,6 +440,7 @@ const PostList = ({
                                         className={`post-list-row-main flex items-center gap-3 rounded-[12px] border p-2 transition-all duration-300 ${isSelected
                                             ? 'border-white/5 bg-white/8'
                                             : 'border-transparent bg-transparent hover:bg-white/4'}`}
+                                        style={isSelected ? { borderColor: list.color_list || colors[0] } : undefined}
                                     >
                                         <div
                                             onClick={(e) => {
@@ -445,10 +457,11 @@ const PostList = ({
                                             className="relative flex h-12 w-12 shrink-0 cursor-pointer items-center justify-center rounded-[8px] transition-all duration-200 hover:scale-105 active:scale-95"
                                             style={{
                                                 backgroundColor: list.color_list || colors[0],
-                                                boxShadow: `0 4px 12px ${(list.color_list || colors[0])}44`
+                                                boxShadow: `0 4px 12px ${(list.color_list || colors[0])}44`,
+                                                color: getContrastColor(list.color_list || colors[0]),
                                             }}
                                         >
-                                            <HiBars3 className="text-[23px] text-white/95" />
+                                            <HiBars3 className="text-[23px]" />
                                             {isSelected && (
                                                 <div className="absolute inset-0 rounded-[8px] bg-white/10" />
                                             )}
@@ -458,7 +471,6 @@ const PostList = ({
                                             <div className="flex items-center justify-between">
                                                 <h4
                                                     className="truncate pr-2 text-[15px] font-bold leading-tight text-white"
-                                                    style={{ color: isSelected ? (list.color_list || colors[0]) : '#fff' }}
                                                 >
                                                     {list.name}
                                                 </h4>

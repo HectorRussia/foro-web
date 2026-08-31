@@ -2,6 +2,7 @@ import { useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { HiOutlineXMark, HiOutlineChevronLeft, HiOutlineChevronRight } from 'react-icons/hi2';
+import { useTheme } from '../hooks/useTheme';
 
 interface MediaLightboxProps {
     urls: string[];
@@ -14,6 +15,7 @@ interface MediaLightboxProps {
 }
 
 const MediaLightbox = ({ urls, mediaType, currentIndex, onClose, onPrev, onNext, tweetUrl }: MediaLightboxProps) => {
+    const { theme, resolvedTheme } = useTheme();
     const isVideo = mediaType === 'video' || mediaType === 'animated_gif';
     const total = urls.length;
 
@@ -42,7 +44,10 @@ const MediaLightbox = ({ urls, mediaType, currentIndex, onClose, onPrev, onNext,
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 onClick={onClose}
-                className="fixed inset-0 z-9999 bg-black/92 backdrop-blur-xl flex items-center justify-center"
+                className="foro-workshop-app app-media-lightbox fixed inset-0 z-9999 bg-black/92 backdrop-blur-xl flex items-center justify-center"
+                data-theme={theme}
+                data-resolved-theme={resolvedTheme}
+                style={{ colorScheme: resolvedTheme }}
             >
                 {/* Close */}
                 <button

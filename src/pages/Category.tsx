@@ -121,13 +121,13 @@ const Category = () => {
     };
 
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-category-page">
             <Sidebar />
             <div className="foro-center-stage">
                 <main className="foro-workspace-main">
                 <div className="space-y-6">
                     {/* Header Section */}
-                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#1e293b]/50 p-6 rounded-2xl backdrop-blur-sm border border-slate-700/50 shadow-xl">
+                    <div className="app-feature-panel flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-[#1e293b]/50 p-6 rounded-2xl backdrop-blur-sm border border-slate-700/50 shadow-xl">
                         <div>
                             <h1 className="text-3xl font-bold bg-linear-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent flex items-center gap-3">
                                 <FaLayerGroup className="text-blue-500" />
@@ -178,7 +178,7 @@ const Category = () => {
                                 <div
                                     key={category.id}
                                     onClick={() => navigate(`/category-news/${category.id}`)}
-                                    className="group bg-[#1e293b] hover:bg-[#253248] border border-slate-700/50 hover:border-blue-500/30 rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 relative overflow-hidden cursor-pointer"
+                                    className="app-dense-card group bg-[#1e293b] hover:bg-[#253248] border border-slate-700/50 hover:border-blue-500/30 rounded-2xl p-6 transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/5 relative overflow-hidden cursor-pointer"
                                 >
                                     <div className="absolute top-0 right-0 p-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
                                         <button
@@ -225,7 +225,7 @@ const Category = () => {
             {/* Form Modal */}
             {isFormModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-                    <div className="bg-[#1e293b] w-full max-w-md rounded-2xl shadow-2xl border border-slate-700 overflow-hidden transform transition-all scale-100 animate-scale-in">
+                    <div className="app-workshop-dialog bg-[#1e293b] w-full max-w-md rounded-2xl shadow-2xl border border-slate-700 overflow-hidden transform transition-all scale-100 animate-scale-in">
                         <div className="px-6 py-4 border-b border-slate-700 flex justify-between items-center bg-slate-800/50">
                             <h3 className="text-xl font-semibold text-white">
                                 {editingCategory ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่ใหม่'}
@@ -280,7 +280,7 @@ const Category = () => {
             {/* Delete Confirmation Modal */}
             {isDeleteModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className="bg-[#1e293b] w-full max-w-sm rounded-2xl shadow-2xl border border-slate-700 p-6 text-center transform transition-all scale-100">
+                    <div className="app-workshop-dialog bg-[#1e293b] w-full max-w-sm rounded-2xl shadow-2xl border border-slate-700 p-6 text-center transform transition-all scale-100">
                         <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
                             <FaTrash className="text-2xl text-red-500" />
                         </div>

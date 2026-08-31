@@ -12,7 +12,7 @@ import CreateContent from "../components/Contents/CreateContent";
 export default function ContentSearchPage() {
     const [isCreateContent, setIsCreateContent] = useState(false);
     return (
-        <div className="foro-page-shell">
+        <div className="foro-page-shell foro-content-page">
             <Sidebar />
             <div className="foro-center-stage">
                 <section className="foro-workspace-panel [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">

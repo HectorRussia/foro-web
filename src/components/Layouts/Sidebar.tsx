@@ -4,6 +4,7 @@ import { LuChevronDown, LuLogOut } from "react-icons/lu";
 import { useLocation, useNavigate } from "react-router-dom";
 import { prototypePlanMock } from "../../api/mocks/prototype";
 import { useAuth } from "../../contexts/AuthContext";
+import ThemeSwitcher from "../ThemeSwitcher";
 import Navbar, { NAV_ITEMS } from "./Navbar";
 
 const Sidebar = () => {
@@ -54,6 +55,9 @@ const Sidebar = () => {
                         alt="Foro Logo"
                         className="h-9 w-auto object-contain"
                     />
+                    <div className="app-desktop-theme-control">
+                        <ThemeSwitcher />
+                    </div>
                 </div>
 
                 <div className="root-sidebar-scroll scrollbar-hide">
@@ -119,8 +123,12 @@ const Sidebar = () => {
                 `}</style>
             </aside>
 
-            <div className="fixed bottom-3 left-3 right-3 z-50 lg:hidden">
-                <div className="rounded-3xl border border-white/8 bg-[#101115]/92 backdrop-blur-2xl shadow-[0_-18px_42px_rgba(0,0,0,0.56)] px-2 py-2">
+            <div className="app-mobile-theme-control lg:hidden">
+                <ThemeSwitcher />
+            </div>
+
+            <div className="app-mobile-nav fixed bottom-3 left-3 right-3 z-50 lg:hidden">
+                <div className="app-mobile-nav-shell rounded-3xl border border-white/8 bg-[#101115]/92 backdrop-blur-2xl shadow-[0_-18px_42px_rgba(0,0,0,0.56)] px-2 py-2">
                     <div className="flex items-end justify-between gap-1">
                         {mobileNavItems.map((item) => {
                             const active = location.pathname === item.path;
@@ -130,7 +138,7 @@ const Sidebar = () => {
                                 <button
                                     key={item.id}
                                     onClick={() => navigate(item.path)}
-                                    className={`flex min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded-[18px] px-1 py-2 transition-all duration-200 ${active ? "bg-blue-500/10 text-white shadow-[inset_0_0_0_1px_rgba(96,165,250,0.16)]" : "text-gray-500 hover:text-gray-300"}`}
+                                    className={`app-mobile-nav-item flex min-w-0 flex-1 flex-col items-center justify-end gap-1 rounded-[18px] px-1 py-2 transition-all duration-200 ${active ? "active bg-blue-500/10 text-white shadow-[inset_0_0_0_1px_rgba(96,165,250,0.16)]" : "text-gray-500 hover:text-gray-300"}`}
                                 >
                                     <span className={`flex h-7 w-7 items-center justify-center transition-all duration-200 ${active ? "text-white" : "text-gray-400"}`}>
                                         <Icon

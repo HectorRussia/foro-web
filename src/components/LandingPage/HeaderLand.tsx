@@ -1,15 +1,13 @@
 import { Link } from 'react-router-dom';
 import { FaSignInAlt, FaArrowRight } from 'react-icons/fa';
 import { useAuth } from '../../contexts/AuthContext';
-import ThemeSwitcher, { type LandingTheme } from './ThemeSwitcher';
+import ThemeSwitcher from '../ThemeSwitcher';
 
 interface HeaderLandProps {
     onOpenLogin: () => void;
-    theme: LandingTheme;
-    onThemeChange: (theme: LandingTheme) => void;
 }
 
-const HeaderLand = ({ onOpenLogin, theme, onThemeChange }: HeaderLandProps) => {
+const HeaderLand = ({ onOpenLogin }: HeaderLandProps) => {
     const { isAuthenticated } = useAuth();
 
     return (
@@ -20,7 +18,7 @@ const HeaderLand = ({ onOpenLogin, theme, onThemeChange }: HeaderLandProps) => {
                     <img src="/images/LOGO-FORO/logo_last.png" alt="FORO Logo" className="h-10 w-auto object-contain" />
                 </div>
                 <div className="landing-header-actions flex items-center gap-2">
-                    <ThemeSwitcher theme={theme} onThemeChange={onThemeChange} />
+                    <ThemeSwitcher />
                     {isAuthenticated ? (
                         <Link to="/dashboard" className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-sm transition-all shadow-lg shadow-blue-500/20 active:scale-95">
                             <FaArrowRight className="text-xs" />
