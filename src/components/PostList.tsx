@@ -13,7 +13,6 @@ export interface PostListWithMembers extends IPostList {
 }
 
 
-const BASE_URL = import.meta.env.VITE_API_URL;
 
 const colors = [
     '#3B82F6',
@@ -83,7 +82,7 @@ const PostList = ({
             }
 
             // Fetch followed users
-            const followResponse = await api.get(`${BASE_URL}/follow`);
+            const followResponse = await api.get('/follow');
             if (Array.isArray(followResponse.data)) {
                 setFollowedUsers(followResponse.data);
             } else if (Array.isArray(followResponse.data?.data)) {

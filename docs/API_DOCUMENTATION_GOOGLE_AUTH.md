@@ -76,8 +76,8 @@ COOKIE_SAMESITE=lax
 
 - Backend ต้อง fail fast ตอน start หาก Google config ไม่ครบ แต่ห้าม log ค่าของ secret
 - Production ต้องใช้ HTTPS และ `COOKIE_SECURE=true`
-- แนะนำให้ frontend/backend production อยู่ภายใต้ site เดียวกัน เช่น `foro.world` และ
-  `api.foro.world` เพื่อให้ refresh cookie ทำงานสม่ำเสมอ
+- Vercel ส่งคำขอ `/api/v1` ไปที่ Render เพื่อให้เบราว์เซอร์รับ OAuth และ refresh cookie
+  ผ่าน `foro-web-nine.vercel.app` ดูค่าที่ต้องตั้งใน [Production deployment](../README.md#production-deployment)
 - `OAUTH_SESSION_SECRET` ต้องแยกจาก Google Client Secret และไม่ commit ลง Git
 
 ## 4. Dependencies และ OAuth Client

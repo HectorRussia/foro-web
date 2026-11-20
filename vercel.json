@@ -1,5 +1,20 @@
 {
+    "$schema": "https://openapi.vercel.sh/vercel.json",
+    "buildCommand": "VITE_API_URL=/api/v1 VITE_GOOGLE_AUTH_ENABLED=${FORO_GOOGLE_AUTH_ENABLED:-false} pnpm build",
+    "headers": [
+        {
+            "source": "/api/v1/:path*",
+            "headers": [
+                { "key": "Cache-Control", "value": "private, no-store" },
+                { "key": "CDN-Cache-Control", "value": "no-store" }
+            ]
+        }
+    ],
     "rewrites": [
+        {
+            "source": "/api/v1/:path*",
+            "destination": "https://foro-news.onrender.com/api/v1/:path*"
+        },
         {
             "source": "/(.*)",
             "destination": "/index.html"

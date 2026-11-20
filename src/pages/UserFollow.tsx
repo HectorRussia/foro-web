@@ -6,7 +6,6 @@ import PostList from '../components/PostList';
 import api from '../api/axiosInstance';
 import type { FollowedUser } from '../interface/userTarget';
 
-const BASE_URL = import.meta.env.VITE_API_URL;
 
 const normalizeXAccount = (account?: string | null) => (account || '').replace(/^@/, '').trim().toLowerCase();
 
@@ -52,7 +51,7 @@ export const UserFollow = () => {
     const fetchFollowedUsers = async () => {
         setIsLoading(true);
         try {
-            const response = await api.get(`${BASE_URL}/follow`);
+            const response = await api.get('/follow');
 
             if (Array.isArray(response.data)) {
                 setUsers(response.data);
@@ -79,7 +78,7 @@ export const UserFollow = () => {
 
         try {
 
-            await api.delete(`${BASE_URL}/follow/users/${userToDelete.id}`);
+            await api.delete(`/follow/users/${userToDelete.id}`);
             setUsers(prev => prev.filter(u => u.id !== userToDelete.id));
             toast.success(`Unfollowed ${getDisplayName(userToDelete)}`);
 

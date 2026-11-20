@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { FaTimes } from 'react-icons/fa';
-import { getUnauthenticatedAuthUrl } from '../../config/auth';
+import { Link } from 'react-router-dom';
+import { getGoogleAuthStartUrl, isGoogleAuthEnabled } from '../../config/auth';
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -127,28 +128,38 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                         <span className="h-px flex-1 bg-white/10" />
                     </div>
 
-                    <a
-                        href={getUnauthenticatedAuthUrl()}
-                        onClick={handleGoogleLogin}
-                        aria-busy={isRedirecting}
-                        aria-disabled={isRedirecting}
-                        className={`group flex w-full items-center justify-center gap-3 rounded-xl border border-white/15 bg-white px-5 py-3.5 font-bold text-slate-900 shadow-lg shadow-black/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#081724] ${isRedirecting ? 'cursor-wait opacity-75' : 'hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-xl active:translate-y-0'}`}
+                    {isGoogleAuthEnabled && (
+                        <a
+                            href={getGoogleAuthStartUrl()}
+                            onClick={handleGoogleLogin}
+                            aria-busy={isRedirecting}
+                            aria-disabled={isRedirecting}
+                            className={`group flex w-full items-center justify-center gap-3 rounded-xl border border-white/15 bg-white px-5 py-3.5 font-bold text-slate-900 shadow-lg shadow-black/20 transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-[#081724] ${isRedirecting ? 'cursor-wait opacity-75' : 'hover:-translate-y-0.5 hover:bg-slate-100 hover:shadow-xl active:translate-y-0'}`}
+                        >
+                            {isRedirecting ? (
+                                <>
+                                    <span
+                                        aria-hidden="true"
+                                        className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
+                                    />
+                                    <span>กำลังพาไปยัง Google...</span>
+                                </>
+                            ) : (
+                                <>
+                                    <GoogleIcon />
+                                    <span>ดำเนินการต่อด้วย Google</span>
+                                </>
+                            )}
+                        </a>
+                    )}
+
+                    <Link
+                        to="/login"
+                        className="mt-3 flex w-full items-center justify-center rounded-xl border border-white/15 px-5 py-3.5 font-bold text-white transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-blue-400"
+                        onClick={handleClose}
                     >
-                        {isRedirecting ? (
-                            <>
-                                <span
-                                    aria-hidden="true"
-                                    className="h-5 w-5 shrink-0 animate-spin rounded-full border-2 border-slate-300 border-t-slate-900"
-                                />
-                                <span>กำลังพาไปยัง Google...</span>
-                            </>
-                        ) : (
-                            <>
-                                <GoogleIcon />
-                                <span>ดำเนินการต่อด้วย Google</span>
-                            </>
-                        )}
-                    </a>
+                        เข้าสู่ระบบด้วยอีเมล
+                    </Link>
 
                     <p className="mt-6 text-xs leading-relaxed text-slate-500">
                         การดำเนินการต่อถือว่าคุณยอมรับข้อกำหนดและนโยบายความเป็นส่วนตัวของ FORO

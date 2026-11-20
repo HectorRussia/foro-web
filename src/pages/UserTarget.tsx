@@ -18,7 +18,6 @@ import type { PostList as IPostList, PostListUser } from '../api/postList';
 import type { UserTweetSearch, Recommendation, FollowedUser } from '../interface/userTarget';
 
 
-const BASE_URL = import.meta.env.VITE_API_URL;
 const UserTarget = () => {
 
     const [searchQuery, setSearchQuery] = useState("Donald J. Trump");
@@ -168,7 +167,7 @@ const UserTarget = () => {
 
         setIsLoading(true);
         try {
-            const response = await api.get(`${BASE_URL}/follow/users/search?query=${searchQuery}`);
+            const response = await api.get('/follow/users/search', { params: { query: searchQuery } });
             if (response.data?.data?.users?.users) {
                 setUsers(response.data.data.users.users.slice(0, 10));
             } else {
@@ -198,7 +197,7 @@ const UserTarget = () => {
         setFollowingAccountKey(normalizedAccount);
 
         try {
-            await api.post(`${BASE_URL}/follow/users/search`, {
+            await api.post('/follow/users/search', {
                 query: activeTab === 'search' ? searchQuery : recommendQuery,
                 x_account: normalizedAccount,
                 name: name,
@@ -250,7 +249,7 @@ const UserTarget = () => {
         setSelectedRecommendationForList(null);
         setRecommendations([]); // Clear for a fresh search
         try {
-            const response = await api.post(`${BASE_URL}/follow/users/llm_recommend`, {
+            const response = await api.post('/follow/users/llm_recommend', {
                 query
             });
             if (response.data?.data?.recommendations) {
@@ -270,7 +269,7 @@ const UserTarget = () => {
     const fetchFollowedUsers = async (): Promise<FollowedUser[]> => {
         setIsFetchingFollowed(true);
         try {
-            const response = await api.get(`${BASE_URL}/follow`);
+            const response = await api.get('/follow');
             const nextUsers = readFollowedUsersResponse(response.data);
 
             setFollowedUsers(nextUsers);
@@ -285,7 +284,7 @@ const UserTarget = () => {
 
     const handleUnfollow = async (userId: number, name: string) => {
         try {
-            await api.delete(`${BASE_URL}/follow/users/${userId}`);
+            await api.delete(`/follow/users/${userId}`);
             toast.success(`Unfollowed ${name}`);
             setFollowedUsers(prev => prev.filter(u => u.id !== userId));
             setRefreshSidebar(prev => prev + 1);
@@ -310,7 +309,7 @@ const UserTarget = () => {
 
         try {
             if (existing) {
-                await api.delete(`${BASE_URL}/follow/users/${existing.id}`);
+                await api.delete(`/follow/users/${existing.id}`);
                 setFollowedUsers(prev => prev.filter(user => user.id !== existing.id));
                 await fetchPostLists();
                 toast.success(`นำ ${source.name} ออกจาก Watchlist แล้ว`);
@@ -485,7 +484,7 @@ const UserTarget = () => {
                 x_account: rec.x_account
             }));
 
-            const response = await api.post(`${BASE_URL}/follow/users/llm_recommend`, {
+            const response = await api.post('/follow/users/llm_recommend', {
                 query: recommendQuery,
                 existing_recommendations: existingData
             });

@@ -266,7 +266,7 @@ const Register = () => {
                                             <h4 className="text-lg font-bold text-gray-900 mb-2">1. บทนำ</h4>
                                             <p>ยินดีต้อนรับสู่ FORO ("FORO", "เรา", "แพลตฟอร์ม")</p>
                                             <p>FORO เป็นแพลตฟอร์มรวบรวม จัดหมวดหมู่ และสรุปข้อมูลที่เปิดเผยต่อสาธารณะจากโซเชียลมีเดีย รวมถึงแต่ไม่จำกัดเพียง X (เดิมชื่อ Twitter) โดยนำเสนอเนื้อหาในรูปแบบที่อ่านเข้าใจง่าย และเชื่อมโยงไปยังแหล่งข้อมูลต้นทาง</p>
-                                            <p>การเข้าใช้งานเว็บไซต์ foro.world ถือว่าท่านได้อ่าน เข้าใจ และยอมรับข้อกำหนดและเงื่อนไขฉบับนี้โดยสมบูรณ์ หากท่านไม่เห็นด้วย โปรดงดใช้งานแพลตฟอร์ม</p>
+                                            <p>การเข้าใช้งานเว็บไซต์ foro-web-nine.vercel.app ถือว่าท่านได้อ่าน เข้าใจ และยอมรับข้อกำหนดและเงื่อนไขฉบับนี้โดยสมบูรณ์ หากท่านไม่เห็นด้วย โปรดงดใช้งานแพลตฟอร์ม</p>
                                         </section>
 
                                         <section>
@@ -339,7 +339,7 @@ const Register = () => {
 
                                         <section>
                                             <h4 className="text-lg font-bold text-gray-900 mb-2">11. ติดต่อเรา</h4>
-                                            <p>เว็บไซต์: <a href="https://foro.world" target="_blank" className="text-blue-600 hover:underline">https://foro.world</a></p>
+                                            <p>เว็บไซต์: <a href="https://foro-web-nine.vercel.app" target="_blank" className="text-blue-600 hover:underline">https://foro-web-nine.vercel.app</a></p>
                                             <p>อีเมล: foroforwork@gmail.com</p>
                                         </section>
                                     </div>
@@ -349,7 +349,7 @@ const Register = () => {
                                             <h4 className="text-lg font-bold text-gray-900 mb-2">1. Introduction</h4>
                                             <p>Welcome to FORO ("FORO", "we", "our", or "the Platform").</p>
                                             <p>FORO is a content aggregation and summarization platform that collects and presents publicly available information from social media platforms, including but not limited to X (formerly Twitter). Content is organized, categorized, and summarized for easier consumption.</p>
-                                            <p>By accessing or using foro.world, you agree to be legally bound by these Terms of Service. If you do not agree, please discontinue use of the Platform.</p>
+                                            <p>By accessing or using foro-web-nine.vercel.app, you agree to be legally bound by these Terms of Service. If you do not agree, please discontinue use of the Platform.</p>
                                         </section>
 
                                         <section>
@@ -421,7 +421,7 @@ const Register = () => {
 
                                         <section>
                                             <h4 className="text-lg font-bold text-gray-900 mb-2">11. Contact Us</h4>
-                                            <p>Website: <a href="https://foro.world" target="_blank" className="text-blue-600 hover:underline">https://foro.world</a></p>
+                                            <p>Website: <a href="https://foro-web-nine.vercel.app" target="_blank" className="text-blue-600 hover:underline">https://foro-web-nine.vercel.app</a></p>
                                             <p>Email: foroforwork@gmail.com</p>
                                         </section>
                                     </div>
@@ -492,7 +492,7 @@ const Register = () => {
 
                                         <section>
                                             <h4 className="text-lg font-bold text-gray-900 mb-2">10. ติดต่อเรา</h4>
-                                            <p>เว็บไซต์: <a href="https://foro.world" target="_blank" className="text-blue-600 hover:underline">https://foro.world</a></p>
+                                            <p>เว็บไซต์: <a href="https://foro-web-nine.vercel.app" target="_blank" className="text-blue-600 hover:underline">https://foro-web-nine.vercel.app</a></p>
                                             <p>อีเมล: foroforwork@gmail.com</p>
                                         </section>
                                     </div>
@@ -500,7 +500,7 @@ const Register = () => {
                                     <div className="space-y-6 text-gray-700 leading-relaxed">
                                         <section>
                                             <h4 className="text-lg font-bold text-gray-900 mb-2">1. Introduction</h4>
-                                            <p>FORO respects your privacy and is committed to protecting your personal information. This Privacy Policy explains how we collect, use, and safeguard your data when you use foro.world.</p>
+                                            <p>FORO respects your privacy and is committed to protecting your personal information. This Privacy Policy explains how we collect, use, and safeguard your data when you use foro-web-nine.vercel.app.</p>
                                         </section>
 
                                         <section>
@@ -561,7 +561,7 @@ const Register = () => {
 
                                         <section>
                                             <h4 className="text-lg font-bold text-gray-900 mb-2">10. Contact</h4>
-                                            <p>Website: <a href="https://foro.world" target="_blank" className="text-blue-600 hover:underline">https://foro.world</a></p>
+                                            <p>Website: <a href="https://foro-web-nine.vercel.app" target="_blank" className="text-blue-600 hover:underline">https://foro-web-nine.vercel.app</a></p>
                                             <p>Email: foroforwork@gmail.com</p>
                                         </section>
                                     </div>
